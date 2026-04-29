@@ -11,19 +11,46 @@ import {
   ShieldCheckIcon,
   TerminalIcon,
 } from "@/components/icons";
-import { Footer, Navbar, SectionHeader } from "@/components/landing";
-import pageStyles from "../page.module.css";
-import sub from "../subpage.module.css";
+import {
+  archChip,
+  btnPrimary,
+  btnSecondary,
+  cardDesc,
+  cardGrid2,
+  cardGrid3,
+  cardHeader,
+  cardTitle,
+  code,
+  commentToken,
+  ctaBanner,
+  ctaBannerHeading,
+  ctaBannerText,
+  Footer,
+  iconBox,
+  Navbar,
+  pageActions,
+  pageBadge,
+  pageDescription,
+  pageHero,
+  pageOrbA,
+  pageOrbB,
+  pageOrbsWrap,
+  pageTitle,
+  promptToken,
+  SectionHeader,
+  section,
+  subCard,
+} from "@/components/landing";
 
 export const metadata: Metadata = {
-  title: "Download · Crowncrate OS",
+  title: "Download · CrownOS",
   description:
-    "Download the latest Crowncrate ISO. GPG-signed builds, mirrors close to you, and verified system images.",
+    "Download the latest CrownOS ISO. GPG-signed builds, mirrors close to you, and verified system images.",
 };
 
 const editions = [
   {
-    name: "Crowncrate Desktop",
+    name: "CrownOS Desktop",
     desc: "Full monochromatic desktop with the ecosystem stack pre-wired.",
     size: "2.4 GB",
     arch: "x86_64",
@@ -31,14 +58,14 @@ const editions = [
     primary: true,
   },
   {
-    name: "Crowncrate Minimal",
+    name: "CrownOS Minimal",
     desc: "Headless base with the kernel, scheduler and package tooling only.",
     size: "780 MB",
     arch: "x86_64",
     icon: TerminalIcon,
   },
   {
-    name: "Crowncrate ARM",
+    name: "CrownOS ARM",
     desc: "Same desktop tuned for aarch64 hardware including dev boards.",
     size: "2.1 GB",
     arch: "aarch64",
@@ -47,15 +74,15 @@ const editions = [
 ];
 
 const mirrors = [
-  { region: "Global CDN", host: "dl.crowncrate.org", speed: "Fastest" },
-  { region: "Europe", host: "eu.mirror.crowncrate.org", speed: "Very fast" },
+  { region: "Global CDN", host: "dl.crownos.org", speed: "Fastest" },
+  { region: "Europe", host: "eu.mirror.crownos.org", speed: "Very fast" },
   {
     region: "North America",
-    host: "na.mirror.crowncrate.org",
+    host: "na.mirror.crownos.org",
     speed: "Very fast",
   },
-  { region: "Asia Pacific", host: "ap.mirror.crowncrate.org", speed: "Fast" },
-  { region: "South America", host: "sa.mirror.crowncrate.org", speed: "Fast" },
+  { region: "Asia Pacific", host: "ap.mirror.crownos.org", speed: "Fast" },
+  { region: "South America", host: "sa.mirror.crownos.org", speed: "Fast" },
 ];
 
 const requirements = [
@@ -66,68 +93,67 @@ const requirements = [
   "Wired or wireless network for first-time updates",
 ];
 
+const reqItem =
+  "grid grid-cols-[1.5rem_1fr] items-start gap-[0.6rem] text-muted-strong [&>svg]:mt-1 [&>svg]:size-4 [&>svg]:text-foreground";
+
 export default function DownloadPage() {
   return (
-    <div className={pageStyles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={pageStyles.main}>
-        <section className={sub.pageHero}>
-          <div className={sub.pageOrbs} aria-hidden>
-            <span className={`${sub.pageOrb} ${sub.pageOrbA}`} />
-            <span className={`${sub.pageOrb} ${sub.pageOrbB}`} />
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+        <section className={pageHero}>
+          <div aria-hidden className={pageOrbsWrap}>
+            <span className={pageOrbA} />
+            <span className={pageOrbB} />
           </div>
-          <span className={sub.pageBadge}>
+          <span className={pageBadge}>
             <DownloadIcon /> Latest release · v1.0
           </span>
-          <h1 className={sub.pageTitle}>Download Crowncrate.</h1>
-          <p className={sub.pageDescription}>
+          <h1 className={pageTitle}>Download CrownOS.</h1>
+          <p className={pageDescription}>
             Choose the edition that matches your hardware. Every build is
             GPG-signed, reproducible from source and served from regional
             mirrors close to you.
           </p>
-          <div className={sub.pageActions}>
-            <a href="#editions" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <a href="#editions" className={btnPrimary}>
               <DownloadIcon /> Pick an edition
             </a>
-            <a href="#verify" className={pageStyles.btnSecondary}>
+            <a href="#verify" className={btnSecondary}>
               <ShieldCheckIcon /> Verify your ISO
             </a>
           </div>
         </section>
 
-        <section id="editions" className={sub.section}>
+        <section id="editions" className={section}>
           <SectionHeader
             eyebrow="Editions"
             eyebrowIcon={PackageIcon}
             title="Three flavours, one Arch core."
-            subtitle="All editions share the same Crowncrate Core, scheduler and update pipeline."
+            subtitle="All editions share the same CrownOS Core, scheduler and update pipeline."
           />
-          <div className={sub.cardGrid3}>
+          <div className={cardGrid3}>
             {editions.map((ed) => {
               const Icon = ed.icon;
               return (
-                <article key={ed.name} className={sub.card}>
-                  <div className={sub.cardHeader}>
-                    <div className={sub.iconBox}>
+                <article key={ed.name} className={subCard}>
+                  <div className={cardHeader}>
+                    <div className={iconBox}>
                       <Icon />
                     </div>
-                    <h3 className={sub.cardTitle}>{ed.name}</h3>
+                    <h3 className={cardTitle}>{ed.name}</h3>
                   </div>
-                  <p className={sub.cardDesc}>{ed.desc}</p>
-                  <div className={pageStyles.archMeta}>
-                    <span className={pageStyles.archChip}>{ed.arch}</span>
-                    <span className={pageStyles.archChip}>{ed.size}</span>
-                    <span className={pageStyles.archChip}>ISO + qcow2</span>
+                  <p className={cardDesc}>{ed.desc}</p>
+                  <div className="mt-1 flex flex-wrap gap-[0.4rem]">
+                    <span className={archChip}>{ed.arch}</span>
+                    <span className={archChip}>{ed.size}</span>
+                    <span className={archChip}>ISO + qcow2</span>
                   </div>
-                  <div className={sub.pageActions}>
+                  <div className={pageActions}>
                     <Link
                       href="/download"
-                      className={
-                        ed.primary
-                          ? pageStyles.btnPrimary
-                          : pageStyles.btnSecondary
-                      }
+                      className={ed.primary ? btnPrimary : btnSecondary}
                     >
                       <DownloadIcon /> Download
                     </Link>
@@ -138,20 +164,28 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Mirrors"
             eyebrowIcon={GlobeIcon}
             title="Pick the mirror closest to you."
             subtitle="Mirrors are operated by community partners and refreshed every 15 minutes."
           />
-          <div className={sub.mirrorList}>
-            {mirrors.map((m) => (
-              <div key={m.host} className={sub.mirrorRow}>
+          <div className="grid gap-2 rounded-2xl border border-border bg-card p-3">
+            {mirrors.map((m, idx) => (
+              <div
+                key={m.host}
+                className={`grid grid-cols-[1.5fr_1fr_1fr_auto] items-center gap-4 rounded-md px-4 py-[0.85rem] text-[0.92rem] transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-foreground)_4%,transparent)] max-[720px]:grid-cols-1 max-[720px]:gap-[0.4rem] ${idx < mirrors.length - 1 ? "border-b border-border" : ""}`}
+              >
                 <span>{m.region}</span>
-                <span className={sub.mirrorRegion}>{m.host}</span>
-                <span className={pageStyles.archChip}>{m.speed}</span>
-                <a href={`https://${m.host}`} className={sub.mirrorBtn}>
+                <span className="font-mono text-[0.85rem] text-muted">
+                  {m.host}
+                </span>
+                <span className={archChip}>{m.speed}</span>
+                <a
+                  href={`https://${m.host}`}
+                  className="inline-flex items-center gap-[0.35rem] rounded-full border border-border bg-[color-mix(in_srgb,var(--color-foreground)_4%,transparent)] px-[0.8rem] py-[0.4rem] text-[0.85rem] text-foreground transition-[border-color] duration-150 hover:border-[color-mix(in_srgb,var(--color-foreground)_35%,transparent)] hover:opacity-100 [&>svg]:size-[0.85rem]"
+                >
                   Open <ArrowUpRightIcon />
                 </a>
               </div>
@@ -159,77 +193,75 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        <section id="verify" className={sub.section}>
+        <section id="verify" className={section}>
           <SectionHeader
             eyebrow="Verify"
             eyebrowIcon={ShieldCheckIcon}
             title="Make sure your ISO is the real thing."
             subtitle="Each release ships with SHA256 checksums and a GPG signature. Verify before you flash."
           />
-          <pre className={sub.code}>
-            <span className={sub.commentToken}>
+          <pre className={code}>
+            <span className={commentToken}>
               # 1. Verify the SHA256 checksum
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> sha256sum -c
-            crowncrate-1.0-x86_64.iso.sha256
+            <span className={promptToken}>$</span> sha256sum -c
+            crownos-1.0-x86_64.iso.sha256
             {"\n\n"}
-            <span className={sub.commentToken}>
-              # 2. Verify the GPG signature
-            </span>
+            <span className={commentToken}># 2. Verify the GPG signature</span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> gpg --verify
-            crowncrate-1.0-x86_64.iso.sig crowncrate-1.0-x86_64.iso
+            <span className={promptToken}>$</span> gpg --verify
+            crownos-1.0-x86_64.iso.sig crownos-1.0-x86_64.iso
             {"\n\n"}
-            <span className={sub.commentToken}>
+            <span className={commentToken}>
               # 3. (Optional) confirm reproducible build
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate verify-build
-            ./crowncrate-1.0-x86_64.iso
+            <span className={promptToken}>$</span> crownos verify-build
+            ./crownos-1.0-x86_64.iso
           </pre>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="System requirements"
             eyebrowIcon={CpuIcon}
-            title="What you need to run Crowncrate."
+            title="What you need to run CrownOS."
           />
-          <div className={sub.cardGrid2}>
-            <div className={sub.card}>
-              <h3 className={sub.cardTitle}>Minimum</h3>
-              <ul className={sub.reqList}>
+          <div className={cardGrid2}>
+            <div className={subCard}>
+              <h3 className={cardTitle}>Minimum</h3>
+              <ul className="grid gap-[0.55rem]">
                 {requirements.map((req) => (
-                  <li key={req} className={sub.reqItem}>
+                  <li key={req} className={reqItem}>
                     <CheckIcon />
                     <span>{req}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div className={sub.card}>
-              <h3 className={sub.cardTitle}>Recommended</h3>
-              <ul className={sub.reqList}>
-                <li className={sub.reqItem}>
+            <div className={subCard}>
+              <h3 className={cardTitle}>Recommended</h3>
+              <ul className="grid gap-[0.55rem]">
+                <li className={reqItem}>
                   <CheckIcon />
                   <span>4-core CPU with vector extensions for local AI</span>
                 </li>
-                <li className={sub.reqItem}>
+                <li className={reqItem}>
                   <CheckIcon />
                   <span>16 GB RAM for comfortable multitasking</span>
                 </li>
-                <li className={sub.reqItem}>
+                <li className={reqItem}>
                   <CheckIcon />
                   <span>NVMe storage for fastest atomic snapshots</span>
                 </li>
-                <li className={sub.reqItem}>
+                <li className={reqItem}>
                   <CheckIcon />
                   <span>
                     Discrete GPU (NVIDIA / AMD / Intel) for accelerated AI
                   </span>
                 </li>
-                <li className={sub.reqItem}>
+                <li className={reqItem}>
                   <CheckIcon />
                   <span>USB drive ≥ 8 GB for installer media</span>
                 </li>
@@ -238,17 +270,19 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        <section className={sub.ctaBanner}>
-          <h3>Need help getting Crowncrate onto your machine?</h3>
-          <p>
+        <section className={ctaBanner}>
+          <h3 className={ctaBannerHeading}>
+            Need help getting CrownOS onto your machine?
+          </h3>
+          <p className={ctaBannerText}>
             The install guide walks you through preparing media, partitioning
             and the first boot — start to finish in under twenty minutes.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/docs" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/docs" className={btnPrimary}>
               Open install guide <ArrowRightIcon />
             </Link>
-            <Link href="/community" className={pageStyles.btnSecondary}>
+            <Link href="/community" className={btnSecondary}>
               Ask the community
             </Link>
           </div>

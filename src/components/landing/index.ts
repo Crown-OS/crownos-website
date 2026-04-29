@@ -15,4 +15,6 @@ export { MarqueeSection } from "./MarqueeSection";
 export { Navbar } from "./Navbar";
 export { PrinciplesSection } from "./PrinciplesSection";
 export { SectionHeader } from "./SectionHeader";
+export * from "./styles";
+export * from "./subpage-styles";
 export { TestimonialsSection } from "./TestimonialsSection";

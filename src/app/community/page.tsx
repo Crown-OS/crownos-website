@@ -14,14 +14,41 @@ import {
   TwitterIcon,
   UsersIcon,
 } from "@/components/icons";
-import { Footer, Navbar, SectionHeader } from "@/components/landing";
-import pageStyles from "../page.module.css";
-import sub from "../subpage.module.css";
+import {
+  btnPrimary,
+  btnSecondary,
+  cardDesc,
+  cardGrid2,
+  cardGrid4,
+  cardHeader,
+  cardTitle,
+  ctaBanner,
+  ctaBannerHeading,
+  ctaBannerText,
+  Footer,
+  iconBox,
+  Navbar,
+  pageActions,
+  pageBadge,
+  pageDescription,
+  pageHero,
+  pageOrbA,
+  pageOrbB,
+  pageOrbsWrap,
+  pageTitle,
+  SectionHeader,
+  section,
+  statCard,
+  statLabel,
+  statRow,
+  statValue,
+  subCard,
+} from "@/components/landing";
 
 export const metadata: Metadata = {
-  title: "Community · Crowncrate OS",
+  title: "Community · CrownOS",
   description:
-    "Join the Crowncrate community on GitHub, Discord and beyond. Contribute, get help and shape the roadmap.",
+    "Join the CrownOS community on GitHub, Discord and beyond. Contribute, get help and shape the roadmap.",
 };
 
 const channels = [
@@ -35,7 +62,7 @@ const channels = [
   {
     icon: GitHubIcon,
     title: "GitHub",
-    desc: "Source, issues and discussions. Every line of Crowncrate is open and reviewable.",
+    desc: "Source, issues and discussions. Every line of CrownOS is open and reviewable.",
     cta: "Open the repo",
     href: "https://github.com",
   },
@@ -81,36 +108,36 @@ const ways = [
   {
     icon: HeartIcon,
     title: "Sponsor the project",
-    desc: "Crowncrate is fully community-funded. Sponsoring keeps mirrors and signing infra running.",
+    desc: "CrownOS is fully community-funded. Sponsoring keeps mirrors and signing infra running.",
   },
 ];
 
 export default function CommunityPage() {
   return (
-    <div className={pageStyles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={pageStyles.main}>
-        <section className={sub.pageHero}>
-          <div className={sub.pageOrbs} aria-hidden>
-            <span className={`${sub.pageOrb} ${sub.pageOrbA}`} />
-            <span className={`${sub.pageOrb} ${sub.pageOrbB}`} />
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+        <section className={pageHero}>
+          <div aria-hidden className={pageOrbsWrap}>
+            <span className={pageOrbA} />
+            <span className={pageOrbB} />
           </div>
-          <span className={sub.pageBadge}>
+          <span className={pageBadge}>
             <UsersIcon /> Community-built, since day one
           </span>
-          <h1 className={sub.pageTitle}>
+          <h1 className={pageTitle}>
             A calm community around an opinionated OS.
           </h1>
-          <p className={sub.pageDescription}>
-            Crowncrate is built in the open by people who care about how their
+          <p className={pageDescription}>
+            CrownOS is built in the open by people who care about how their
             systems feel. Drop in, ask questions, ship a patch — every voice
             shapes the roadmap.
           </p>
-          <div className={sub.pageActions}>
+          <div className={pageActions}>
             <a
               href="https://discord.com"
-              className={pageStyles.btnPrimary}
+              className={btnPrimary}
               target="_blank"
               rel="noreferrer"
             >
@@ -118,7 +145,7 @@ export default function CommunityPage() {
             </a>
             <a
               href="https://github.com"
-              className={pageStyles.btnSecondary}
+              className={btnSecondary}
               target="_blank"
               rel="noreferrer"
             >
@@ -127,25 +154,25 @@ export default function CommunityPage() {
           </div>
         </section>
 
-        <section className={sub.section}>
-          <div className={sub.statRow}>
+        <section className={section}>
+          <div className={statRow}>
             {stats.map((s) => (
-              <div key={s.label} className={sub.statCard}>
-                <span className={sub.statValue}>{s.value}</span>
-                <span className={sub.statLabel}>{s.label}</span>
+              <div key={s.label} className={statCard}>
+                <span className={statValue}>{s.value}</span>
+                <span className={statLabel}>{s.label}</span>
               </div>
             ))}
           </div>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Channels"
             eyebrowIcon={MessageIcon}
             title="Where the community lives."
             subtitle="Pick the room that suits you. We're active across all of them."
           />
-          <div className={sub.cardGrid2}>
+          <div className={cardGrid2}>
             {channels.map((c) => {
               const Icon = c.icon;
               return (
@@ -154,19 +181,16 @@ export default function CommunityPage() {
                   href={c.href}
                   target="_blank"
                   rel="noreferrer"
-                  className={sub.card}
+                  className={subCard}
                 >
-                  <div className={sub.cardHeader}>
-                    <div className={sub.iconBox}>
+                  <div className={cardHeader}>
+                    <div className={iconBox}>
                       <Icon />
                     </div>
-                    <h3 className={sub.cardTitle}>{c.title}</h3>
+                    <h3 className={cardTitle}>{c.title}</h3>
                   </div>
-                  <p className={sub.cardDesc}>{c.desc}</p>
-                  <span
-                    className={pageStyles.btnGhost}
-                    style={{ width: "fit-content", padding: "0.5rem 0" }}
-                  >
+                  <p className={cardDesc}>{c.desc}</p>
+                  <span className="inline-flex w-fit items-center gap-2 py-2 text-foreground hover:opacity-100 [&>svg]:size-4">
                     {c.cta} <ArrowUpRightIcon />
                   </span>
                 </a>
@@ -175,38 +199,40 @@ export default function CommunityPage() {
           </div>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Get involved"
             eyebrowIcon={StarIcon}
-            title="Four ways to make Crowncrate better."
+            title="Four ways to make CrownOS better."
             subtitle="Code is one of many. Documentation, support and sponsorship matter just as much."
           />
-          <div className={sub.cardGrid4}>
+          <div className={cardGrid4}>
             {ways.map((w) => {
               const Icon = w.icon;
               return (
-                <article key={w.title} className={sub.card}>
-                  <div className={sub.iconBox}>
+                <article key={w.title} className={subCard}>
+                  <div className={iconBox}>
                     <Icon />
                   </div>
-                  <h3 className={sub.cardTitle}>{w.title}</h3>
-                  <p className={sub.cardDesc}>{w.desc}</p>
+                  <h3 className={cardTitle}>{w.title}</h3>
+                  <p className={cardDesc}>{w.desc}</p>
                 </article>
               );
             })}
           </div>
         </section>
 
-        <section className={sub.ctaBanner}>
-          <h3>Read the contributor guide before sending your first PR.</h3>
-          <p>
+        <section className={ctaBanner}>
+          <h3 className={ctaBannerHeading}>
+            Read the contributor guide before sending your first PR.
+          </h3>
+          <p className={ctaBannerText}>
             We keep things friendly: small PRs, tight scopes, kind reviews. The
             contributor guide covers the workflow, code style and the release
             cadence.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/docs" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/docs" className={btnPrimary}>
               Open contributor docs <ArrowRightIcon />
             </Link>
           </div>

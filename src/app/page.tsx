@@ -15,14 +15,13 @@ import {
   principles,
   TestimonialsSection,
 } from "@/components/landing";
-import styles from "./page.module.css";
 
 export default function Home() {
   return (
-    <div className={styles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={styles.main}>
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
         <HeroSection metrics={heroMetrics} />
         <MarqueeSection items={marqueeItems} />
         <PrinciplesSection principles={principles} />

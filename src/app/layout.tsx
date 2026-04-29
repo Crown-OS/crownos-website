@@ -14,11 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Crowncrate OS · An AI-ready Arch Linux distribution",
+    default: "CrownOS · An AI-ready Arch Linux distribution",
     template: "%s",
   },
   description:
-    "Crowncrate is a beautiful, monochromatic Arch-based Linux distribution built for performance, open source values and a calm AI-ready desktop ecosystem.",
+    "CrownOS is a beautiful, monochromatic Arch-based Linux distribution built for performance, open source values and a calm AI-ready desktop ecosystem.",
 };
 
 export default function RootLayout({

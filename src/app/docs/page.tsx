@@ -14,14 +14,39 @@ import {
   ShieldCheckIcon,
   TerminalIcon,
 } from "@/components/icons";
-import { Footer, Navbar, SectionHeader } from "@/components/landing";
-import pageStyles from "../page.module.css";
-import sub from "../subpage.module.css";
+import {
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  cardDesc,
+  cardHeader,
+  cardTitle,
+  code,
+  commentToken,
+  ctaBanner,
+  ctaBannerHeading,
+  ctaBannerText,
+  Footer,
+  iconBox,
+  Navbar,
+  pageActions,
+  pageBadge,
+  pageDescription,
+  pageHero,
+  pageOrbA,
+  pageOrbB,
+  pageOrbsWrap,
+  pageTitle,
+  promptToken,
+  SectionHeader,
+  section,
+  subCard,
+} from "@/components/landing";
 
 export const metadata: Metadata = {
-  title: "Docs · Crowncrate OS",
+  title: "Docs · CrownOS",
   description:
-    "Documentation for Crowncrate — install guide, configuration, AI runtime, ecosystem features and contributing.",
+    "Documentation for CrownOS — install guide, configuration, AI runtime, ecosystem features and contributing.",
 };
 
 const sections = [
@@ -39,10 +64,10 @@ const sections = [
   {
     icon: TerminalIcon,
     title: "The shell",
-    desc: "Pacman, AUR, Flatpak — and what Crowncrate adds on top.",
+    desc: "Pacman, AUR, Flatpak — and what CrownOS adds on top.",
     links: [
       "Package management",
-      "The crowncrate CLI",
+      "The crownos CLI",
       "Service management",
       "Snapshots and rollback",
     ],
@@ -107,7 +132,7 @@ const sections = [
     title: "Reference",
     desc: "API references for the SDK, plugins, and shell integrations.",
     links: [
-      "Crowncrate SDK",
+      "CrownOS SDK",
       "Plugin API",
       "Shell extensions",
       "Configuration schema",
@@ -119,68 +144,72 @@ const tocLinks = sections.map((s) => s.title);
 
 export default function DocsPage() {
   return (
-    <div className={pageStyles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={pageStyles.main}>
-        <section className={sub.pageHero}>
-          <div className={sub.pageOrbs} aria-hidden>
-            <span className={`${sub.pageOrb} ${sub.pageOrbA}`} />
-            <span className={`${sub.pageOrb} ${sub.pageOrbB}`} />
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+        <section className={pageHero}>
+          <div aria-hidden className={pageOrbsWrap}>
+            <span className={pageOrbA} />
+            <span className={pageOrbB} />
           </div>
-          <span className={sub.pageBadge}>
+          <span className={pageBadge}>
             <BookIcon /> Documentation · v1.0
           </span>
-          <h1 className={sub.pageTitle}>
-            Learn Crowncrate, one calm page at a time.
-          </h1>
-          <p className={sub.pageDescription}>
+          <h1 className={pageTitle}>Learn CrownOS, one calm page at a time.</h1>
+          <p className={pageDescription}>
             Concise, opinionated documentation for installing, configuring and
-            extending Crowncrate. Every page links straight to the source.
+            extending CrownOS. Every page links straight to the source.
           </p>
-          <div className={sub.pageActions}>
-            <a href="#getting-started" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <a href="#getting-started" className={btnPrimary}>
               <RocketIcon /> Start with the basics
             </a>
-            <Link href="/community" className={pageStyles.btnSecondary}>
+            <Link href="/community" className={btnSecondary}>
               Ask the community
             </Link>
           </div>
         </section>
 
-        <div className={sub.docsLayout}>
-          <aside className={sub.docsToc}>
-            <p className={sub.docsTocHeading}>Sections</p>
+        <div className="grid grid-cols-[240px_1fr] items-start gap-8 max-[1024px]:grid-cols-1">
+          <aside className="sticky top-24 grid gap-1 rounded-2xl border border-border bg-card p-4 max-[1024px]:static">
+            <p className="px-2 pb-2 pt-1 text-[0.78rem] uppercase tracking-[0.16em] text-muted-strong">
+              Sections
+            </p>
             {tocLinks.map((label) => (
               <a
                 key={label}
                 href={`#${label.toLowerCase().replace(/\s+/g, "-")}`}
-                className={sub.docsTocLink}
+                className="rounded-md px-[0.6rem] py-[0.45rem] text-[0.92rem] text-muted transition-[color,background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-foreground)_5%,transparent)] hover:text-foreground hover:opacity-100"
               >
                 {label}
               </a>
             ))}
           </aside>
 
-          <div className={sub.section}>
+          <div className={section}>
             {sections.map((s) => {
               const Icon = s.icon;
               return (
                 <article
                   key={s.title}
                   id={s.title.toLowerCase().replace(/\s+/g, "-")}
-                  className={sub.card}
+                  className={subCard}
                 >
-                  <div className={sub.cardHeader}>
-                    <div className={sub.iconBox}>
+                  <div className={cardHeader}>
+                    <div className={iconBox}>
                       <Icon />
                     </div>
-                    <h3 className={sub.cardTitle}>{s.title}</h3>
+                    <h3 className={cardTitle}>{s.title}</h3>
                   </div>
-                  <p className={sub.cardDesc}>{s.desc}</p>
-                  <div className={sub.docList}>
+                  <p className={cardDesc}>{s.desc}</p>
+                  <div className="mt-1 grid gap-[0.4rem]">
                     {s.links.map((link) => (
-                      <Link key={link} href="/docs">
+                      <Link
+                        key={link}
+                        href="/docs"
+                        className="inline-flex items-center gap-2 text-[0.9rem] text-muted hover:text-foreground hover:opacity-100 [&>svg]:size-[0.85rem] [&>svg]:text-muted-strong"
+                      >
                         <ArrowRightIcon /> {link}
                       </Link>
                     ))}
@@ -191,57 +220,57 @@ export default function DocsPage() {
           </div>
         </div>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Cheatsheet"
             eyebrowIcon={KeyIcon}
             title="The five commands you'll use most."
-            subtitle="A pocket reference for everyday Crowncrate work."
+            subtitle="A pocket reference for everyday CrownOS work."
           />
-          <pre className={sub.code}>
-            <span className={sub.commentToken}># Update everything</span>
+          <pre className={code}>
+            <span className={commentToken}># Update everything</span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate sync
+            <span className={promptToken}>$</span> crownos sync
             {"\n\n"}
-            <span className={sub.commentToken}>
+            <span className={commentToken}>
               # Create a snapshot before a risky change
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate snapshot
+            <span className={promptToken}>$</span> crownos snapshot
             "before-experiment"
             {"\n\n"}
-            <span className={sub.commentToken}>
+            <span className={commentToken}>
               # Roll back to the previous snapshot
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate rollback
+            <span className={promptToken}>$</span> crownos rollback
             {"\n\n"}
-            <span className={sub.commentToken}>
+            <span className={commentToken}>
               # Pair a new phone for ecosystem features
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate pair
+            <span className={promptToken}>$</span> crownos pair
             {"\n\n"}
-            <span className={sub.commentToken}>
+            <span className={commentToken}>
               # Ask the local AI a quick question
             </span>
             {"\n"}
-            <span className={sub.promptToken}>$</span> crowncrate ask "free up
-            disk on my dev partition"
+            <span className={promptToken}>$</span> crownos ask "free up disk on
+            my dev partition"
           </pre>
         </section>
 
-        <section className={sub.ctaBanner}>
-          <h3>Looking for the API reference?</h3>
-          <p>
-            The SDK and plugin reference covers every public surface of
-            Crowncrate, generated from source on every release.
+        <section className={ctaBanner}>
+          <h3 className={ctaBannerHeading}>Looking for the API reference?</h3>
+          <p className={ctaBannerText}>
+            The SDK and plugin reference covers every public surface of CrownOS,
+            generated from source on every release.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/docs" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/docs" className={btnPrimary}>
               <CodeIcon /> Open the SDK reference
             </Link>
-            <Link href="/changelog" className={pageStyles.btnGhost}>
+            <Link href="/changelog" className={btnGhost}>
               See what changed <ArrowUpRightIcon />
             </Link>
           </div>

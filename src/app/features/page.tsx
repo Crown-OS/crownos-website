@@ -36,14 +36,36 @@ import {
   WandIcon,
   ZapIcon,
 } from "@/components/icons";
-import { Footer, Navbar, SectionHeader } from "@/components/landing";
-import pageStyles from "../page.module.css";
-import sub from "../subpage.module.css";
+import {
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  cardDesc,
+  cardGrid4,
+  cardTitle,
+  ctaBanner,
+  ctaBannerHeading,
+  ctaBannerText,
+  Footer,
+  iconBox,
+  Navbar,
+  pageActions,
+  pageBadge,
+  pageDescription,
+  pageHero,
+  pageOrbA,
+  pageOrbB,
+  pageOrbsWrap,
+  pageTitle,
+  SectionHeader,
+  section,
+  subCard,
+} from "@/components/landing";
 
 export const metadata: Metadata = {
-  title: "Features · Crowncrate OS",
+  title: "Features · CrownOS",
   description:
-    "Every capability that ships with Crowncrate — performance, AI, ecosystem sync, theming and security.",
+    "Every capability that ships with CrownOS — performance, AI, ecosystem sync, theming and security.",
 };
 
 const featureGroups = [
@@ -188,7 +210,7 @@ const featureGroups = [
     icon: LockIcon,
     eyebrow: "Trust",
     description:
-      "Crowncrate ships with strong defaults so you don't have to harden it yourself.",
+      "CrownOS ships with strong defaults so you don't have to harden it yourself.",
     items: [
       {
         icon: ShieldCheckIcon,
@@ -244,30 +266,30 @@ const featureGroups = [
 
 export default function FeaturesPage() {
   return (
-    <div className={pageStyles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={pageStyles.main}>
-        <section className={sub.pageHero}>
-          <div className={sub.pageOrbs} aria-hidden>
-            <span className={`${sub.pageOrb} ${sub.pageOrbA}`} />
-            <span className={`${sub.pageOrb} ${sub.pageOrbB}`} />
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+        <section className={pageHero}>
+          <div aria-hidden className={pageOrbsWrap}>
+            <span className={pageOrbA} />
+            <span className={pageOrbB} />
           </div>
-          <span className={sub.pageBadge}>
+          <span className={pageBadge}>
             <SparklesIcon /> The full feature set
           </span>
-          <h1 className={sub.pageTitle}>
-            Everything Crowncrate ships with — without the bloat.
+          <h1 className={pageTitle}>
+            Everything CrownOS ships with — without the bloat.
           </h1>
-          <p className={sub.pageDescription}>
+          <p className={pageDescription}>
             A curated, transparent feature set across performance, AI, the
             ecosystem stack, theming and security. No paywalls, no add-ons.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/download" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/download" className={btnPrimary}>
               <DownloadIcon /> Try it now
             </Link>
-            <Link href="/docs" className={pageStyles.btnSecondary}>
+            <Link href="/docs" className={btnSecondary}>
               Read the docs
             </Link>
           </div>
@@ -276,23 +298,23 @@ export default function FeaturesPage() {
         {featureGroups.map((group) => {
           const HeroIcon = group.icon;
           return (
-            <section key={group.title} className={sub.section}>
+            <section key={group.title} className={section}>
               <SectionHeader
                 eyebrow={group.eyebrow}
                 eyebrowIcon={HeroIcon}
                 title={group.title}
                 subtitle={group.description}
               />
-              <div className={sub.cardGrid4}>
+              <div className={cardGrid4}>
                 {group.items.map((item) => {
                   const ItemIcon = item.icon;
                   return (
-                    <article key={item.title} className={sub.card}>
-                      <div className={sub.iconBox}>
+                    <article key={item.title} className={subCard}>
+                      <div className={iconBox}>
                         <ItemIcon />
                       </div>
-                      <h3 className={sub.cardTitle}>{item.title}</h3>
-                      <p className={sub.cardDesc}>{item.desc}</p>
+                      <h3 className={cardTitle}>{item.title}</h3>
+                      <p className={cardDesc}>{item.desc}</p>
                     </article>
                   );
                 })}
@@ -301,17 +323,19 @@ export default function FeaturesPage() {
           );
         })}
 
-        <section className={sub.ctaBanner}>
-          <h3>One ISO. Every feature. No hidden tier.</h3>
-          <p>
-            Crowncrate ships every capability above in a single download.
-            Nothing locked behind a paywall, nothing pinned to a specific cloud.
+        <section className={ctaBanner}>
+          <h3 className={ctaBannerHeading}>
+            One ISO. Every feature. No hidden tier.
+          </h3>
+          <p className={ctaBannerText}>
+            CrownOS ships every capability above in a single download. Nothing
+            locked behind a paywall, nothing pinned to a specific cloud.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/download" className={pageStyles.btnPrimary}>
-              <DownloadIcon /> Download Crowncrate
+          <div className={pageActions}>
+            <Link href="/download" className={btnPrimary}>
+              <DownloadIcon /> Download CrownOS
             </Link>
-            <Link href="/community" className={pageStyles.btnGhost}>
+            <Link href="/community" className={btnGhost}>
               Talk to the community <ArrowRightIcon />
             </Link>
           </div>

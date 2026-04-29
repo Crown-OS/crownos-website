@@ -1,11 +1,10 @@
-import styles from "@/app/page.module.css";
 import { ChevronDownIcon, MessageIcon } from "../icons";
 import { SectionHeader } from "./SectionHeader";
 
 const faqs = [
   {
-    q: "Is Crowncrate really just Arch underneath?",
-    a: "Yes. Crowncrate is a curated distribution built on the Arch Linux base, with a custom scheduler, composited shell and a few opinionated defaults. You get full pacman + AUR access and rolling updates.",
+    q: "Is CrownOS really just Arch underneath?",
+    a: "Yes. CrownOS is a curated distribution built on the Arch Linux base, with a custom scheduler, composited shell and a few opinionated defaults. You get full pacman + AUR access and rolling updates.",
   },
   {
     q: "Does the AI run locally?",
@@ -13,7 +12,7 @@ const faqs = [
   },
   {
     q: "Will my apps from regular Arch / Manjaro work?",
-    a: "Almost always — Crowncrate uses the same package format. Flatpak, AppImage and AUR all work out of the box.",
+    a: "Almost always — CrownOS uses the same package format. Flatpak, AppImage and AUR all work out of the box.",
   },
   {
     q: "How customisable is the desktop really?",
@@ -39,14 +38,19 @@ export function FAQSection() {
         subtitle="Everything you'd want to know before flashing the ISO."
       />
 
-      <div className={styles.faq}>
+      <div className="grid gap-[0.55rem]">
         {faqs.map((item) => (
-          <details key={item.q} className={styles.faqItem}>
-            <summary className={styles.faqQuestion}>
+          <details
+            key={item.q}
+            className="group overflow-hidden rounded-2xl border border-border bg-card transition-[border-color] duration-150 open:border-[color-mix(in_srgb,var(--color-foreground)_25%,transparent)]"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-[1.1rem] py-4 font-medium [&::-webkit-details-marker]:hidden">
               {item.q}
-              <ChevronDownIcon />
+              <ChevronDownIcon className="size-4 text-muted-strong transition-transform duration-300 group-open:rotate-180" />
             </summary>
-            <div className={styles.faqAnswer}>{item.a}</div>
+            <div className="px-[1.1rem] pb-[1.1rem] text-[0.95rem] leading-[1.6] text-muted">
+              {item.a}
+            </div>
           </details>
         ))}
       </div>

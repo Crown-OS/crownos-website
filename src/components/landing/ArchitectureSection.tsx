@@ -1,4 +1,3 @@
-import styles from "@/app/page.module.css";
 import {
   CpuIcon,
   CustomizabilityIcon,
@@ -8,6 +7,7 @@ import {
   ServerIcon,
 } from "../icons";
 import { SectionHeader } from "./SectionHeader";
+import { archChip, iconTile } from "./styles";
 
 const stack = [
   {
@@ -29,7 +29,7 @@ const stack = [
     title: "Composited shell",
     description:
       "Monochromatic compositor with smooth animations and zero forced motion.",
-    chips: ["Hyprcrate", "GTK + Qt", "fractional scale"],
+    chips: ["Hyprcrown", "GTK + Qt", "fractional scale"],
   },
   {
     icon: DatabaseIcon,
@@ -61,24 +61,29 @@ export function ArchitectureSection() {
         eyebrow="Under the hood"
         eyebrowIcon={CpuIcon}
         title="A measured stack — every layer chosen for clarity."
-        subtitle="Crowncrate keeps the powerful parts of Arch and removes the friction. Performance and openness, top to bottom."
+        subtitle="CrownOS keeps the powerful parts of Arch and removes the friction. Performance and openness, top to bottom."
       />
 
-      <div className={styles.archGrid}>
+      <div className="grid grid-cols-3 gap-4 max-[1024px]:grid-cols-1">
         {stack.map((item) => {
           const Icon = item.icon;
           return (
-            <article key={item.title} className={styles.archCard}>
-              <div className={styles.archHeader}>
-                <div className={styles.featureIconWrapper}>
-                  <Icon className={styles.icon} />
+            <article
+              key={item.title}
+              className="relative isolate grid gap-[0.85rem] overflow-hidden rounded-2xl border border-border bg-card p-6 transition-[border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--color-foreground)_25%,transparent)] after:absolute after:inset-x-[-1px] after:top-[-1px] after:h-px after:opacity-50 after:bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--color-foreground)_35%,transparent),transparent)]"
+            >
+              <div className="flex items-center gap-3">
+                <div className={iconTile}>
+                  <Icon className="size-5" />
                 </div>
-                <h3>{item.title}</h3>
+                <h3 className="text-[1.05rem]">{item.title}</h3>
               </div>
-              <p className={styles.archDesc}>{item.description}</p>
-              <div className={styles.archMeta}>
+              <p className="text-[0.93rem] leading-[1.55] text-muted">
+                {item.description}
+              </p>
+              <div className="mt-1 flex flex-wrap gap-[0.4rem]">
                 {item.chips.map((chip) => (
-                  <span key={chip} className={styles.archChip}>
+                  <span key={chip} className={archChip}>
                     {chip}
                   </span>
                 ))}

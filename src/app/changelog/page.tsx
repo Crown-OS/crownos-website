@@ -11,20 +11,42 @@ import {
   ShieldCheckIcon,
   ZapIcon,
 } from "@/components/icons";
-import { Footer, Navbar, SectionHeader } from "@/components/landing";
-import pageStyles from "../page.module.css";
-import sub from "../subpage.module.css";
+import {
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  cardDesc,
+  cardGrid3,
+  cardTitle,
+  ctaBanner,
+  ctaBannerHeading,
+  ctaBannerText,
+  Footer,
+  iconBox,
+  Navbar,
+  pageActions,
+  pageBadge,
+  pageDescription,
+  pageHero,
+  pageOrbA,
+  pageOrbB,
+  pageOrbsWrap,
+  pageTitle,
+  SectionHeader,
+  section,
+  subCard,
+} from "@/components/landing";
 
 export const metadata: Metadata = {
-  title: "Changelog · Crowncrate OS",
-  description: "Release notes, breaking changes and roadmap for Crowncrate OS.",
+  title: "Changelog · CrownOS",
+  description: "Release notes, breaking changes and roadmap for CrownOS.",
 };
 
 const releases = [
   {
     tag: "v1.0",
     date: "2026-04-22",
-    title: "Crowncrate goes stable",
+    title: "CrownOS goes stable",
     highlights: [
       "Stable release of the monochromatic desktop and ecosystem stack.",
       "Local AI runtime with on-device assist enabled by default.",
@@ -69,7 +91,7 @@ const releases = [
     title: "First public preview",
     highlights: [
       "Initial public preview built on the Arch base.",
-      "Crowncrate CLI scaffolded with sync, snapshot and rollback subcommands.",
+      "CrownOS CLI scaffolded with sync, snapshot and rollback subcommands.",
       "Documentation site launched.",
     ],
   },
@@ -95,59 +117,65 @@ const upcoming = [
 
 export default function ChangelogPage() {
   return (
-    <div className={pageStyles.container}>
+    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
       <Navbar />
 
-      <main className={pageStyles.main}>
-        <section className={sub.pageHero}>
-          <div className={sub.pageOrbs} aria-hidden>
-            <span className={`${sub.pageOrb} ${sub.pageOrbA}`} />
-            <span className={`${sub.pageOrb} ${sub.pageOrbB}`} />
+      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+        <section className={pageHero}>
+          <div aria-hidden className={pageOrbsWrap}>
+            <span className={pageOrbA} />
+            <span className={pageOrbB} />
           </div>
-          <span className={sub.pageBadge}>
+          <span className={pageBadge}>
             <PackageIcon /> Changelog · 5 releases
           </span>
-          <h1 className={sub.pageTitle}>Every change, in plain language.</h1>
-          <p className={sub.pageDescription}>
+          <h1 className={pageTitle}>Every change, in plain language.</h1>
+          <p className={pageDescription}>
             We ship small, predictable updates and write them up the way we'd
             want them written. No marketing fluff — just what changed.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/download" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/download" className={btnPrimary}>
               <DownloadIcon /> Get the latest
             </Link>
-            <a href="/feed.xml" className={pageStyles.btnSecondary}>
+            <a href="/feed.xml" className={btnSecondary}>
               Subscribe via RSS
             </a>
           </div>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Releases"
             eyebrowIcon={PackageIcon}
             title="Release history."
             subtitle="Each release is GPG signed, snapshot-rollback ready and reproducible from source."
           />
-          <div className={sub.timeline}>
+          <div className="relative grid gap-4">
             {releases.map((r) => (
-              <article key={r.tag} className={sub.release}>
-                <header className={sub.releaseHeader}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                    }}
-                  >
-                    <span className={sub.releaseTag}>{r.tag}</span>
-                    <h3 className={sub.releaseTitle}>{r.title}</h3>
+              <article
+                key={r.tag}
+                className="relative isolate grid gap-3 overflow-hidden rounded-2xl border border-border bg-card p-6"
+              >
+                <header className="flex flex-wrap items-baseline justify-between gap-3">
+                  <div className="flex items-center gap-[0.6rem]">
+                    <span className="inline-flex items-center gap-[0.4rem] rounded-full border border-border bg-[color-mix(in_srgb,var(--color-foreground)_4%,transparent)] px-[0.6rem] py-[0.2rem] font-mono text-[0.8rem] text-muted-strong">
+                      {r.tag}
+                    </span>
+                    <h3 className="text-[1.2rem] tracking-[-0.025em]">
+                      {r.title}
+                    </h3>
                   </div>
-                  <span className={sub.releaseDate}>{r.date}</span>
+                  <span className="font-mono text-[0.85rem] text-muted">
+                    {r.date}
+                  </span>
                 </header>
-                <ul className={sub.releaseBody}>
+                <ul className="grid gap-[0.55rem] text-[0.95rem] leading-[1.6] text-muted-strong">
                   {r.highlights.map((h) => (
-                    <li key={h}>
+                    <li
+                      key={h}
+                      className="grid list-none grid-cols-[1.1rem_1fr] items-start gap-[0.65rem] [&>svg]:mt-[0.2rem] [&>svg]:size-4 [&>svg]:text-muted-strong"
+                    >
                       <CheckIcon />
                       <span>{h}</span>
                     </li>
@@ -158,40 +186,40 @@ export default function ChangelogPage() {
           </div>
         </section>
 
-        <section className={sub.section}>
+        <section className={section}>
           <SectionHeader
             eyebrow="Roadmap"
             eyebrowIcon={FlameIcon}
             title="What's coming next."
             subtitle="Roadmap items in active development. Dates are intentionally absent — we ship when ready."
           />
-          <div className={sub.cardGrid3}>
+          <div className={cardGrid3}>
             {upcoming.map((u) => {
               const Icon = u.icon;
               return (
-                <article key={u.title} className={sub.card}>
-                  <div className={sub.iconBox}>
+                <article key={u.title} className={subCard}>
+                  <div className={iconBox}>
                     <Icon />
                   </div>
-                  <h3 className={sub.cardTitle}>{u.title}</h3>
-                  <p className={sub.cardDesc}>{u.desc}</p>
+                  <h3 className={cardTitle}>{u.title}</h3>
+                  <p className={cardDesc}>{u.desc}</p>
                 </article>
               );
             })}
           </div>
         </section>
 
-        <section className={sub.ctaBanner}>
-          <h3>Have a feature in mind?</h3>
-          <p>
+        <section className={ctaBanner}>
+          <h3 className={ctaBannerHeading}>Have a feature in mind?</h3>
+          <p className={ctaBannerText}>
             Open a discussion on GitHub or drop in on Discord. The roadmap is
             shaped by the community — every well-argued issue has a chance.
           </p>
-          <div className={sub.pageActions}>
-            <Link href="/community" className={pageStyles.btnPrimary}>
+          <div className={pageActions}>
+            <Link href="/community" className={btnPrimary}>
               <PlusIcon /> Suggest a feature
             </Link>
-            <Link href="/features" className={pageStyles.btnGhost}>
+            <Link href="/features" className={btnGhost}>
               See what already ships <ArrowRightIcon />
             </Link>
           </div>
