@@ -104,13 +104,13 @@ propagating:
 32 links point back at `/docs`**. The "Open the SDK reference" CTA does too.
 
 Real documentation now lives in
-[crownos-documentations](https://github.com/Crown-OS/crownos-documentations).
+[the CrownOS documentation](https://github.com/Crown-OS/crownOs/tree/main/docs).
 Wiring `/docs` to it is worthwhile work.
 
 ## Contributing
 
 See the organization-wide
-[contribution guide](https://github.com/Crown-OS/crownos-documentations/blob/main/CONTRIBUTING.md).
+[contribution guide](https://github.com/Crown-OS/crownOs/blob/main/CONTRIBUTING.md).
 Default branch here is **`main`**; use the `website` commit scope.
 
 ## License
