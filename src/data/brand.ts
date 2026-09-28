@@ -4,3 +4,5 @@ export const CROWN_PATH =
 export const CROWN_VIEWBOX = "16 18 272 213";
 
 export const CROWN_BOUNDS = { x: 16, y: 18, width: 272, height: 213 } as const;
+
+export const CROWN_LETTER = "w";

@@ -9,7 +9,6 @@ const MAX_PIXEL_RATIO = 2;
 export function mountMetalText(
   host: HTMLElement,
   canvas: HTMLCanvasElement,
-  text: string,
   onReady: () => void,
 ): () => void {
   const gl = canvas.getContext("webgl", {
@@ -42,7 +41,7 @@ export function mountMetalText(
       width: `${frame.width}px`,
       height: `${frame.height}px`,
     });
-    paintTextMask(mask, host, text, frame, pixelRatio);
+    paintTextMask(mask, host, frame, pixelRatio);
     canvas.width = mask.width;
     canvas.height = mask.height;
     gl.viewport(0, 0, canvas.width, canvas.height);

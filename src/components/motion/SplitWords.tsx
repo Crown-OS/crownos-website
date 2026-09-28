@@ -53,8 +53,9 @@ export function SplitWords({
       className={className}
       style={{ "--delay": `${delay}ms` } as CSSProperties}
     >
-      {tokenizeLines(lines).map((tokens) => (
-        <span key={tokens[0]?.index} className={lineClassName}>
+      {tokenizeLines(lines).map((tokens, lineIndex) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: lines are static and positional
+        <span key={lineIndex} className={lineClassName}>
           {tokens.map((token) => (
             <Word key={token.index} {...token} highlight={highlight} />
           ))}

@@ -17,7 +17,7 @@ export function Hero() {
           lines={hero.lines}
           highlight={hero.brand}
           delay={150}
-          className="text-display md:col-span-6 md:col-start-7"
+          className="text-display md:col-span-6 md:col-start-7 last:text-neutrel-600"
         />
       </div>
 
