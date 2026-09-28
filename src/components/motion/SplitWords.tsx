@@ -1,5 +1,6 @@
 import type { CSSProperties, JSX } from "react";
 import { type Token, tokenizeLines } from "@/util/emphasis";
+import { MetalText } from "./MetalText";
 
 type SplitWordsProps = {
   lines: readonly string[];
@@ -7,12 +8,16 @@ type SplitWordsProps = {
   className?: string;
   lineClassName?: string;
   delay?: number;
+  highlight?: string;
 };
 
 export const EMPHASIS_CLASS =
   "font-serif text-[1.06em] font-normal italic tracking-[-0.02em] pr-[0.04em]";
 
-function Word({ word, emphasis, index }: Token) {
+type WordProps = Token & { highlight?: string };
+
+function Word({ word, emphasis, index, highlight }: WordProps) {
+  const highlighted = highlight && word.startsWith(highlight);
   return (
     <>
       <span className="split-word">
@@ -20,7 +25,14 @@ function Word({ word, emphasis, index }: Token) {
           style={{ "--i": index } as CSSProperties}
           className={emphasis ? EMPHASIS_CLASS : undefined}
         >
-          {word}
+          {highlighted ? (
+            <>
+              <MetalText text={highlight} />
+              {word.slice(highlight.length)}
+            </>
+          ) : (
+            word
+          )}
         </span>
       </span>{" "}
     </>
@@ -33,6 +45,7 @@ export function SplitWords({
   className,
   lineClassName = "block",
   delay = 0,
+  highlight,
 }: SplitWordsProps) {
   return (
     <Tag
@@ -43,7 +56,7 @@ export function SplitWords({
       {tokenizeLines(lines).map((tokens) => (
         <span key={tokens[0]?.index} className={lineClassName}>
           {tokens.map((token) => (
-            <Word key={token.index} {...token} />
+            <Word key={token.index} {...token} highlight={highlight} />
           ))}
         </span>
       ))}

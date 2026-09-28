@@ -20,7 +20,7 @@ export const pageDescription =
 
 export const pageActions = "mt-2 flex flex-wrap gap-3";
 
-export const section = "grid gap-6";
+export const section = "grid gap-6 p-12";
 
 export const cardGrid2 = "grid grid-cols-2 gap-4 max-[720px]:grid-cols-1";
 export const cardGrid3 =

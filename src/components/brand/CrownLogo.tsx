@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { CROWN_PATH, CROWN_VIEWBOX } from "@/components/icons";
+import { CROWN_PATH, CROWN_VIEWBOX } from "@/data/brand";
 
 type CrownLogoProps = { className?: string };
 

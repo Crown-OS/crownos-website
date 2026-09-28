@@ -123,6 +123,188 @@
   }
 }
 
+.compositor-window {
+  transform-origin: center;
+  animation: compositor-layout 8s var(--ease-in-out-circ) infinite;
+}
+
+.compositor-tiling {
+  animation: show-while-tiled 8s var(--ease-in-out-circ) infinite;
+}
+
+.compositor-floating {
+  animation: show-while-floating 8s var(--ease-in-out-circ) infinite;
+}
+
+@keyframes compositor-layout {
+  0%,
+  40%,
+  100% {
+    transform: none;
+  }
+  50%,
+  90% {
+    transform: var(--float);
+  }
+}
+
+@keyframes show-while-tiled {
+  0%,
+  40%,
+  100% {
+    opacity: 1;
+  }
+  50%,
+  90% {
+    opacity: 0;
+  }
+}
+
+@keyframes show-while-floating {
+  0%,
+  40%,
+  100% {
+    opacity: 0;
+  }
+  50%,
+  90% {
+    opacity: 1;
+  }
+}
+
+.base-cursor {
+  animation: base-select 10s var(--ease-in-out-circ) infinite;
+}
+
+@keyframes base-select {
+  0%,
+  16%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  20%,
+  36% {
+    transform: translate3d(0, 100%, 0);
+  }
+  40%,
+  56% {
+    transform: translate3d(0, 200%, 0);
+  }
+  60%,
+  76% {
+    transform: translate3d(0, 300%, 0);
+  }
+  80%,
+  96% {
+    transform: translate3d(0, 400%, 0);
+  }
+}
+
+.uikit-morph {
+  animation: uikit-radius 6s var(--ease-in-out-circ) infinite;
+}
+
+@keyframes uikit-radius {
+  0%,
+  35%,
+  100% {
+    border-radius: 4px;
+  }
+  50%,
+  85% {
+    border-radius: 999px;
+  }
+}
+
+.agent-step {
+  animation: agent-step 7s var(--ease-out-expo) calc(var(--i) * 0.7s) infinite
+    both;
+}
+
+@keyframes agent-step {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translate3d(0, 0.5rem, 0);
+  }
+  12%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.meter-fill {
+  transform-origin: left;
+  animation: meter-load 4.5s var(--ease-in-out-circ) calc(var(--i) * -1.3s)
+    infinite alternate;
+}
+
+@keyframes meter-load {
+  from {
+    transform: scaleX(calc(var(--level) * 0.35));
+  }
+  to {
+    transform: scaleX(var(--level));
+  }
+}
+
+.wave-bar {
+  animation: wave-pulse 1.3s ease-in-out calc(var(--i) * -83ms) infinite
+    alternate;
+}
+
+@keyframes wave-pulse {
+  from {
+    transform: scaleY(0.25);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.vault-ring {
+  animation: vault-ripple 3.6s var(--ease-out-quart) calc(var(--i) * 1.2s)
+    infinite both;
+}
+
+@keyframes vault-ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+.fleet-dot {
+  opacity: 0.16;
+  animation: fleet-sync 4s var(--ease-in-out-circ) calc(var(--i) * 70ms)
+    infinite;
+}
+
+@keyframes fleet-sync {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: none;
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  40%,
+  80% {
+    opacity: 0.7;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .js [data-reveal],
   .js [data-reveal] .split-word > span {
@@ -133,6 +315,16 @@
   }
 
   .js [data-reveal="wipe"]::after,
+  .compositor-window,
+  .compositor-tiling,
+  .compositor-floating,
+  .base-cursor,
+  .uikit-morph,
+  .agent-step,
+  .meter-fill,
+  .wave-bar,
+  .vault-ring,
+  .fleet-dot,
   .marquee-track,
   .roll-char {
     animation: none;

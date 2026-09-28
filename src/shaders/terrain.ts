@@ -4,7 +4,7 @@ export const TERRAIN_SHADER = `${SHADER_HEADER}
 void main() {
   vec2 uv = gl_FragCoord.xy / uResolution;
   vec2 p = (gl_FragCoord.xy - 0.5 * uResolution) / uResolution.y;
-  float t = uTime * 0.03;
+  float t = uTime * 0.05;
   vec2 drift = uPointer * vec2(0.05, 0.03);
 
   float ridge = -0.2 + 0.26 * fbm(vec2(p.x * 1.2 + t + drift.x, 3.1)) + 0.06 * sin(p.x * 1.9 + 0.8);

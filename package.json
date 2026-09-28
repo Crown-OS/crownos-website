@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "deploy": "next build && wrangler deploy",
+    "preview": "next build && wrangler dev",
     "lint": "biome check",
     "format": "biome format --write"
   },
@@ -24,7 +26,8 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "^4.2.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.143.0"
   },
   "ignoreScripts": [
     "sharp",

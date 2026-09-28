@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { runWhileVisible } from "@/util/frame-loop";
+import { createEasedPointer } from "@/util/pointer";
 import { createFullscreenProgram, uploadGlyphAtlas } from "@/util/webgl";
 
 const MAX_PIXEL_RATIO = 1.5;
-const POINTER_EASING = 0.05;
 
 type ShaderCanvasProps = {
   fragment: string;
@@ -35,16 +35,14 @@ export function ShaderCanvas({
 
     const resolution = uniform("uResolution");
     const time = uniform("uTime");
-    const pointer = uniform("uPointer");
-    const target = { x: 0, y: 0 };
-    const eased = { x: 0, y: 0 };
+    const pointerPosition = uniform("uPointer");
+    const pointer = createEasedPointer(() => canvas.getBoundingClientRect());
     const pixelRatio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO);
 
     const draw = (now: number) => {
-      eased.x += (target.x - eased.x) * POINTER_EASING;
-      eased.y += (target.y - eased.y) * POINTER_EASING;
+      const { x, y } = pointer.step();
       gl.uniform1f(time, now / 1000);
-      gl.uniform2f(pointer, eased.x, eased.y);
+      gl.uniform2f(pointerPosition, x, y);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
 
@@ -58,12 +56,6 @@ export function ShaderCanvas({
       draw(performance.now());
     };
 
-    const track = (event: PointerEvent) => {
-      const bounds = canvas.getBoundingClientRect();
-      target.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
-      target.y = 1 - ((event.clientY - bounds.top) / bounds.height) * 2;
-    };
-
     if (glyphs) {
       document.fonts.ready.then(() => {
         uploadGlyphAtlas(gl, glyphs, getComputedStyle(canvas).fontFamily);
@@ -74,13 +66,12 @@ export function ShaderCanvas({
 
     const sizeObserver = new ResizeObserver(resize);
     sizeObserver.observe(canvas);
-    window.addEventListener("pointermove", track, { passive: true });
     const stop = runWhileVisible(canvas, draw);
 
     return () => {
       stop();
       sizeObserver.disconnect();
-      window.removeEventListener("pointermove", track);
+      pointer.dispose();
     };
   }, [fragment, glyphs, cellSize]);
 

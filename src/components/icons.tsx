@@ -1,4 +1,5 @@
 import type { SVGProps } from "react";
+import { CROWN_PATH, CROWN_VIEWBOX } from "@/data/brand";
 
 const iconProps = {
   width: "24",
@@ -578,11 +579,6 @@ export const FlameIcon = (props: SVGProps<SVGSVGElement>) => (
 );
 
 /* ================== Brand ================== */
-
-export const CROWN_PATH =
-  "M16 18L125.98 115.041L152 18L178.02 115.041L288 18C288 18 282.702 36.957 271.848 61.6117L209.114 231L190.96 163.296C179.106 169.399 166.126 173 152 173C137.874 173 124.894 169.399 113.04 163.296L94.8863 231L32.152 61.6117C21.2977 36.957 16 18 16 18Z";
-
-export const CROWN_VIEWBOX = "16 18 272 213";
 
 export const CrownIcon = (props: SVGProps<SVGSVGElement>) => (
   <svg

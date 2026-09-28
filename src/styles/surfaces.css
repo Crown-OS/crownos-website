@@ -87,3 +87,17 @@
 @utility shadow-pop {
   box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7);
 }
+
+@utility text-metal {
+  background-image: linear-gradient(
+    180deg,
+    #fafafa 0%,
+    #d4d4d4 46%,
+    #3a3a3a 50%,
+    #8a8a8a 72%,
+    #cfcfcf 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}

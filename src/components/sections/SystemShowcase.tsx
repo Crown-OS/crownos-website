@@ -4,7 +4,13 @@ import { HorizontalTrack, SplitWords } from "@/components/motion";
 import { type Capability, system } from "@/data/crownos";
 import { CapabilityVisual } from "./CapabilityVisual";
 
-const CARD_OFFSETS = ["md:mb-0", "md:mb-16", "md:mb-6", "md:mb-24"] as const;
+const CARD_OFFSETS = [
+  "md:mb-0",
+  "md:mb-16",
+  "md:mb-6",
+  "md:mb-24",
+  "md:mb-10",
+] as const;
 
 function IntroPanel() {
   return (
@@ -44,11 +50,8 @@ function CapabilityCard({
       style={{ "--delay": `${index * 90}ms` } as CSSProperties}
       className={`group grid w-full content-end gap-3 md:w-[clamp(17rem,24vw,24rem)] ${CARD_OFFSETS[index]}`}
     >
-      <p className="font-mono text-micro text-ink/50 uppercase">
-        {capability.kicker}
-      </p>
       <h3 className="text-title">{capability.title}</h3>
-      <div className="grid h-[clamp(11rem,30vh,16rem)] content-center rounded-lg bg-ink p-5 text-foreground">
+      <div className="relative grid h-[clamp(11rem,30vh,16rem)] content-center overflow-clip rounded-lg bg-ink p-5 text-foreground">
         <CapabilityVisual visual={capability.visual} />
       </div>
       <p className="max-w-[22rem] text-ui text-ink/60 leading-snug">
@@ -64,7 +67,7 @@ function CapabilityDeck() {
       <div className="flex h-full flex-col justify-between gap-12 rounded-2xl bg-paper p-[clamp(1.25rem,3vw,2.5rem)] text-ink">
         <SplitWords
           as="h2"
-          lines={[`${system.cardTitle} *`]}
+          lines={[`${system.cardTitle}`]}
           className="text-[clamp(3rem,10vw,10rem)] leading-[0.9] tracking-[-0.06em]"
         />
         <div className="grid gap-10 md:flex md:items-end md:gap-5">

@@ -2,9 +2,10 @@ import {
   Download,
   Ecosystem,
   Hero,
-  Manifesto,
   MarqueeBand,
+  OurVision,
   Pillars,
+  Solutions,
   SystemShowcase,
 } from "@/components/sections";
 import { Footer, Navbar } from "@/components/site";
@@ -16,7 +17,8 @@ export default function Home() {
       <main>
         <Hero />
         <MarqueeBand />
-        <Manifesto />
+        <OurVision />
+        <Solutions />
         <Pillars />
         <Ecosystem />
         <SystemShowcase />

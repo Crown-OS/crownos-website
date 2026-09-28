@@ -18,7 +18,7 @@ export function MarqueeBand() {
             {marqueeWords.map((word) => (
               <span key={word} className="flex items-center">
                 <span className="px-[0.14em]">{word}</span>
-                <span className="font-light text-[0.8em] text-ink/25">©</span>
+                <span className="px-16"></span>
               </span>
             ))}
           </div>

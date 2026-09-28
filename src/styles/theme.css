@@ -31,6 +31,12 @@
   --color-accent: #ffffff;
   --color-accent-fg: #111111;
 
+  --color-brand-red: #ff0a36;
+  --color-brand-coral: #ff5a3c;
+  --color-brand-blush: #e89ab8;
+  --color-brand-orchid: #b765dd;
+  --color-brand-violet: #6a00d4;
+
   --text-mega: clamp(4rem, 17vw, 19rem);
   --text-mega--line-height: 0.8;
   --text-mega--letter-spacing: -0.065em;

@@ -1,8 +1,7 @@
 import { ShaderCanvas, SplitWords } from "@/components/motion";
-import { Eyebrow, PillLink } from "@/components/ui";
+import { PillLink } from "@/components/ui";
 import { download, hero } from "@/data/crownos";
 import { TERRAIN_SHADER } from "@/shaders/terrain";
-import { BootCard } from "./BootCard";
 
 export function Hero() {
   return (
@@ -13,19 +12,13 @@ export function Hero() {
       <ShaderCanvas fragment={TERRAIN_SHADER} className="-z-10" />
 
       <div className="mt-[clamp(3rem,14vh,10rem)] grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-4">
-        <BootCard className="order-2 md:order-1 md:col-span-4" />
-
-        <div className="relative order-1 md:order-2 md:col-span-6 md:col-start-7">
-          <Eyebrow className="absolute top-[0.6em] left-0 max-md:hidden">
-            {hero.label}
-          </Eyebrow>
-          <SplitWords
-            as="h1"
-            lines={hero.lines}
-            delay={150}
-            className="text-display md:[&>span:first-child]:pl-[max(10.5rem,12vw)]"
-          />
-        </div>
+        <SplitWords
+          as="h1"
+          lines={hero.lines}
+          highlight={hero.brand}
+          delay={150}
+          className="text-display md:col-span-6 md:col-start-7"
+        />
       </div>
 
       <div className="mt-auto grid grid-cols-12 items-end gap-4 pt-16 text-ui text-muted">
