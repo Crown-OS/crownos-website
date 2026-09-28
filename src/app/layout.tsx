@@ -1,15 +1,29 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Fragment_Mono, Instrument_Serif, Inter_Tight } from "next/font/google";
+import Script from "next/script";
+import type { ReactNode } from "react";
+import { Cursor, RevealObserver, SmoothScroll } from "@/components/motion";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sans = Inter_Tight({
+  variable: "--font-inter-tight",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const serif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  weight: "400",
+  style: ["normal", "italic"],
   subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = Fragment_Mono({
+  variable: "--font-fragment-mono",
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -18,17 +32,28 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "CrownOS is a beautiful, monochromatic Arch-based Linux distribution built for performance, open source values and a calm AI-ready desktop ecosystem.",
+    "CrownOS is a monochromatic, Arch-based Linux distribution built for performance, open source values and a calm, AI-ready desktop ecosystem.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = { themeColor: "#111111" };
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${sans.variable} ${serif.variable} ${mono.variable}`}
+      suppressHydrationWarning
+    >
+      <body>
+        <Script id="motion-flag" strategy="beforeInteractive">
+          {"document.documentElement.classList.add('js')"}
+        </Script>
+        <SmoothScroll>
+          {children}
+          <Cursor />
+          <RevealObserver />
+        </SmoothScroll>
+      </body>
     </html>
   );
 }

@@ -46,9 +46,7 @@ import {
   ctaBanner,
   ctaBannerHeading,
   ctaBannerText,
-  Footer,
   iconBox,
-  Navbar,
   pageActions,
   pageBadge,
   pageDescription,
@@ -61,6 +59,7 @@ import {
   section,
   subCard,
 } from "@/components/landing";
+import { Footer, Navbar } from "@/components/site";
 
 export const metadata: Metadata = {
   title: "Features · CrownOS",
@@ -266,83 +265,83 @@ const featureGroups = [
 
 export default function FeaturesPage() {
   return (
-    <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[5rem] pb-12 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[4.5rem]">
+    <>
       <Navbar />
+      <div className="relative z-[1] mx-auto w-[min(1200px,100%-3rem)] pt-[7rem] pb-32 max-[720px]:w-[min(1200px,100%-1.25rem)] max-[720px]:pt-[6rem]">
+        <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
+          <section className={pageHero}>
+            <div aria-hidden className={pageOrbsWrap}>
+              <span className={pageOrbA} />
+              <span className={pageOrbB} />
+            </div>
+            <span className={pageBadge}>
+              <SparklesIcon /> The full feature set
+            </span>
+            <h1 className={pageTitle}>
+              Everything CrownOS ships with — without the bloat.
+            </h1>
+            <p className={pageDescription}>
+              A curated, transparent feature set across performance, AI, the
+              ecosystem stack, theming and security. No paywalls, no add-ons.
+            </p>
+            <div className={pageActions}>
+              <Link href="/download" className={btnPrimary}>
+                <DownloadIcon /> Try it now
+              </Link>
+              <Link href="/docs" className={btnSecondary}>
+                Read the docs
+              </Link>
+            </div>
+          </section>
 
-      <main className="grid gap-[clamp(5rem,11vw,9rem)] pt-[clamp(3rem,8vw,6rem)]">
-        <section className={pageHero}>
-          <div aria-hidden className={pageOrbsWrap}>
-            <span className={pageOrbA} />
-            <span className={pageOrbB} />
-          </div>
-          <span className={pageBadge}>
-            <SparklesIcon /> The full feature set
-          </span>
-          <h1 className={pageTitle}>
-            Everything CrownOS ships with — without the bloat.
-          </h1>
-          <p className={pageDescription}>
-            A curated, transparent feature set across performance, AI, the
-            ecosystem stack, theming and security. No paywalls, no add-ons.
-          </p>
-          <div className={pageActions}>
-            <Link href="/download" className={btnPrimary}>
-              <DownloadIcon /> Try it now
-            </Link>
-            <Link href="/docs" className={btnSecondary}>
-              Read the docs
-            </Link>
-          </div>
-        </section>
+          {featureGroups.map((group) => {
+            const HeroIcon = group.icon;
+            return (
+              <section key={group.title} className={section}>
+                <SectionHeader
+                  eyebrow={group.eyebrow}
+                  eyebrowIcon={HeroIcon}
+                  title={group.title}
+                  subtitle={group.description}
+                />
+                <div className={cardGrid4}>
+                  {group.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <article key={item.title} className={subCard}>
+                        <div className={iconBox}>
+                          <ItemIcon />
+                        </div>
+                        <h3 className={cardTitle}>{item.title}</h3>
+                        <p className={cardDesc}>{item.desc}</p>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
 
-        {featureGroups.map((group) => {
-          const HeroIcon = group.icon;
-          return (
-            <section key={group.title} className={section}>
-              <SectionHeader
-                eyebrow={group.eyebrow}
-                eyebrowIcon={HeroIcon}
-                title={group.title}
-                subtitle={group.description}
-              />
-              <div className={cardGrid4}>
-                {group.items.map((item) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <article key={item.title} className={subCard}>
-                      <div className={iconBox}>
-                        <ItemIcon />
-                      </div>
-                      <h3 className={cardTitle}>{item.title}</h3>
-                      <p className={cardDesc}>{item.desc}</p>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-
-        <section className={ctaBanner}>
-          <h3 className={ctaBannerHeading}>
-            One ISO. Every feature. No hidden tier.
-          </h3>
-          <p className={ctaBannerText}>
-            CrownOS ships every capability above in a single download. Nothing
-            locked behind a paywall, nothing pinned to a specific cloud.
-          </p>
-          <div className={pageActions}>
-            <Link href="/download" className={btnPrimary}>
-              <DownloadIcon /> Download CrownOS
-            </Link>
-            <Link href="/community" className={btnGhost}>
-              Talk to the community <ArrowRightIcon />
-            </Link>
-          </div>
-        </section>
-      </main>
-
+          <section className={ctaBanner}>
+            <h3 className={ctaBannerHeading}>
+              One ISO. Every feature. No hidden tier.
+            </h3>
+            <p className={ctaBannerText}>
+              CrownOS ships every capability above in a single download. Nothing
+              locked behind a paywall, nothing pinned to a specific cloud.
+            </p>
+            <div className={pageActions}>
+              <Link href="/download" className={btnPrimary}>
+                <DownloadIcon /> Download CrownOS
+              </Link>
+              <Link href="/community" className={btnGhost}>
+                Talk to the community <ArrowRightIcon />
+              </Link>
+            </div>
+          </section>
+        </main>
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }

@@ -1,0 +1,146 @@
+@layer components {
+  [data-reveal="wipe"] {
+    position: relative;
+  }
+}
+
+.js [data-reveal] {
+  --delay: 0ms;
+  opacity: 0;
+  transform: translate3d(0, 2.5rem, 0) skewY(2.5deg);
+  filter: blur(12px);
+  transition:
+    opacity 0.9s var(--ease-out-expo) var(--delay),
+    transform 1.2s var(--ease-out-expo) var(--delay),
+    filter 0.9s var(--ease-out-expo) var(--delay);
+}
+
+.js [data-reveal][data-shown] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.js [data-reveal="split"],
+.js [data-reveal="wipe"] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.split-word {
+  display: inline-block;
+  overflow: clip;
+  overflow-clip-margin: 0.12em;
+  vertical-align: top;
+  padding-block: 0.06em 0.12em;
+  margin-block: -0.06em -0.12em;
+}
+
+.split-word > span {
+  display: inline-block;
+}
+
+.js [data-reveal="split"] .split-word > span {
+  transform: translate3d(0, 112%, 0) rotate(5deg);
+  transform-origin: 0 100%;
+  transition: transform 1.15s var(--ease-out-expo)
+    calc(var(--delay) + var(--i, 0) * 42ms);
+}
+
+.js [data-reveal="split"][data-shown] .split-word > span {
+  transform: none;
+}
+
+.js [data-reveal="wipe"] {
+  transition: color 0s linear calc(var(--delay) + 0.42s);
+}
+
+.js [data-reveal="wipe"]:not([data-shown]) {
+  color: transparent;
+}
+
+.js [data-reveal="wipe"]::after {
+  content: "";
+  position: absolute;
+  inset: -0.1em -0.15em;
+  background: var(--color-foreground);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+
+.js [data-reveal="wipe"][data-shown]::after {
+  animation: wipe 0.9s var(--ease-in-out-circ) var(--delay) both;
+}
+
+@keyframes wipe {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  48% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  52% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+.roll {
+  display: inline-flex;
+  overflow: clip;
+  line-height: 1.15;
+  height: 1.15em;
+}
+
+.roll-char {
+  display: inline-block;
+  white-space: pre;
+  text-shadow: 0 1.15em currentColor;
+  transition: transform 0.55s var(--ease-out-expo) calc(var(--i) * 16ms);
+}
+
+:where(a, button, .roll-host):is(:hover, :focus-visible) .roll-char {
+  transform: translate3d(0, -1.15em, 0);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--marquee-duration, 36s) linear infinite;
+}
+
+@keyframes marquee {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-reveal],
+  .js [data-reveal] .split-word > span {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+
+  .js [data-reveal="wipe"]::after,
+  .marquee-track,
+  .roll-char {
+    animation: none;
+    transition: none;
+  }
+}
+
+.cursor-none,
+.cursor-none * {
+  cursor: none;
+}

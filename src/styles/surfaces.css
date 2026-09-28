@@ -1,0 +1,89 @@
+@utility text-gradient {
+  background: linear-gradient(
+    180deg,
+    var(--color-foreground) 0%,
+    color-mix(in srgb, var(--color-foreground) 65%, var(--color-background))
+      100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+@utility bg-cta {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-foreground) 96%, transparent),
+    color-mix(in srgb, var(--color-foreground) 80%, transparent)
+  );
+}
+
+@utility bg-card-radial {
+  background: radial-gradient(
+    140% 110% at 0% 0%,
+    color-mix(in srgb, var(--color-foreground) 10%, transparent),
+    transparent 55%
+  );
+}
+
+@utility bg-page-hero {
+  background:
+    radial-gradient(
+      80% 60% at 50% -10%,
+      color-mix(in srgb, var(--color-foreground) 16%, transparent),
+      transparent 60%
+    ), var(--color-card);
+}
+
+@utility bg-cta-banner {
+  background:
+    radial-gradient(
+      80% 100% at 100% 0%,
+      color-mix(in srgb, var(--color-foreground) 14%, transparent),
+      transparent 55%
+    ), var(--color-card);
+}
+
+@utility bg-icon-tile {
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--color-foreground) 18%, transparent),
+      transparent 60%
+    ), color-mix(in srgb, var(--color-foreground) 4%, transparent);
+}
+
+@utility bg-orb-soft {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-foreground) 25%, transparent),
+    transparent 70%
+  );
+}
+
+@utility bg-orb-page {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-foreground) 45%, transparent),
+    transparent 70%
+  );
+}
+
+@utility bg-spotlight {
+  background: radial-gradient(
+    60% 55% at 50% 100%,
+    color-mix(in srgb, var(--color-foreground) 9%, transparent),
+    transparent 70%
+  );
+}
+
+@utility shadow-glow-cta {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-foreground) 30%, transparent),
+    0 12px 40px -10px
+    color-mix(in srgb, var(--color-foreground) 30%, transparent);
+}
+
+@utility shadow-pop {
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7);
+}

@@ -576,3 +576,23 @@ export const FlameIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
   </svg>
 );
+
+/* ================== Brand ================== */
+
+export const CROWN_PATH =
+  "M16 18L125.98 115.041L152 18L178.02 115.041L288 18C288 18 282.702 36.957 271.848 61.6117L209.114 231L190.96 163.296C179.106 169.399 166.126 173 152 173C137.874 173 124.894 169.399 113.04 163.296L94.8863 231L32.152 61.6117C21.2977 36.957 16 18 16 18Z";
+
+export const CROWN_VIEWBOX = "16 18 272 213";
+
+export const CrownIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    {...iconProps}
+    viewBox={CROWN_VIEWBOX}
+    fill="currentColor"
+    stroke="none"
+    {...props}
+  >
+    <title>CrownOS</title>
+    <path d={CROWN_PATH} />
+  </svg>
+);
