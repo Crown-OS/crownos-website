@@ -8,3 +8,4 @@ export { ScrubWords } from "./ScrubWords";
 export { ShaderCanvas } from "./ShaderCanvas";
 export { SmoothScroll } from "./SmoothScroll";
 export { EMPHASIS_CLASS, SplitWords } from "./SplitWords";
+export { VisionStack } from "./VisionStack";

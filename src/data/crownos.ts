@@ -25,7 +25,8 @@ export const downloadLink: NavLink = { label: "Download", href: "/download" };
 export const hero = {
   brand: "CrownOS",
   lines: [
-    "Meet CrownOS,",
+    "Meet",
+    "CrownOS",
     "an *agent native* desktop",
     "built on Linux kernel.",
   ],
@@ -37,10 +38,19 @@ export const marqueeWords = [
   "Install the complete desktop in 60 seconds",
 ] as const;
 
+export type VisionPanel = {
+  statement: string;
+  os: "windows" | "macos" | "linux";
+};
+
 export const our_vision = {
   label: "Our Vision",
-  text: "An operating system should be the *invisible* layer between intent and action — fast enough to disappear, open enough to trust, and calm enough that your work is the only thing left on *screen.*",
-  signature: "— The CrownOS vision, 2026",
+  intro: "We are building an Operating System that is",
+  panels: [
+    { statement: "Not closed.", os: "macos" },
+    { statement: "Not sloppy.", os: "windows" },
+    { statement: "Easy to set up.", os: "linux" },
+  ] satisfies VisionPanel[],
 } as const;
 
 export const solutions = {
@@ -90,7 +100,7 @@ export const solutions = {
 
 export const pillars = [
   { word: "Agentic", mark: "*" },
-  { word: "Smoothest", mark: "#" },
+  { word: "Smooooth", mark: "#" },
   { word: "Fully Customizable", mark: "™" },
 ] as const;
 
@@ -184,7 +194,7 @@ export const system = {
 } as const;
 
 export const download = {
-  lines: ["Crown your", "desktop."],
+  lines: ["Crown your", "desktop with a", "*few clicks*"],
   meta: "x86_64 · UEFI · GPG-signed ISO",
   primary: { label: "Download CrownOS", href: "/download" },
   secondary: { label: "Read the docs", href: "/docs" },

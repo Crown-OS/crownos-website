@@ -16,8 +16,10 @@ export function Hero() {
           as="h1"
           lines={hero.lines}
           highlight={hero.brand}
+          highlightClassName="text-[1.3em]"
+          emphasisVariant="sweep"
           delay={150}
-          className="text-display md:col-span-6 md:col-start-7 last:text-neutrel-600"
+          className="text-display md:col-span-6 md:col-start-7 *:nth-[n+3]:text-[0.62em] *:nth-[n+3]:leading-[1.1] *:nth-[n+3]:tracking-[-0.03em] *:nth-[n+3]:text-muted"
         />
       </div>
 

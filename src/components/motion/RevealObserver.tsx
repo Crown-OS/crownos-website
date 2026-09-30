@@ -2,15 +2,14 @@
 
 import { useEffect } from "react";
 import { prefersReducedMotion } from "@/util/frame-loop";
+import { markRevealed, REVEALED_ATTRIBUTE } from "@/util/reveal";
 
-const PENDING = "[data-reveal]:not([data-shown])";
-
-const show = (element: Element) => element.setAttribute("data-shown", "");
+const PENDING = `[data-reveal]:not([${REVEALED_ATTRIBUTE}])`;
 
 export function RevealObserver() {
   useEffect(() => {
     if (prefersReducedMotion()) {
-      document.querySelectorAll(PENDING).forEach(show);
+      document.querySelectorAll(PENDING).forEach(markRevealed);
       return;
     }
 
@@ -18,7 +17,7 @@ export function RevealObserver() {
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          show(entry.target);
+          markRevealed(entry.target);
           intersection.unobserve(entry.target);
         }
       },

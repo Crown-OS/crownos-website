@@ -29,3 +29,18 @@ export function tokenizeLines(lines: readonly string[]): Token[][] {
     return tokens;
   });
 }
+
+export function mergeEmphasisRuns(tokens: readonly Token[]): Token[] {
+  return tokens.reduce<Token[]>((merged, token) => {
+    const previous = merged.at(-1);
+    if (previous?.emphasis && token.emphasis) {
+      merged[merged.length - 1] = {
+        ...previous,
+        word: `${previous.word} ${token.word}`,
+      };
+    } else {
+      merged.push(token);
+    }
+    return merged;
+  }, []);
+}

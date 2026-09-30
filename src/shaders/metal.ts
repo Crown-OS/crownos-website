@@ -1,18 +1,26 @@
+import { SHIMMER } from "@/data/shimmer";
 import { SHADER_HEADER } from "./noise";
+
+const seconds = (ms: number) => (ms / 1000).toFixed(3);
 
 export const METAL_SHADER = `${SHADER_HEADER}
 uniform sampler2D uMask;
+uniform float uSweep;
 
-const float BEVEL_STRENGTH = 1.5;
+const float BEVEL_STRENGTH = 2.6;
 const float SAMPLE_SPREAD = 0.01;
-const float HORIZON_SOFTNESS = 0.22;
-const float SWEEP_SECONDS = 9.0;
+const float HORIZON_SOFTNESS = 0.12;
+const float SWEEP_DURATION = ${seconds(SHIMMER.brandSweepMs)};
+const float SWEEP_OVERSHOOT = 0.7;
+const float SWEEP_SHARPNESS = 3.0;
+const float SWEEP_STRENGTH = 0.9;
+const float PI = 3.14159265;
 
 float bevelHeight(vec2 uv) { return texture2D(uMask, uv).g; }
 
 float studioReflection(float horizon) {
-  float sky = mix(0.8, 0.95, smoothstep(0.0, 0.6, horizon));
-  float ground = mix(0.66, 0.56, smoothstep(0.0, -0.6, horizon));
+  float sky = mix(0.88, 1.0, smoothstep(0.0, 0.5, horizon));
+  float ground = mix(0.46, 0.16, smoothstep(0.0, -0.5, horizon));
   return mix(ground, sky, smoothstep(-HORIZON_SOFTNESS, HORIZON_SOFTNESS, horizon));
 }
 
@@ -37,14 +45,18 @@ void main() {
   float tone = studioReflection(horizon);
 
   vec3 light = normalize(vec3(uPointer.x * 0.5 - 0.3, uPointer.y * 0.4 + 0.6, 0.8));
-  float specular = pow(max(dot(normal, normalize(light + vec3(0.0, 0.0, 1.0))), 0.0), 18.0);
+  float specular = pow(max(dot(normal, normalize(light + vec3(0.0, 0.0, 1.0))), 0.0), 42.0);
 
   float aspect = uResolution.x / uResolution.y;
-  float sweepPhase = fract(uTime / SWEEP_SECONDS) * 1.6;
-  float sweepX = mix(-0.7, 0.7, sweepPhase) * aspect;
-  float glint = exp(-pow((p.x + p.y * 0.6 - sweepX) * 4.0, 2.0)) * step(sweepPhase, 1.0);
+  float progress = uSweep / SWEEP_DURATION;
+  float eased = 0.5 - 0.5 * cos(PI * clamp(progress, 0.0, 1.0));
+  float reach = 0.5 * aspect + SWEEP_OVERSHOOT;
+  float sweepX = mix(-reach, reach, eased);
+  float glint = exp(-pow((p.x + p.y * 0.6 - sweepX) * SWEEP_SHARPNESS, 2.0))
+    * step(0.0, progress) * step(progress, 1.0);
 
-  float shade = clamp(tone + specular * 0.16 + glint * 0.1, 0.0, 1.0);
+  float lit = clamp(tone + specular * 0.45, 0.0, 1.0);
+  float shade = mix(lit, 1.0, glint * SWEEP_STRENGTH);
   gl_FragColor = vec4(vec3(shade) * coverage, coverage);
 }
 `;

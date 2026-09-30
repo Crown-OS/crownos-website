@@ -42,7 +42,7 @@
 }
 
 .js [data-reveal="split"] .split-word > span {
-  transform: translate3d(0, 112%, 0) rotate(5deg);
+  transform: translate3d(0, var(--rise-from, 112%), 0) rotate(5deg);
   transform-origin: 0 100%;
   transition: transform 1.15s var(--ease-out-expo)
     calc(var(--delay) + var(--i, 0) * 42ms);
@@ -50,6 +50,26 @@
 
 .js [data-reveal="split"][data-shown] .split-word > span {
   transform: none;
+}
+
+.split-word:has(> .text-sweep) {
+  --rise-from: 190%;
+  overflow-clip-margin: 0.7em;
+}
+
+.js [data-shown] .text-sweep {
+  animation: text-sweep var(--sweep-cycle) linear var(--sweep-at) infinite;
+}
+
+@keyframes text-sweep {
+  0% {
+    background-position: 100% 0;
+    animation-timing-function: var(--ease-in-out-sine);
+  }
+  26%,
+  100% {
+    background-position: 0 0;
+  }
 }
 
 .js [data-reveal="wipe"] {
@@ -315,6 +335,7 @@
   }
 
   .js [data-reveal="wipe"]::after,
+  .js [data-shown] .text-sweep,
   .compositor-window,
   .compositor-tiling,
   .compositor-floating,

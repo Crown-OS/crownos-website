@@ -7,7 +7,13 @@ import { mountMetalText } from "@/util/metal-text";
 
 const CROWN_ASPECT = `${CROWN_BOUNDS.width} / ${CROWN_BOUNDS.height}`;
 
-export function MetalText({ text }: { text: string }) {
+export function MetalText({
+  text,
+  className = "",
+}: {
+  text: string;
+  className?: string;
+}) {
   const hostRef = useRef<HTMLSpanElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [shaded, setShaded] = useState(false);
@@ -23,7 +29,7 @@ export function MetalText({ text }: { text: string }) {
   }, []);
 
   return (
-    <span ref={hostRef} className="relative inline-block">
+    <span ref={hostRef} className={`relative inline-block ${className}`}>
       <span className="sr-only">{text}</span>
       <span aria-hidden className={shaded ? "text-transparent" : "text-metal"}>
         <span data-mask="text">{lead}</span>
