@@ -11,6 +11,7 @@ type ShaderCanvasProps = {
   fragment: string;
   glyphs?: string;
   cellSize?: number;
+  resolutionScale?: number;
   className?: string;
 };
 
@@ -18,6 +19,7 @@ export function ShaderCanvas({
   fragment,
   glyphs,
   cellSize = 14,
+  resolutionScale = 1,
   className,
 }: ShaderCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,7 +39,8 @@ export function ShaderCanvas({
     const time = uniform("uTime");
     const pointerPosition = uniform("uPointer");
     const pointer = createEasedPointer(() => canvas.getBoundingClientRect());
-    const pixelRatio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO);
+    const pixelRatio =
+      Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO) * resolutionScale;
 
     const draw = (now: number) => {
       const { x, y } = pointer.step();
@@ -73,7 +76,7 @@ export function ShaderCanvas({
       sizeObserver.disconnect();
       pointer.dispose();
     };
-  }, [fragment, glyphs, cellSize]);
+  }, [fragment, glyphs, cellSize, resolutionScale]);
 
   return (
     <canvas

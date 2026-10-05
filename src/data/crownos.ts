@@ -49,7 +49,7 @@ export const our_vision = {
   panels: [
     { statement: "Not closed.", os: "macos" },
     { statement: "Not sloppy.", os: "windows" },
-    { statement: "Easy to set up.", os: "linux" },
+    { statement: "Not fragmented", os: "linux" },
   ] satisfies VisionPanel[],
 } as const;
 

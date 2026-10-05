@@ -1,7 +1,10 @@
 import { ShaderCanvas, SplitWords } from "@/components/motion";
 import { PillLink } from "@/components/ui";
 import { download, hero } from "@/data/crownos";
-import { TERRAIN_SHADER } from "@/shaders/terrain";
+import {
+  DARK_VEIL_RESOLUTION_SCALE,
+  DARK_VEIL_SHADER,
+} from "@/shaders/dark-veil";
 
 export function Hero() {
   return (
@@ -9,7 +12,11 @@ export function Hero() {
       aria-label="Introduction"
       className="relative isolate flex min-h-svh flex-col overflow-clip px-gutter pt-[4.5rem] pb-8"
     >
-      <ShaderCanvas fragment={TERRAIN_SHADER} className="-z-10" />
+      <ShaderCanvas
+        fragment={DARK_VEIL_SHADER}
+        resolutionScale={DARK_VEIL_RESOLUTION_SCALE}
+        className="-z-10 mask-b-from-78%"
+      />
 
       <div className="mt-[clamp(3rem,14vh,10rem)] grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-4">
         <SplitWords

@@ -7,7 +7,6 @@ import { type Solution, solutions } from "@/data/crownos";
 import { SolutionVisual } from "./SolutionVisual";
 
 const CARD_STAGGER_MS = 80;
-const CARD_PADDING = "p-[clamp(1.25rem,2.4vw,2rem)]";
 
 const SPANS: Record<Solution["span"], string> = {
   lead: "md:col-span-7",
@@ -21,6 +20,13 @@ const LAYOUTS: Record<Solution["span"], string> = {
   side: "flex-col",
   third: "flex-col",
   full: "flex-col md:flex-row-reverse md:*:basis-1/2",
+};
+
+const MIRROR_EDGES: Record<Solution["span"], string> = {
+  lead: "",
+  side: "",
+  third: "",
+  full: "md:plate-mirror-start",
 };
 
 function SolutionCard({
@@ -39,23 +45,21 @@ function SolutionCard({
       <Link
         href={solutions.href}
         data-cursor="Explore"
-        className={`group flex h-full overflow-clip rounded-lg border border-border bg-background-elev transition-[border-color,background-color] duration-700 ease-out-expo hover:border-border-strong hover:bg-card ${LAYOUTS[solution.span]}`}
+        className={`group plate-chrome flex h-full overflow-clip rounded-lg ${LAYOUTS[solution.span]}`}
       >
         <div
-          className={`grid min-h-[clamp(13rem,22vw,18rem)] flex-1 content-center transition-transform duration-700 ease-out-expo group-hover:scale-[1.02] ${CARD_PADDING}`}
+          className={`plate-mirror grid min-h-[clamp(14rem,24vw,20rem)] flex-1 content-center ${MIRROR_EDGES[solution.span]}`}
         >
           <SolutionVisual visual={solution.visual} />
         </div>
-        <div
-          className={`flex items-end justify-between gap-6 pt-0 ${CARD_PADDING}`}
-        >
-          <h3 className="grid max-w-[24ch] gap-3 text-title">
+        <div className="plate-satin flex items-end justify-between gap-6">
+          <h3 className="grid max-w-[24ch] gap-3 text-deboss text-title">
             <span className="font-mono text-micro text-muted uppercase">
               {solution.audience}
             </span>
             {solution.title}
           </h3>
-          <span className="grid size-11 shrink-0 place-items-center rounded-full border border-border-strong transition-[background-color,color,rotate] duration-500 ease-out-expo group-hover:rotate-90 group-hover:bg-foreground group-hover:text-background">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full border border-border-strong shadow-deboss transition-[background-color,color,rotate] duration-500 ease-out-expo group-hover:rotate-90 group-hover:bg-foreground group-hover:text-background">
             <PlusIcon className="size-4" />
           </span>
         </div>
