@@ -1,16 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { INTRO_STAGGER } from "@/data/intro";
-import { LAPTOP_SLOT_SELECTOR } from "@/data/laptop";
+import { LAPTOP_SLOT_SELECTOR, LAPTOP_TUNE_PARAM } from "@/data/laptop";
 import { prefersReducedMotion } from "@/util/frame-loop";
 import { getIntroPhase, onIntroChange, registerIntroTask } from "@/util/intro";
+import { LaptopTuner } from "./LaptopTuner";
+import type { LaptopStage } from "./laptop-stage";
 
 const loadScene = () =>
   Promise.all([import("./laptop-stage"), import("./laptop-timeline")]);
 
+const wantsTuner = () =>
+  new URLSearchParams(window.location.search).has(LAPTOP_TUNE_PARAM);
+
+type Tuner = { stage: LaptopStage; replay: () => void };
+
 export function HeroLaptop({ className }: { className?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const [tuner, setTuner] = useState<Tuner | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -35,6 +43,14 @@ export function HeroLaptop({ className }: { className?: string }) {
       const stopWatch = onIntroChange(enter);
       enter();
 
+      if (wantsTuner()) {
+        const replay = () => {
+          stopEntrance();
+          stopEntrance = timeline.playEntrance(stage, 0);
+        };
+        setTuner({ stage, replay });
+      }
+
       teardown = () => {
         stopWatch();
         stopEntrance();
@@ -49,5 +65,10 @@ export function HeroLaptop({ className }: { className?: string }) {
     };
   }, []);
 
-  return <div ref={hostRef} aria-hidden className={className} />;
+  return (
+    <>
+      <div ref={hostRef} aria-hidden className={className} />
+      {tuner && <LaptopTuner stage={tuner.stage} onReplay={tuner.replay} />}
+    </>
+  );
 }

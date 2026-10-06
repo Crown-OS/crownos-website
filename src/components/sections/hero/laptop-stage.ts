@@ -11,60 +11,63 @@ import {
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import {
   LAPTOP_CAMERA,
-  LAPTOP_FOOTPRINT,
   LAPTOP_MOTION,
+  LAPTOP_SCALE,
   LAPTOP_SPLIT_QUERY,
   type LaptopPose,
+  type LaptopView,
 } from "@/data/laptop";
-import { loadLaptop } from "./laptop-model";
-
-type Framing = { from: LaptopPose; to: LaptopPose };
+import {
+  type Footprint,
+  type Framing,
+  frame,
+  measureFootprint,
+} from "./laptop-framing";
+import { type LaptopModel, loadLaptop } from "./laptop-model";
 
 export type LaptopStage = {
   poses(): Framing;
   setPose(pose: LaptopPose): void;
   /** Rest at the final pose and keep tracking the slot as the layout changes. */
   settle(): void;
+  /** Effective view settings: defaults for the current layout plus any overrides. */
+  view(): LaptopView;
+  /** Replace the view overrides (`{}` restores the defaults). */
+  tune(overrides: Partial<LaptopView>): void;
   dispose(): void;
 };
 
+type Layout = keyof typeof LAPTOP_MOTION.yawDeg;
+
 const MAX_PIXEL_RATIO = { wide: 1.5, compact: 1.25 } as const;
 
-/** Fits the settled laptop inside `slot`; the entrance starts off-screen left at the same height. */
-function frame(host: DOMRect, slot: DOMRect, layout: Layout): Framing {
-  const size = Math.min(
-    slot.width / LAPTOP_FOOTPRINT.width,
-    slot.height / LAPTOP_FOOTPRINT.height,
-  );
-  const originX =
-    slot.left - host.left + slot.width / 2 + LAPTOP_FOOTPRINT.originX * size;
-  const originY =
-    slot.top - host.top + slot.height / 2 + LAPTOP_FOOTPRINT.originY * size;
-  const width = size / host.width;
-  const ndcY = 1 - (originY / host.height) * 2;
-  const yawDeg = LAPTOP_MOTION.yawDeg[layout];
-
-  return {
-    from: {
-      ndcX: -1 - LAPTOP_MOTION.offscreen * width,
-      ndcY,
-      depth: LAPTOP_MOTION.startDepth,
-      width,
-      yawDeg: yawDeg - LAPTOP_MOTION.turnDeg,
-      lidDeg: 0,
-    },
-    to: {
-      ndcX: (originX / host.width) * 2 - 1,
-      ndcY,
-      depth: 0,
-      width,
-      yawDeg,
-      lidDeg: LAPTOP_MOTION.openDeg,
-    },
-  };
+/** The laptop stays on the camera axis; this moves its image to `ndc` without turning the camera. */
+function shiftLens(camera: PerspectiveCamera, ndcX: number, ndcY: number) {
+  camera.updateProjectionMatrix();
+  camera.projectionMatrix.elements[8] = -ndcX;
+  camera.projectionMatrix.elements[9] = -ndcY;
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
 }
 
-type Layout = keyof typeof LAPTOP_MOTION.yawDeg;
+/** Field of view that renders a unit-width laptop at `width` of the viewport from `distance`. */
+const fovFor = (width: number, distance: number, aspect: number) =>
+  MathUtils.radToDeg(2 * Math.atan(1 / (2 * width * distance * aspect)));
+
+function footprintMeter(laptop: LaptopModel, rig: Group, spin: Group) {
+  let cached: { key: string; footprint: Footprint } | undefined;
+  return ({ pitchDeg, yawDeg, lidDeg, distance }: LaptopView) => {
+    const key = `${pitchDeg}|${yawDeg}|${lidDeg}|${distance}`;
+    if (cached?.key === key) return cached.footprint;
+    rig.position.set(0, 0, 0);
+    rig.rotation.x = MathUtils.degToRad(pitchDeg);
+    spin.rotation.y = MathUtils.degToRad(yawDeg);
+    laptop.setLid(lidDeg);
+    rig.updateMatrixWorld(true);
+    const footprint = measureFootprint(laptop.outline(), distance);
+    cached = { key, footprint };
+    return footprint;
+  };
+}
 
 export async function mountLaptopStage(
   host: HTMLElement,
@@ -93,12 +96,10 @@ export async function mountLaptopStage(
   key.position.set(-3, 5, 4);
   scene.add(key);
 
-  const camera = new PerspectiveCamera(LAPTOP_CAMERA.fov, 1, 0.1, 100);
-  camera.position.set(0, 0, LAPTOP_CAMERA.distance);
+  const camera = new PerspectiveCamera(30, 1, 0.05, 100);
 
   const laptop = await loadLaptop();
   const rig = new Group();
-  rig.rotation.x = MathUtils.degToRad(LAPTOP_CAMERA.pitchDeg);
   const spin = new Group();
   spin.add(laptop.root);
   rig.add(spin);
@@ -106,8 +107,27 @@ export async function mountLaptopStage(
 
   const wide = window.matchMedia(LAPTOP_SPLIT_QUERY);
   const layout = (): Layout => (wide.matches ? "wide" : "compact");
-  const poses = () =>
-    frame(host.getBoundingClientRect(), slot.getBoundingClientRect(), layout());
+
+  let overrides: Partial<LaptopView> = {};
+  const view = (): LaptopView => ({
+    scale: LAPTOP_SCALE,
+    pitchDeg: LAPTOP_CAMERA.pitchDeg,
+    yawDeg: LAPTOP_MOTION.yawDeg[layout()],
+    lidDeg: LAPTOP_MOTION.openDeg,
+    distance: LAPTOP_CAMERA.distance,
+    ...overrides,
+  });
+
+  const measure = footprintMeter(laptop, rig, spin);
+  const poses = () => {
+    const current = view();
+    return frame(
+      host.getBoundingClientRect(),
+      slot.getBoundingClientRect(),
+      measure(current),
+      current,
+    );
+  };
 
   let pose = poses().from;
   let settled = false;
@@ -122,16 +142,13 @@ export async function mountLaptopStage(
     pending ||= requestAnimationFrame(render);
   };
 
-  const halfHeightAt = (depth: number) =>
-    Math.tan(MathUtils.degToRad(LAPTOP_CAMERA.fov / 2)) *
-    (LAPTOP_CAMERA.distance - depth);
-
   const apply = () => {
-    const halfHeight = halfHeightAt(pose.depth);
-    const halfWidth = halfHeight * camera.aspect;
-    const focalHalfWidth = halfHeightAt(0) * camera.aspect;
-    rig.position.set(pose.ndcX * halfWidth, pose.ndcY * halfHeight, pose.depth);
-    rig.scale.setScalar(pose.width * 2 * focalHalfWidth);
+    const { distance, pitchDeg } = view();
+    camera.position.set(0, 0, distance);
+    camera.fov = fovFor(pose.width, distance, camera.aspect);
+    shiftLens(camera, pose.ndcX, pose.ndcY);
+    rig.position.set(0, 0, pose.depth * distance);
+    rig.rotation.x = MathUtils.degToRad(pitchDeg);
     spin.rotation.y = MathUtils.degToRad(pose.yawDeg);
     laptop.setLid(pose.lidDeg);
     invalidate();
@@ -145,7 +162,6 @@ export async function mountLaptopStage(
     );
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
-    camera.updateProjectionMatrix();
     if (settled) pose = poses().to;
     apply();
     // Resizing clears the WebGL buffer; redraw before this frame paints, not on the next one.
@@ -176,10 +192,19 @@ export async function mountLaptopStage(
 
   return {
     poses,
-    setPose: show,
+    setPose(next) {
+      settled = false;
+      show(next);
+    },
     settle() {
       settled = true;
       show(poses().to);
+    },
+    view,
+    tune(next) {
+      overrides = next;
+      if (settled) pose = poses().to;
+      apply();
     },
     dispose() {
       cancelAnimationFrame(pending);
