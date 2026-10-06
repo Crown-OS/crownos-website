@@ -117,6 +117,9 @@ export async function mountLaptopStage(
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     apply();
+    // Resizing clears the WebGL buffer; redraw before this frame paints, not on the next one.
+    cancelAnimationFrame(frame);
+    render();
   };
 
   const sizeObserver = new ResizeObserver(resize);

@@ -20,6 +20,18 @@ const TRAVEL = asTransition(stretch(SPRING_TIGHT, 3.6));
 const SPIN = asTransition(stretch(SPRING_TIGHT, 3.8), 0.1);
 const LID = asTransition(stretch(SPRING_MORPH, 2.6), 1.1);
 
+/**
+ * motion snaps the last 0.5 units of large-range springs in a single frame
+ * (a visible 0.5° twist on the 360° spin). Settle every channel to a fraction
+ * of its own range instead, so the final step stays sub-pixel.
+ */
+const REST_PRECISION = 1e-4;
+
+const settle = (start: number, end: number) => {
+  const tolerance = Math.abs(end - start) * REST_PRECISION;
+  return { restDelta: tolerance, restSpeed: tolerance * 10 };
+};
+
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 export function playEntrance(stage: LaptopStage, delay: number): () => void {
@@ -35,6 +47,7 @@ export function playEntrance(stage: LaptopStage, delay: number): () => void {
   ) =>
     animate(start, end, {
       ...transition,
+      ...settle(start, end),
       delay: transition.delay + delay,
       onUpdate: (value) => {
         write(value);
