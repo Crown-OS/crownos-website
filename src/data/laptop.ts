@@ -16,13 +16,6 @@ export const LAPTOP_HINGE = {
   modeledOpenDeg: 110.38,
 } as const;
 
-export const LAPTOP_IDLE = {
-  /** Peak vertical drift as a fraction of the laptop width. */
-  amplitude: 0.018,
-  periodMs: 5200,
-  rollDeg: 0.6,
-} as const;
-
 export type LaptopPose = {
   /** Horizontal position in normalized device coords (-1 left … 1 right). */
   ndcX: number;
@@ -40,10 +33,10 @@ export const LAPTOP_CAMERA = { fov: 28, distance: 7, pitchDeg: 22 } as const;
 export const LAPTOP_POSES = {
   wide: {
     from: {
-      ndcX: 0,
-      ndcY: 0,
-      depth: -10,
-      width: 0.05,
+      ndcX: -1.35,
+      ndcY: -0.58,
+      depth: -6,
+      width: 0.3,
       yawDeg: -336,
       lidDeg: 0,
     },
@@ -58,10 +51,10 @@ export const LAPTOP_POSES = {
   },
   compact: {
     from: {
-      ndcX: 0,
-      ndcY: 0,
-      depth: -10,
-      width: 0.1,
+      ndcX: -1.6,
+      ndcY: -0.6,
+      depth: -6,
+      width: 0.68,
       yawDeg: -343,
       lidDeg: 0,
     },

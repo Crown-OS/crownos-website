@@ -12,22 +12,18 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import {
   LAPTOP_BREAKPOINT,
   LAPTOP_CAMERA,
-  LAPTOP_IDLE,
   LAPTOP_POSES,
   type LaptopPose,
 } from "@/data/laptop";
-import { runWhileVisible } from "@/util/frame-loop";
 import { loadLaptop } from "./laptop-model";
 
 export type LaptopStage = {
   poses(): { from: LaptopPose; to: LaptopPose };
   setPose(pose: LaptopPose): void;
-  startIdle(): void;
   dispose(): void;
 };
 
 const MAX_PIXEL_RATIO = { wide: 1.5, compact: 1.25 } as const;
-const TAU = Math.PI * 2;
 
 export async function mountLaptopStage(
   host: HTMLElement,
@@ -61,11 +57,9 @@ export async function mountLaptopStage(
   const laptop = await loadLaptop();
   const rig = new Group();
   rig.rotation.x = MathUtils.degToRad(LAPTOP_CAMERA.pitchDeg);
-  const float = new Group();
   const spin = new Group();
   spin.add(laptop.root);
-  float.add(spin);
-  rig.add(float);
+  rig.add(spin);
   scene.add(rig);
 
   const wide = window.matchMedia(LAPTOP_BREAKPOINT);
@@ -73,21 +67,12 @@ export async function mountLaptopStage(
 
   let pose: LaptopPose = LAPTOP_POSES[layout()].from;
   let frame = 0;
-  let stopIdle = () => {};
 
   const render = () => {
     frame = 0;
     renderer.render(scene, camera);
   };
 
-  /** Eases in from rest (zero offset, zero velocity) so the hand-off from the entrance is seamless. */
-  const drift = (since: number) => (now: number) => {
-    const phase = ((now - since) / LAPTOP_IDLE.periodMs) * TAU;
-    float.position.y = (LAPTOP_IDLE.amplitude * (1 - Math.cos(phase))) / 2;
-    float.rotation.z =
-      MathUtils.degToRad(LAPTOP_IDLE.rollDeg) * Math.sin(phase / 2);
-    render();
-  };
   const invalidate = () => {
     frame ||= requestAnimationFrame(render);
   };
@@ -135,12 +120,7 @@ export async function mountLaptopStage(
       renderer.domElement.style.opacity = "1";
       apply();
     },
-    startIdle() {
-      stopIdle();
-      stopIdle = runWhileVisible(renderer.domElement, drift(performance.now()));
-    },
     dispose() {
-      stopIdle();
       cancelAnimationFrame(frame);
       sizeObserver.disconnect();
       laptop.dispose();

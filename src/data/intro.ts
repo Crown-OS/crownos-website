@@ -15,7 +15,7 @@ export const INTRO_TIMING = {
 
 /** Entrance offsets in seconds, measured from the start of the circle reveal. */
 export const INTRO_STAGGER = {
-  laptop: 0.2,
+  laptop: 0.65,
   navbar: 0.7,
-  heroText: 0.8,
+  heroText: 0.4,
 } as const;

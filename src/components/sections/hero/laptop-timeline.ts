@@ -1,11 +1,6 @@
 import { animate } from "motion";
 import type { LaptopPose } from "@/data/laptop";
-import {
-  asTransition,
-  SPRING_MORPH,
-  SPRING_TIGHT,
-  stretch,
-} from "@/data/springs";
+import { asTransition, SPRING_TIGHT, stretch } from "@/data/springs";
 import type { LaptopStage } from "./laptop-stage";
 
 const TRAVEL_CHANNELS = [
@@ -18,7 +13,8 @@ const TRAVEL_CHANNELS = [
 /** Travel is one overdamped spring so position and scale glide along a single, wobble-free path. */
 const TRAVEL = asTransition(stretch(SPRING_TIGHT, 3.6));
 const SPIN = asTransition(stretch(SPRING_TIGHT, 3.8), 0.1);
-const LID = asTransition(stretch(SPRING_MORPH, 2.6), 1.1);
+/** Overdamped so the hinge stops at its target instead of swinging past it. */
+const LID = asTransition(stretch(SPRING_TIGHT, 2.2), 1.1);
 
 /**
  * motion snaps the last 0.5 units of large-range springs in a single frame
@@ -37,7 +33,6 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 export function playEntrance(stage: LaptopStage, delay: number): () => void {
   const { from, to } = stage.poses();
   const pose = { ...from };
-  let stopped = false;
 
   const channel = (
     start: number,
@@ -68,12 +63,7 @@ export function playEntrance(stage: LaptopStage, delay: number): () => void {
     }),
   ];
 
-  Promise.all(controls).then(() => {
-    if (!stopped) stage.startIdle();
-  });
-
   return () => {
-    stopped = true;
     for (const control of controls) control.stop();
   };
 }
