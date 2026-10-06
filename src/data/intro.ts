@@ -8,8 +8,12 @@ export const INTRO_BOOT_SCRIPT = `if(${INTRO_PATH}.test(location.pathname))docum
 export const INTRO_TIMING = {
   minLoadingMs: 1400,
   maxLoadingMs: 6000,
-  /** Crown pops up, then falls fully off-screen before the circle opens. */
+  /** One shake-then-rest loop; the drop waits for the next loop to begin. */
+  vibrateMs: 1250,
+  /** Crown pops up, then falls off-screen. */
   dropMs: 1150,
+  /** The circle starts opening this long before the drop finishes. */
+  revealOverlapMs: 200,
   revealMs: 1600,
 } as const;
 

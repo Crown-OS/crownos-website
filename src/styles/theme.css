@@ -1,3 +1,10 @@
+/* Side-by-side hero: desktops, plus landscape phones and tablets. Mirrors LAPTOP_SPLIT_QUERY. */
+@custom-variant split {
+  @media (width >= 64rem), (width >= 48rem) and (orientation: landscape) {
+    @slot;
+  }
+}
+
 @theme {
   --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;

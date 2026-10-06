@@ -63,11 +63,13 @@ export function playEntrance(stage: LaptopStage, delay: number): () => void {
     }),
   ];
 
+  let stopped = false;
+  Promise.all(controls).then(() => {
+    if (!stopped) stage.settle();
+  });
+
   return () => {
+    stopped = true;
     for (const control of controls) control.stop();
   };
-}
-
-export function holdFinalPose(stage: LaptopStage) {
-  stage.setPose({ ...stage.poses().to });
 }

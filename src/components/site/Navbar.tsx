@@ -45,13 +45,13 @@ export function Navbar() {
           <Link
             href="/"
             data-cursor="Home"
-            className="col-span-6 flex items-center gap-2 text-ui md:col-span-3"
+            className="col-span-6 flex items-center gap-2 text-ui lg:col-span-3"
           >
             <CrownIcon className="size-6" />
             <RollText text="CrownOS" />
           </Link>
 
-          <ul className="col-span-5 col-start-7 hidden items-center justify-between text-ui md:flex">
+          <ul className="col-span-5 col-start-7 hidden items-center justify-between text-ui lg:flex">
             {navLinks.map(({ label, href, mark }) => (
               <li key={href}>
                 <Link href={href} className="flex items-start gap-1">
@@ -66,7 +66,7 @@ export function Navbar() {
 
           <Link
             href={downloadLink.href}
-            className="col-start-12 hidden items-center justify-end gap-1 text-ui md:flex"
+            className="col-start-12 hidden items-center justify-end gap-1 text-ui lg:flex"
           >
             <RollText text={downloadLink.label} />
             <ArrowUpRightIcon className="size-3" />
@@ -77,7 +77,7 @@ export function Navbar() {
             aria-expanded={menuOpen}
             aria-controls="menu-drawer"
             onClick={() => setMenuOpen(true)}
-            className="col-span-6 justify-self-end text-ui uppercase md:hidden"
+            className="col-span-6 justify-self-end text-ui uppercase lg:hidden"
           >
             <RollText text="Menu" />
           </button>

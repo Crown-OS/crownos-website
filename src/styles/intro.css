@@ -36,7 +36,7 @@ html:not(.js) .intro-overlay {
 .intro-crown {
   width: clamp(3.5rem, 7vw, 5.5rem);
   filter: drop-shadow(0 1.25rem 2.5rem rgb(0 0 0 / 0.6));
-  animation: crown-vibrate 1.25s linear infinite;
+  animation: crown-vibrate var(--intro-vibrate-ms) linear infinite;
 }
 
 .intro-overlay:is([data-state="drop"], [data-state="reveal"]) .intro-crown {

@@ -30,36 +30,31 @@ export type LaptopPose = {
 
 export const LAPTOP_CAMERA = { fov: 28, distance: 7, pitchDeg: 22 } as const;
 
-export const LAPTOP_POSES = {
-  wide: {
-    from: {
-      ndcX: -1.35,
-      ndcY: -0.58,
-      depth: -6,
-      width: 0.3,
-      yawDeg: -336,
-      lidDeg: 0,
-    },
-    to: {
-      ndcX: -0.48,
-      ndcY: -0.58,
-      depth: 0,
-      width: 0.3,
-      yawDeg: 24,
-      lidDeg: 90,
-    },
-  },
-  compact: {
-    from: {
-      ndcX: -1.6,
-      ndcY: -0.6,
-      depth: -6,
-      width: 0.68,
-      yawDeg: -343,
-      lidDeg: 0,
-    },
-    to: { ndcX: 0, ndcY: -0.6, depth: 0, width: 0.68, yawDeg: 17, lidDeg: 90 },
-  },
-} satisfies Record<string, { from: LaptopPose; to: LaptopPose }>;
+export const LAPTOP_SLOT_SELECTOR = "[data-laptop-slot]";
 
-export const LAPTOP_BREAKPOINT = "(min-width: 48rem)";
+/**
+ * On-screen footprint of the settled laptop, in laptop widths, measured at its
+ * final angle. Used to fit it inside the layout slot.
+ */
+export const LAPTOP_FOOTPRINT = {
+  /** Visible extent with the lid open (perspective and yaw make it exceed one width). */
+  width: 1.28,
+  height: 1.11,
+  /** Rig origin (front-center of the base) offset from the footprint's center. */
+  originX: 0.041,
+  originY: 0.477,
+} as const;
+
+export const LAPTOP_MOTION = {
+  /** Final yaw toward the headline, per layout. */
+  yawDeg: { wide: 24, compact: 17 },
+  turnDeg: 360,
+  startDepth: -6,
+  /** Start this many laptop widths past the left edge so the spin never peeks in early. */
+  offscreen: 1.2,
+  openDeg: 90,
+} as const;
+
+/** Mirrors the `split` variant in theme.css: the laptop sits beside the headline instead of below it. */
+export const LAPTOP_SPLIT_QUERY =
+  "(min-width: 64rem), (min-width: 48rem) and (orientation: landscape)";

@@ -21,7 +21,7 @@ export function Hero() {
       />
       <HeroLaptop className="-z-5 pointer-events-none absolute inset-0" />
 
-      <div className="mt-[clamp(3rem,14vh,10rem)] grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-4">
+      <div className="mt-[clamp(3rem,14vh,10rem)] grid flex-1 grid-cols-1 grid-rows-[auto_minmax(11rem,1fr)] gap-8 split:flex-none split:grid-cols-12 split:grid-rows-none split:gap-4">
         <SplitWords
           as="h1"
           lines={hero.lines}
@@ -31,7 +31,12 @@ export function Hero() {
           revealFrom="right"
           revealGate="intro"
           delay={INTRO_STAGGER.heroText * 1000}
-          className="text-display md:col-span-6 md:col-start-7 *:nth-[n+3]:text-[0.62em] *:nth-[n+3]:leading-[1.1] *:nth-[n+3]:tracking-[-0.03em] *:nth-[n+3]:text-muted"
+          className="text-display split:col-span-6 split:col-start-7 split:row-start-1 *:nth-[n+3]:text-[0.62em] *:nth-[n+3]:leading-[1.1] *:nth-[n+3]:tracking-[-0.03em] *:nth-[n+3]:text-muted"
+        />
+        <div
+          data-laptop-slot
+          aria-hidden
+          className="w-[88%] max-w-[32rem] justify-self-center split:col-span-6 split:col-start-1 split:row-start-1 split:mt-[5vh] split:mr-6 split:h-[clamp(9rem,50vh,44rem)] split:w-auto split:justify-self-stretch split:max-w-none"
         />
       </div>
 
