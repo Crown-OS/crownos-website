@@ -48,6 +48,24 @@ export const LAPTOP_TUNE_PARAM = "tune-laptop";
 
 export const LAPTOP_SLOT_SELECTOR = "[data-laptop-slot]";
 
+/**
+ * Contact shadow under the base, in laptop widths. On a near-black page a
+ * shadow alone has nothing to darken, so a faint light pool implies the
+ * surface first; dark layers on top sell the contact.
+ */
+export const LAPTOP_SHADOW = {
+  layers: [
+    { tone: "light", blur: 0.7, opacity: 0.08, inset: -0.3 },
+    { tone: "dark", blur: 0.5, opacity: 0.5, inset: -0.06 },
+    { tone: "dark", blur: 0.1, opacity: 0.65, inset: -0.025 },
+    { tone: "dark", blur: 0.035, opacity: 0.9, inset: -0.012 },
+  ],
+  cornerRadius: 0.04,
+  /** Plane padding around the footprint so the widest blur isn't clipped. */
+  margin: 1.2,
+  resolution: 1024,
+} as const;
+
 /** Multiplier on the slot-fitted size; above 1 lets the laptop overflow its slot. */
 export const LAPTOP_SCALE = 1.03;
 

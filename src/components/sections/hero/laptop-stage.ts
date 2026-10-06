@@ -24,6 +24,7 @@ import {
   measureFootprint,
 } from "./laptop-framing";
 import { type LaptopModel, loadLaptop } from "./laptop-model";
+import { createContactShadow } from "./laptop-shadow";
 
 export type LaptopStage = {
   poses(): Framing;
@@ -101,7 +102,8 @@ export async function mountLaptopStage(
   const laptop = await loadLaptop();
   const rig = new Group();
   const spin = new Group();
-  spin.add(laptop.root);
+  const shadow = createContactShadow(laptop.depth);
+  spin.add(shadow, laptop.root);
   rig.add(spin);
   scene.add(rig);
 
@@ -210,6 +212,9 @@ export async function mountLaptopStage(
       cancelAnimationFrame(pending);
       sizeObserver.disconnect();
       laptop.dispose();
+      shadow.geometry.dispose();
+      shadow.material.map?.dispose();
+      shadow.material.dispose();
       scene.environment?.dispose();
       pmrem.dispose();
       renderer.dispose();

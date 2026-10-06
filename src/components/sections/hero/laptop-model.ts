@@ -17,6 +17,8 @@ import { LAPTOP_ASSET, LAPTOP_HINGE } from "@/data/laptop";
 export type LaptopModel = {
   /** Unit-width laptop, centered on its base, hinge at the back. */
   root: Group;
+  /** Depth of the base relative to its unit width (its footprint on the ground). */
+  depth: number;
   setLid(openDeg: number): void;
   /** A sparse sample of vertices in world space; call after updating world matrices. */
   outline(): Vector3[];
@@ -72,15 +74,17 @@ function hingeLid(lid: Object3D) {
   };
 }
 
-function normalize(model: Object3D): Group {
-  const box = new Box3().setFromObject(model);
+function normalize(model: Object3D) {
+  // Precise: the lid's pivot rotation makes per-mesh boxes balloon, which would
+  // float the base above y = 0.
+  const box = new Box3().setFromObject(model, true);
   const size = box.getSize(new Vector3());
   const center = box.getCenter(new Vector3());
   model.position.sub(center.setY(box.min.y));
   const root = new Group();
   root.add(model);
   root.scale.setScalar(1 / size.x);
-  return root;
+  return { root, depth: size.z / size.x };
 }
 
 function swapScreen(model: Object3D, url: string) {
@@ -122,10 +126,11 @@ export async function loadLaptop(): Promise<LaptopModel> {
   if (LAPTOP_ASSET.screen) swapScreen(scene, LAPTOP_ASSET.screen);
 
   setLid(0);
-  const root = normalize(scene);
+  const { root, depth } = normalize(scene);
 
   return {
     root,
+    depth,
     setLid,
     outline: tracer(sampleVertices(root)),
     dispose: () => disposeTree(root),
