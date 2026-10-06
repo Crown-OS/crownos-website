@@ -9,6 +9,8 @@ import { createFullscreenProgram, createTexture, uploadTexture } from "./webgl";
 const MAX_PIXEL_RATIO = 2;
 const IDLE_SWEEP = -1;
 
+export const METAL_GLINT_EVENT = "metal:glint";
+
 const sweepSeconds = (revealedAt: number | undefined, now: number) => {
   if (revealedAt === undefined) return IDLE_SWEEP;
   const sinceLead = now - revealedAt - SHIMMER.leadMs;
@@ -70,6 +72,10 @@ export function mountMetalText(
   const stopRevealWatch = onRevealed(host, (time) => {
     revealedAt = time;
   });
+  const glint = () => {
+    revealedAt = performance.now() - SHIMMER.leadMs;
+  };
+  host.addEventListener(METAL_GLINT_EVENT, glint);
 
   document.fonts.ready.then(() => {
     if (disposed) return;
@@ -79,6 +85,7 @@ export function mountMetalText(
 
   return () => {
     disposed = true;
+    host.removeEventListener(METAL_GLINT_EVENT, glint);
     stopLoop();
     stopRevealWatch();
     sizeObserver.disconnect();

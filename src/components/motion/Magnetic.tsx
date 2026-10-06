@@ -2,15 +2,14 @@
 
 import { motion, useSpring } from "motion/react";
 import { type PointerEvent, type ReactNode, useRef } from "react";
-
-const SPRING = { stiffness: 200, damping: 15, mass: 0.6 };
+import { SPRING_BOUNCY } from "@/data/springs";
 
 type MagneticProps = { children: ReactNode; strength?: number };
 
 export function Magnetic({ children, strength = 0.32 }: MagneticProps) {
   const bounds = useRef<DOMRect | null>(null);
-  const x = useSpring(0, SPRING);
-  const y = useSpring(0, SPRING);
+  const x = useSpring(0, SPRING_BOUNCY);
+  const y = useSpring(0, SPRING_BOUNCY);
 
   const attract = (event: PointerEvent<HTMLSpanElement>) => {
     if (event.pointerType !== "mouse") return;

@@ -7,14 +7,24 @@ import { useState } from "react";
 import { ArrowUpRightIcon, CrownIcon } from "@/components/icons";
 import { RollText } from "@/components/motion";
 import { downloadLink, navLinks } from "@/data/crownos";
+import { INTRO_STAGGER } from "@/data/intro";
+import { asTransition, SPRING_MORPH, stretch } from "@/data/springs";
+import { type IntroPhase, useIntroPhase } from "@/util/intro";
 import { MenuDrawer } from "./MenuDrawer";
 
 const HIDE_AFTER = 120;
 const SLIDE = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const;
+const INTRO_TRANSITION = {
+  loading: { duration: 0 },
+  revealing: asTransition(stretch(SPRING_MORPH, 2), INTRO_STAGGER.navbar),
+  done: SLIDE,
+} satisfies Record<IntroPhase, object>;
 
 export function Navbar() {
   const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const intro = useIntroPhase();
+  const tucked = intro === "loading" || (hidden && !menuOpen);
 
   useLenis(({ scroll, direction }) => {
     setHidden(scroll > HIDE_AFTER && direction === 1);
@@ -25,8 +35,8 @@ export function Navbar() {
       <motion.header
         className="fixed inset-x-0 top-0 z-50 text-white mix-blend-difference"
         initial={false}
-        animate={{ y: hidden && !menuOpen ? "-110%" : "0%" }}
-        transition={SLIDE}
+        animate={{ y: tucked ? "-110%" : "0%" }}
+        transition={INTRO_TRANSITION[intro]}
       >
         <nav
           aria-label="Primary"
