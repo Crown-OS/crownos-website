@@ -52,6 +52,28 @@
   transform: none;
 }
 
+.js [data-reveal-from="right"] .split-word {
+  overflow: visible;
+}
+
+.js [data-reveal="split"][data-reveal-from="right"] .split-word > span {
+  --word-delay: calc(var(--delay) + var(--i, 0) * 65ms);
+  opacity: 0;
+  transform: translate3d(var(--slide-from, 36vw), 0, 0);
+  transition:
+    transform var(--ease-spring-morph-duration) var(--ease-spring-morph)
+    var(--word-delay),
+    opacity 0.9s var(--ease-out-quart) var(--word-delay);
+}
+
+.js
+  [data-reveal="split"][data-reveal-from="right"][data-shown]
+  .split-word
+  > span {
+  opacity: 1;
+  transform: none;
+}
+
 .split-word:has(> .text-sweep) {
   --rise-from: 190%;
   overflow-clip-margin: 0.7em;
@@ -331,6 +353,12 @@
     opacity: 1;
     transform: none;
     filter: none;
+    transition: none;
+  }
+
+  .js [data-reveal-from="right"] .split-word > span {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 

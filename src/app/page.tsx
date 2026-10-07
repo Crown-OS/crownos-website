@@ -1,3 +1,4 @@
+import { IntroOverlay } from "@/components/intro";
 import {
   Download,
   Ecosystem,
@@ -13,6 +14,7 @@ import { Footer, Navbar } from "@/components/site";
 export default function Home() {
   return (
     <>
+      <IntroOverlay />
       <Navbar />
       <main>
         <Hero />

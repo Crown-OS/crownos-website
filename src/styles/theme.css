@@ -1,3 +1,10 @@
+/* Side-by-side hero: desktops, plus landscape phones and tablets. Mirrors LAPTOP_SPLIT_QUERY. */
+@custom-variant split {
+  @media (width >= 64rem), (width >= 48rem) and (orientation: landscape) {
+    @slot;
+  }
+}
+
 @theme {
   --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
@@ -79,6 +86,59 @@
   --ease-in-out-circ: cubic-bezier(0.85, 0, 0.15, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  /* SPRING_MORPH stretched x3 (src/data/springs.ts), sampled until fully settled. */
+  --ease-spring-morph: linear(
+    0,
+    0.0253,
+    0.0906,
+    0.182,
+    0.2879,
+    0.3993,
+    0.5093,
+    0.6131,
+    0.7073,
+    0.79,
+    0.8604,
+    0.9184,
+    0.9646,
+    0.9999,
+    1.0256,
+    1.0432,
+    1.0539,
+    1.0591,
+    1.06,
+    1.0578,
+    1.0534,
+    1.0477,
+    1.0412,
+    1.0345,
+    1.0279,
+    1.0218,
+    1.0163,
+    1.0115,
+    1.0075,
+    1.0042,
+    1.0016,
+    0.9996,
+    0.9982,
+    0.9972,
+    0.9967,
+    0.9964,
+    0.9964,
+    0.9966,
+    0.9969,
+    0.9972,
+    0.9976,
+    0.998,
+    0.9984,
+    0.9988,
+    0.9991,
+    0.9994,
+    0.9996,
+    0.9998,
+    1
+  );
+  --ease-spring-morph-duration: 1750ms;
 
   --animate-float: float 12s ease-in-out infinite;
   --animate-float-slow: float 16s ease-in-out -3s infinite;

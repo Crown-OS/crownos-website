@@ -48,7 +48,7 @@ function SolutionCard({
         className={`group plate-chrome flex h-full overflow-clip rounded-lg ${LAYOUTS[solution.span]}`}
       >
         <div
-          className={`plate-mirror grid min-h-[clamp(14rem,24vw,20rem)] flex-1 content-center ${MIRROR_EDGES[solution.span]}`}
+          className={`plate-mirror grid grid-cols-1 min-h-[clamp(14rem,24vw,20rem)] flex-1 content-center ${MIRROR_EDGES[solution.span]}`}
         >
           <SolutionVisual visual={solution.visual} />
         </div>
@@ -88,7 +88,7 @@ export function Solutions() {
         </div>
       </div>
 
-      <ul className="mt-[clamp(3rem,6vw,5rem)] grid gap-3 md:grid-cols-12">
+      <ul className="mt-[clamp(3rem,6vw,5rem)] grid grid-cols-1 gap-3 md:grid-cols-12">
         {solutions.items.map((solution, index) => (
           <SolutionCard
             key={solution.visual}

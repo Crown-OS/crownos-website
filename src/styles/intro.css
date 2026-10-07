@@ -1,0 +1,118 @@
+@property --intro-hole {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+html[data-intro="loading"] {
+  overflow: hidden;
+}
+
+.intro-overlay {
+  --intro-hole: 0px;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: var(--color-background);
+  mask: radial-gradient(
+    circle at 50% 50%,
+    transparent var(--intro-hole),
+    #000 calc(var(--intro-hole) + 1px)
+  );
+  animation: intro-failsafe 0s linear 12s forwards;
+}
+
+html:not(.js) .intro-overlay {
+  display: none;
+}
+
+.intro-overlay[data-state="reveal"] {
+  --intro-hole: 150vmax;
+  transition: --intro-hole var(--intro-reveal-ms) var(--ease-in-out-sine);
+}
+
+.intro-crown {
+  width: clamp(3.5rem, 7vw, 5.5rem);
+  filter: drop-shadow(0 1.25rem 2.5rem rgb(0 0 0 / 0.6));
+  animation: crown-vibrate var(--intro-vibrate-ms) linear infinite;
+}
+
+.intro-overlay:is([data-state="drop"], [data-state="reveal"]) .intro-crown {
+  animation: crown-drop var(--intro-drop-ms) linear forwards;
+}
+
+@keyframes crown-vibrate {
+  0%,
+  34%,
+  100% {
+    transform: none;
+  }
+  3% {
+    transform: translate3d(-2px, 1px, 0) rotate(-2.5deg);
+  }
+  6% {
+    transform: translate3d(2px, -1px, 0) rotate(2.5deg);
+  }
+  9% {
+    transform: translate3d(-2px, -1px, 0) rotate(-2deg);
+  }
+  12% {
+    transform: translate3d(2px, 1px, 0) rotate(2deg);
+  }
+  15% {
+    transform: translate3d(-1.5px, 0, 0) rotate(-1.5deg);
+  }
+  18% {
+    transform: translate3d(1.5px, -0.5px, 0) rotate(1.5deg);
+  }
+  22% {
+    transform: translate3d(-1px, 0.5px, 0) rotate(-1deg);
+  }
+  26% {
+    transform: translate3d(1px, 0, 0) rotate(0.6deg);
+  }
+  30% {
+    transform: translate3d(-0.5px, 0, 0) rotate(-0.3deg);
+  }
+}
+
+@keyframes crown-drop {
+  0% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  38% {
+    transform: translate3d(0, -4.5rem, 0) scale(1.08) rotate(-5deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35);
+  }
+  100% {
+    transform: translate3d(0, calc(50vh + 100% + 4rem), 0) scale(1)
+      rotate(16deg);
+  }
+}
+
+@keyframes intro-failsafe {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-crown {
+    animation: none;
+  }
+
+  .intro-overlay:is([data-state="drop"], [data-state="reveal"]) .intro-crown {
+    animation: none;
+    opacity: 0;
+    transition: opacity 0.3s linear;
+  }
+
+  .intro-overlay[data-state="reveal"] {
+    --intro-hole: 0px;
+    opacity: 0;
+    transition: opacity 0.4s linear;
+  }
+}

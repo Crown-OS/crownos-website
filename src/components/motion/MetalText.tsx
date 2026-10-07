@@ -1,20 +1,48 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { motion, useSpring } from "motion/react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { CrownLogo } from "@/components/brand/CrownLogo";
 import { CROWN_BOUNDS, CROWN_LETTER } from "@/data/brand";
-import { mountMetalText } from "@/util/metal-text";
+import { SPRING_BOUNCY } from "@/data/springs";
+import { METAL_GLINT_EVENT, mountMetalText } from "@/util/metal-text";
 
 const CROWN_ASPECT = `${CROWN_BOUNDS.width} / ${CROWN_BOUNDS.height}`;
+const PRESSED_SCALE = 0.92;
+
+function usePress(hostRef: RefObject<HTMLSpanElement | null>) {
+  const scale = useSpring(1, SPRING_BOUNCY);
+  const pressed = useRef(false);
+  const press = () => {
+    pressed.current = true;
+    scale.set(PRESSED_SCALE);
+  };
+  const release = () => {
+    if (!pressed.current) return;
+    pressed.current = false;
+    scale.set(1);
+    hostRef.current?.dispatchEvent(new Event(METAL_GLINT_EVENT));
+  };
+  return {
+    style: { scale },
+    onPointerDown: press,
+    onPointerUp: release,
+    onPointerLeave: release,
+    onPointerCancel: release,
+  };
+}
 
 export function MetalText({
   text,
   className = "",
+  pressable = false,
 }: {
   text: string;
   className?: string;
+  pressable?: boolean;
 }) {
   const hostRef = useRef<HTMLSpanElement>(null);
+  const press = usePress(hostRef);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [shaded, setShaded] = useState(false);
   const crownAt = text.indexOf(CROWN_LETTER);
@@ -29,7 +57,12 @@ export function MetalText({
   }, []);
 
   return (
-    <span ref={hostRef} className={`relative inline-block ${className}`}>
+    <motion.span
+      ref={hostRef}
+      className={`relative inline-block ${pressable ? "touch-manipulation select-none" : ""} ${className}`}
+      data-cursor={pressable ? "" : undefined}
+      {...(pressable ? press : {})}
+    >
       <span className="sr-only">{text}</span>
       <span aria-hidden className={shaded ? "text-transparent" : "text-metal"}>
         <span data-mask="text">{lead}</span>
@@ -53,6 +86,6 @@ export function MetalText({
         aria-hidden
         className="pointer-events-none absolute"
       />
-    </span>
+    </motion.span>
   );
 }

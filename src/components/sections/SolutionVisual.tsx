@@ -101,14 +101,14 @@ const VISUALS: Record<Solution["visual"], ReactNode> = {
     </div>
   ),
   frames: (
-    <div className="grid gap-4 text-micro">
+    <div className="grid grid-cols-1 gap-4 text-micro">
       <p className="flex items-baseline justify-between">
         <span className="text-title tabular-nums">
           144<span className="text-ui text-muted"> fps</span>
         </span>
         <span className="font-mono text-faint">VRR · 6.9 ms</span>
       </p>
-      <div className="overflow-clip border-foreground/10 border-y py-3">
+      <div className="min-w-0 overflow-clip border-foreground/10 border-y py-3">
         <div
           style={{ "--marquee-duration": "5s" } as CSSProperties}
           className="marquee-track"

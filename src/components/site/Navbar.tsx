@@ -7,14 +7,24 @@ import { useState } from "react";
 import { ArrowUpRightIcon, CrownIcon } from "@/components/icons";
 import { RollText } from "@/components/motion";
 import { downloadLink, navLinks } from "@/data/crownos";
+import { INTRO_STAGGER } from "@/data/intro";
+import { asTransition, SPRING_MORPH, stretch } from "@/data/springs";
+import { type IntroPhase, useIntroPhase } from "@/util/intro";
 import { MenuDrawer } from "./MenuDrawer";
 
 const HIDE_AFTER = 120;
 const SLIDE = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const;
+const INTRO_TRANSITION = {
+  loading: { duration: 0 },
+  revealing: asTransition(stretch(SPRING_MORPH, 2), INTRO_STAGGER.navbar),
+  done: SLIDE,
+} satisfies Record<IntroPhase, object>;
 
 export function Navbar() {
   const [hidden, setHidden] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const intro = useIntroPhase();
+  const tucked = intro === "loading" || (hidden && !menuOpen);
 
   useLenis(({ scroll, direction }) => {
     setHidden(scroll > HIDE_AFTER && direction === 1);
@@ -25,8 +35,8 @@ export function Navbar() {
       <motion.header
         className="fixed inset-x-0 top-0 z-50 text-white mix-blend-difference"
         initial={false}
-        animate={{ y: hidden && !menuOpen ? "-110%" : "0%" }}
-        transition={SLIDE}
+        animate={{ y: tucked ? "-110%" : "0%" }}
+        transition={INTRO_TRANSITION[intro]}
       >
         <nav
           aria-label="Primary"
@@ -35,13 +45,13 @@ export function Navbar() {
           <Link
             href="/"
             data-cursor="Home"
-            className="col-span-6 flex items-center gap-2 text-ui md:col-span-3"
+            className="col-span-6 flex items-center gap-2 text-ui lg:col-span-3"
           >
             <CrownIcon className="size-6" />
             <RollText text="CrownOS" />
           </Link>
 
-          <ul className="col-span-5 col-start-7 hidden items-center justify-between text-ui md:flex">
+          <ul className="col-span-5 col-start-7 hidden items-center justify-between text-ui lg:flex">
             {navLinks.map(({ label, href, mark }) => (
               <li key={href}>
                 <Link href={href} className="flex items-start gap-1">
@@ -56,7 +66,7 @@ export function Navbar() {
 
           <Link
             href={downloadLink.href}
-            className="col-start-12 hidden items-center justify-end gap-1 text-ui md:flex"
+            className="col-start-12 hidden items-center justify-end gap-1 text-ui lg:flex"
           >
             <RollText text={downloadLink.label} />
             <ArrowUpRightIcon className="size-3" />
@@ -67,7 +77,7 @@ export function Navbar() {
             aria-expanded={menuOpen}
             aria-controls="menu-drawer"
             onClick={() => setMenuOpen(true)}
-            className="col-span-6 justify-self-end text-ui uppercase md:hidden"
+            className="col-span-6 justify-self-end text-ui uppercase lg:hidden"
           >
             <RollText text="Menu" />
           </button>

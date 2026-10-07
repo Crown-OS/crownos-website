@@ -1,10 +1,12 @@
 import { ShaderCanvas, SplitWords } from "@/components/motion";
 import { PillLink } from "@/components/ui";
 import { download, hero } from "@/data/crownos";
+import { INTRO_STAGGER } from "@/data/intro";
 import {
   DARK_VEIL_RESOLUTION_SCALE,
   DARK_VEIL_SHADER,
 } from "@/shaders/dark-veil";
+import { HeroLaptop } from "./hero/HeroLaptop";
 
 export function Hero() {
   return (
@@ -17,16 +19,24 @@ export function Hero() {
         resolutionScale={DARK_VEIL_RESOLUTION_SCALE}
         className="-z-10 mask-b-from-78%"
       />
+      <HeroLaptop className="-z-5 pointer-events-none absolute inset-0" />
 
-      <div className="mt-[clamp(3rem,14vh,10rem)] grid grid-cols-1 gap-10 md:grid-cols-12 md:gap-4">
+      <div className="mt-[clamp(1rem,4vh,3rem)] grid flex-1 grid-cols-1 content-center gap-8 split:mt-[clamp(3rem,14vh,10rem)] split:flex-none split:content-normal split:grid-cols-12 split:gap-4">
         <SplitWords
           as="h1"
           lines={hero.lines}
           highlight={hero.brand}
           highlightClassName="text-[1.3em]"
           emphasisVariant="sweep"
-          delay={150}
-          className="text-display md:col-span-6 md:col-start-7 *:nth-[n+3]:text-[0.62em] *:nth-[n+3]:leading-[1.1] *:nth-[n+3]:tracking-[-0.03em] *:nth-[n+3]:text-muted"
+          revealFrom="right"
+          revealGate="intro"
+          delay={INTRO_STAGGER.heroText * 1000}
+          className="row-start-2 text-display split:col-span-6 split:col-start-7 split:row-start-1 *:nth-[n+3]:text-[0.62em] *:nth-[n+3]:leading-[1.1] *:nth-[n+3]:tracking-[-0.03em] *:nth-[n+3]:text-muted"
+        />
+        <div
+          data-laptop-slot
+          aria-hidden
+          className="row-start-1 aspect-[128/111] max-h-[36svh] w-[88%] max-w-[32rem] justify-self-center split:col-span-6 split:col-start-1 split:row-start-1 split:mt-[5vh] split:mr-6 split:h-[clamp(9rem,50vh,44rem)] split:w-auto split:justify-self-stretch split:aspect-auto split:max-h-none split:max-w-none"
         />
       </div>
 

@@ -2,18 +2,18 @@
 
 import { motion, useMotionValue, useSpring } from "motion/react";
 import { useEffect, useState } from "react";
+import { asTransition, SPRING_MORPH, SPRING_TIGHT } from "@/data/springs";
 import { useMediaQuery } from "@/util/use-media-query";
 
 const INTERACTIVE = "a, button, [data-cursor]";
-const FOLLOW = { stiffness: 520, damping: 42, mass: 0.45 };
-const MORPH = { type: "spring", stiffness: 380, damping: 26 } as const;
+const MORPH = asTransition(SPRING_MORPH);
 
 export function Cursor() {
   const finePointer = useMediaQuery("(hover: hover) and (pointer: fine)");
   const x = useMotionValue(-100);
   const y = useMotionValue(-100);
-  const followX = useSpring(x, FOLLOW);
-  const followY = useSpring(y, FOLLOW);
+  const followX = useSpring(x, SPRING_TIGHT);
+  const followY = useSpring(y, SPRING_TIGHT);
   const [active, setActive] = useState(false);
   const [label, setLabel] = useState("");
   const [visible, setVisible] = useState(false);

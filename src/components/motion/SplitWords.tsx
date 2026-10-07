@@ -26,6 +26,8 @@ type SplitWordsProps = {
   highlight?: string;
   highlightClassName?: string;
   emphasisVariant?: EmphasisVariant;
+  revealFrom?: "below" | "right";
+  revealGate?: "intro";
 };
 
 type WordProps = Token &
@@ -41,7 +43,7 @@ function WordContent({
   if (highlight && word.startsWith(highlight)) {
     return (
       <>
-        <MetalText text={highlight} className={highlightClassName} />
+        <MetalText text={highlight} className={highlightClassName} pressable />
         {word.slice(highlight.length)}
       </>
     );
@@ -83,6 +85,8 @@ export function SplitWords({
   highlight,
   highlightClassName,
   emphasisVariant = "solid",
+  revealFrom = "below",
+  revealGate,
 }: SplitWordsProps) {
   const tokenLines =
     emphasisVariant === "sweep"
@@ -91,6 +95,8 @@ export function SplitWords({
   return (
     <Tag
       data-reveal="split"
+      data-reveal-from={revealFrom}
+      data-reveal-gate={revealGate}
       className={className}
       style={{ "--delay": `${delay}ms` } as CSSProperties}
     >
