@@ -2,9 +2,9 @@ import { ShaderCanvas, SplitWords } from "@/components/motion";
 import { PillLink } from "@/components/ui";
 import { download, hero } from "@/data/crownos";
 import {
-  DARK_VEIL_RESOLUTION_SCALE,
-  DARK_VEIL_SHADER,
-} from "@/shaders/dark-veil";
+  SILK_RIBBONS_RESOLUTION_SCALE,
+  SILK_RIBBONS_SHADER,
+} from "@/shaders/silk-ribbons";
 
 export function Hero() {
   return (
@@ -13,8 +13,8 @@ export function Hero() {
       className="relative isolate flex min-h-svh flex-col overflow-clip px-gutter pt-[4.5rem] pb-8"
     >
       <ShaderCanvas
-        fragment={DARK_VEIL_SHADER}
-        resolutionScale={DARK_VEIL_RESOLUTION_SCALE}
+        fragment={SILK_RIBBONS_SHADER}
+        resolutionScale={SILK_RIBBONS_RESOLUTION_SCALE}
         className="-z-10 mask-b-from-78%"
       />
 
