@@ -3,11 +3,11 @@ import type { VisualKey } from "@/data/feature";
 import { AccessoryHub } from "./AccessoryHub";
 import { ConfigTree } from "./ConfigTree";
 import { DeviceMesh } from "./DeviceMesh";
-import { SchedulerLanes } from "./KernelArt";
 import { CompositorLayers, CrownUIBlocks } from "./LineArt";
 import { Migration } from "./Migration";
 import { PhysicsDrag } from "./PhysicsDrag";
 import { PluginSandbox } from "./PluginSandbox";
+import { ProcessorChip } from "./ProcessorChip";
 import { RemoteAgents } from "./RemoteAgents";
 import { SecondScreen } from "./SecondScreen";
 import { ThemedApps } from "./ThemedApps";
@@ -26,7 +26,7 @@ const VISUALS = {
   "remote-agents": RemoteAgents,
   "compositor-layers": CompositorLayers,
   "crownui-blocks": CrownUIBlocks,
-  "scheduler-lanes": SchedulerLanes,
+  "processor-chip": ProcessorChip,
 } satisfies Record<VisualKey, ComponentType>;
 
 export function Visual({ name }: { name: VisualKey }) {

@@ -11,7 +11,7 @@ export type VisualKey =
   | "remote-agents"
   | "compositor-layers"
   | "crownui-blocks"
-  | "scheduler-lanes";
+  | "processor-chip";
 
 export type IconKey =
   | "folder"
