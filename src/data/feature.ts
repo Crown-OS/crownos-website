@@ -1,7 +1,7 @@
 export type VisualKey =
-  | "plugin-sandbox"
-  | "device-mesh"
-  | "migration"
+  | "agent-window"
+  | "link-window"
+  | "migration-terminal"
   | "config-tree"
   | "themed-apps"
   | "accessory-hub"
@@ -36,7 +36,7 @@ export type Tone =
 
 export type Feature = {
   label?: string;
-  title: string;
+  title?: string;
   description: string;
   icon?: IconKey;
   visual?: VisualKey;

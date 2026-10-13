@@ -2,12 +2,12 @@ import type { Feature, SectionCopy } from "./feature";
 
 export const foundation = {
   heading: {
-    title: "Built on Arch. *Engineered* by us",
+    title: "Redesigned the entire graphics stack",
     lead: "We started with Arch Linux, lean and trusted, then rebuilt the graphics stack from the compositor up.",
   },
   pillars: [
     {
-      label: "Crown Compositor",
+      label: "Crownpositor",
       title: "Smooth on modest hardware",
       description:
         "A Wayland compositor written in Rust and tuned for low memory. Rendering is fully GPU accelerated with direct scanout, so an idle frame costs almost nothing.",

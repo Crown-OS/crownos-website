@@ -110,6 +110,89 @@
   animation: layer-drift 6s var(--ease-in-out-sine) infinite alternate;
 }
 
+.cursor-drift {
+  animation: cursor-drift 5s var(--ease-in-out-sine) infinite alternate;
+}
+
+[data-spotlight]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    32rem circle at var(--spot-x, 50%) var(--spot-y, 50%),
+    rgb(255 255 255 / 0.07),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-out-expo);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-spotlight]:hover::after {
+    opacity: 1;
+  }
+}
+
+.scroll-progress {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 60;
+  height: 2px;
+  background: var(--color-foreground);
+  transform-origin: 0 50%;
+  scale: 0 1;
+  pointer-events: none;
+}
+
+@supports (animation-timeline: view()) {
+  .scroll-progress {
+    animation: grow-x linear both;
+    animation-timeline: scroll(root);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .scroll-unveil {
+      animation: unveil linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% cover 45%;
+    }
+
+    .scroll-zoom {
+      animation: settle-zoom linear backwards;
+      animation-timeline: view();
+      animation-range: entry 0% cover 50%;
+    }
+  }
+}
+
+@keyframes grow-x {
+  to {
+    scale: 1 1;
+  }
+}
+
+@keyframes unveil {
+  from {
+    clip-path: inset(12% 9% round var(--radius-card));
+  }
+  to {
+    clip-path: inset(0 round var(--radius-card));
+  }
+}
+
+@keyframes settle-zoom {
+  from {
+    scale: 1.14;
+  }
+  to {
+    scale: 1;
+  }
+}
+
 @keyframes link-flow {
   to {
     stroke-dashoffset: -18;
@@ -138,6 +221,12 @@
   }
 }
 
+@keyframes cursor-drift {
+  to {
+    translate: 6% -14%;
+  }
+}
+
 @keyframes layer-drift {
   to {
     transform: translate3d(-3px, 2px, 0);
@@ -159,6 +248,7 @@
   .pulse-dot,
   .spin-slow,
   .draw-stroke,
+  .cursor-drift,
   .layer-drift {
     animation: none;
     transition: none;

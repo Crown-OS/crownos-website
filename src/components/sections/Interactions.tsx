@@ -17,21 +17,28 @@ export function Interactions() {
           >
             <div
               data-reveal
-              className="grid justify-items-start gap-6 md:col-span-5 md:gap-8 lg:col-span-4 lg:col-start-2"
+              className="grid justify-items-start gap-8 md:col-span-5 md:gap-10 lg:col-span-4 lg:col-start-2"
             >
               <IconTile icon={icon} />
-              <h3 className="text-balance text-headline text-trim">{title}</h3>
-              <p className="text-pretty font-normal text-lead text-muted">
-                {description}
-              </p>
+              <div className="grid gap-6">
+                <h3 className="text-balance text-headline text-trim">
+                  {title}
+                </h3>
+                <p className="text-pretty font-normal text-lead text-muted">
+                  {description}
+                </p>
+              </div>
             </div>
             <Parallax className="md:col-span-7 lg:col-span-6 lg:col-start-7">
               <div
                 data-reveal
+                data-spotlight
                 data-tone="tide"
-                className="aurora squircle rounded-card aspect-[6/5] overflow-hidden"
+                className="aurora squircle rounded-card scroll-unveil relative aspect-[6/5] overflow-hidden"
               >
-                <Visual name={visual} />
+                <div className="scroll-zoom size-full">
+                  <Visual name={visual} />
+                </div>
               </div>
             </Parallax>
           </article>

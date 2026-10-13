@@ -3,12 +3,12 @@ import type { Feature, SectionCopy } from "./feature";
 type FlipFeature = Feature & { detail: string };
 
 export const personalize = {
-  heading: { title: "Make it *yours* from one place" },
+  heading: { title: "Apply all your changes from one place" },
   cards: [
     {
       icon: "folder",
       title: "One folder runs the whole system",
-      description: "Every behaviour of CrownOS lives in ~/.config/crown",
+      description: "Every behaviour of CrownOS lives in ~/.config/crownos",
       detail:
         "Keybindings, displays, power, network, animations and plugins are plain TOML files in a single folder. The Settings app writes the same files, so you can click, edit by hand, version with git or carry them to a new machine.",
       visual: "config-tree",

@@ -68,10 +68,7 @@ export function Hero() {
         data-tone="mono"
         className="sticky top-0 h-svh overflow-clip px-gutter pt-20 text-center md:pt-32"
       >
-        <div
-          aria-hidden
-          className="aurora fade-y absolute inset-0 -z-10"
-        />
+        <div aria-hidden className="aurora fade-y absolute inset-0 -z-10" />
         <motion.div
           ref={copyRef}
           style={{ y: headlineY }}

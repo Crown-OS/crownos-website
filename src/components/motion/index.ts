@@ -1,7 +1,10 @@
 export { Cursor } from "./Cursor";
 export { IntroLoader } from "./IntroLoader";
+export { Magnetic } from "./Magnetic";
 export { Parallax } from "./Parallax";
+export { PointerSpotlight } from "./PointerSpotlight";
 export { RevealObserver } from "./RevealObserver";
+export { RevealText } from "./RevealText";
 export { RollText } from "./RollText";
 export { ScrollSequence } from "./ScrollSequence";
 export { SmoothScroll } from "./SmoothScroll";

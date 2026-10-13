@@ -2,7 +2,7 @@ import type { Feature, SectionCopy } from "./feature";
 
 export const trust = {
   heading: {
-    title: "Your system answers to *you*",
+    title: "Your system answers to you",
     lead: "Power without giving up control. Every layer can be inspected, limited and undone.",
   },
   points: [

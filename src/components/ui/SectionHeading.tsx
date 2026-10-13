@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
+import { RevealText } from "@/components/motion";
 import type { SectionCopy } from "@/data/feature";
-import { Emphasized } from "./Emphasized";
 
 type Alignment = "start" | "center";
 
@@ -19,9 +19,11 @@ export function SectionHeading({
     <header
       className={`grid max-w-4xl gap-6 md:gap-8 ${ALIGNMENT_CLASSES[align]}`}
     >
-      <h2 id={id} data-reveal className="text-balance text-headline text-trim">
-        <Emphasized text={title} />
-      </h2>
+      <RevealText
+        id={id}
+        text={title}
+        className="text-balance text-headline text-trim"
+      />
       {lead && (
         <p
           data-reveal

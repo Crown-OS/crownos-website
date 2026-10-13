@@ -1,12 +1,12 @@
 import type { ComponentType } from "react";
 import type { VisualKey } from "@/data/feature";
 import { AccessoryHub } from "./AccessoryHub";
+import { AgentWindow } from "./AgentWindow";
 import { ConfigTree } from "./ConfigTree";
-import { DeviceMesh } from "./DeviceMesh";
 import { CompositorLayers, CrownUIBlocks } from "./LineArt";
-import { Migration } from "./Migration";
+import { LinkWindow } from "./LinkWindow";
+import { MigrationTerminal } from "./MigrationTerminal";
 import { PhysicsDrag } from "./PhysicsDrag";
-import { PluginSandbox } from "./PluginSandbox";
 import { ProcessorChip } from "./ProcessorChip";
 import { RemoteAgents } from "./RemoteAgents";
 import { SecondScreen } from "./SecondScreen";
@@ -14,9 +14,9 @@ import { ThemedApps } from "./ThemedApps";
 import { TilingToggle } from "./TilingToggle";
 
 const VISUALS = {
-  "plugin-sandbox": PluginSandbox,
-  "device-mesh": DeviceMesh,
-  migration: Migration,
+  "agent-window": AgentWindow,
+  "link-window": LinkWindow,
+  "migration-terminal": MigrationTerminal,
   "config-tree": ConfigTree,
   "themed-apps": ThemedApps,
   "accessory-hub": AccessoryHub,

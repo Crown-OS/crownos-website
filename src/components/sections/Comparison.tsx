@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
+import { RevealText } from "@/components/motion";
 import { Section } from "@/components/ui";
 import { comparison } from "@/data/comparison";
 import { ComparisonMatrix } from "./ComparisonMatrix";
@@ -19,14 +20,14 @@ export function Comparison() {
 
   return (
     <Section labelledBy="comparison-title">
-      <div
-        data-reveal
-        className="flex flex-wrap items-center gap-x-6 gap-y-6 md:gap-x-8"
-      >
-        <h2 id="comparison-title" className="text-headline text-trim">
-          {comparison.title}
-        </h2>
+      <div className="flex flex-wrap items-center gap-6 md:gap-x-8">
+        <RevealText
+          id="comparison-title"
+          text={comparison.title}
+          className="text-headline text-trim"
+        />
         <div
+          data-reveal
           role="tablist"
           aria-label="Comparison"
           className="flex flex-wrap gap-2"
@@ -70,14 +71,14 @@ export function Comparison() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-12 md:mt-16"
+        className="mt-stack"
       >
         {active.kind === "meter" ? (
           <ComparisonMeters tab={active} />
         ) : (
           <ComparisonMatrix tab={active} />
         )}
-        <p className="mt-12 max-w-3xl font-normal text-faint text-sm md:mt-16">
+        <p className="mt-8 max-w-3xl font-normal text-faint text-sm">
           {active.note}
         </p>
       </motion.div>

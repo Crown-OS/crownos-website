@@ -72,6 +72,8 @@
   --text-micro--letter-spacing: 0;
 
   --spacing-gutter: clamp(1rem, 3.4vw, 3.125rem);
+  --spacing-section: clamp(6rem, 10vw, 9rem);
+  --spacing-stack: clamp(3rem, 5vw, 4.5rem);
 
   --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;

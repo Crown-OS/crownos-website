@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   Cursor,
   IntroLoader,
+  PointerSpotlight,
   RevealObserver,
   SmoothScroll,
 } from "@/components/motion";
@@ -69,8 +70,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </noscript>
         <IntroLoader />
         <SmoothScroll>
+          <div aria-hidden className="scroll-progress" />
           {children}
           <Cursor />
+          <PointerSpotlight />
           <RevealObserver />
         </SmoothScroll>
       </body>

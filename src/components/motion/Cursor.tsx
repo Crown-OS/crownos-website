@@ -2,6 +2,7 @@
 
 import { motion, useMotionValue, useSpring } from "motion/react";
 import { useEffect, useState } from "react";
+import { FINE_POINTER } from "@/util/pointer";
 import { useMediaQuery } from "@/util/use-media-query";
 
 const INTERACTIVE = "a, button, [data-cursor]";
@@ -9,7 +10,7 @@ const FOLLOW = { stiffness: 520, damping: 42, mass: 0.45 };
 const MORPH = { type: "spring", stiffness: 380, damping: 26 } as const;
 
 export function Cursor() {
-  const finePointer = useMediaQuery("(hover: hover) and (pointer: fine)");
+  const finePointer = useMediaQuery(FINE_POINTER);
   const x = useMotionValue(-100);
   const y = useMotionValue(-100);
   const followX = useSpring(x, FOLLOW);

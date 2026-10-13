@@ -150,6 +150,12 @@
   );
 }
 
+@utility meter-segments {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='5' height='100%25' rx='2.5'/%3E%3C/svg%3E");
+  mask-size: 12px 100%;
+  mask-repeat: repeat-x;
+}
+
 @utility glow {
   background:
     radial-gradient(
@@ -187,6 +193,11 @@
   --text-ui--letter-spacing: -0.011em;
 }
 
+@utility font-display {
+  font-family: var(--font-sans);
+  --text-title--letter-spacing: -0.03em;
+}
+
 @layer base {
   /* biome-ignore lint/correctness/noUnknownProperty: corner-shape ships in Chromium 139+ */
   @supports (corner-shape: squircle) {
@@ -202,4 +213,42 @@
       corner-shape: squircle;
     }
   }
+}
+
+@utility window-stage {
+  container-type: inline-size;
+  --spacing: calc(100cqw / var(--frame-width) * 4);
+  --text-xs: calc(var(--spacing) * 2.75);
+  --text-sm: calc(var(--spacing) * 3.125);
+  --text-base: calc(var(--spacing) * 3.5);
+  --text-lg: calc(var(--spacing) * 4.5);
+  --radius-md: calc(var(--spacing) * 1.5);
+  --radius-lg: calc(var(--spacing) * 2.5);
+  --radius-xl: calc(var(--spacing) * 3.5);
+  --radius-2xl: calc(var(--spacing) * 4.5);
+  letter-spacing: -0.006em;
+}
+
+@utility window-light {
+  color-scheme: light;
+  color: #1d1d1f;
+  background: rgb(232 232 237 / 0.82);
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.14),
+    0 2px 6px rgb(0 0 0 / 0.1),
+    0 28px 56px -16px rgb(0 0 0 / 0.42),
+    0 72px 128px -40px rgb(0 0 0 / 0.5);
+}
+
+@utility window-dark {
+  color: rgb(255 255 255 / 0.88);
+  background: rgb(38 38 42 / 0.82);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1),
+    0 2px 6px rgb(0 0 0 / 0.2),
+    0 28px 56px -16px rgb(0 0 0 / 0.55),
+    0 72px 128px -40px rgb(0 0 0 / 0.6);
 }

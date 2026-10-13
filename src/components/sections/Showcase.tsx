@@ -7,20 +7,20 @@ import { showcase } from "@/data/showcase";
 
 type Layout = "spotlight" | "stacked";
 
-const CARD_SURFACE = "aurora squircle rounded-card relative overflow-hidden";
+const CARD_SURFACE =
+  "aurora squircle rounded-card group relative overflow-hidden";
 
-function CardHeading({ label, title }: Pick<Feature, "label" | "title">) {
+function CardHeading({ label }: Pick<Feature, "label">) {
   return (
-    <hgroup className="grid gap-3">
-      <p className="text-tagline text-white/60 text-trim">{label}</p>
-      <h3 className="text-balance text-tagline text-trim">{title}</h3>
-    </hgroup>
+    <h3 className="max-w-xl text-balance font-content font-medium text-tagline text-white text-trim">
+      {label}
+    </h3>
   );
 }
 
 function CardDescription({ text }: { text: string }) {
   return (
-    <p className="max-w-lg text-pretty font-normal text-lead text-white/80">
+    <p className="max-w-lg text-pretty font-normal text-lead text-white/75 text-trim">
       {text}
     </p>
   );
@@ -37,7 +37,9 @@ function ShowcaseCard({
 }) {
   const visual = feature.visual && (
     <Parallax distance={20} className="relative">
-      <Visual name={feature.visual} />
+      <div className="transition-[scale] duration-700 ease-out-expo group-hover:scale-[1.03]">
+        <Visual name={feature.visual} />
+      </div>
     </Parallax>
   );
 
@@ -45,10 +47,11 @@ function ShowcaseCard({
     return (
       <article
         data-reveal
+        data-spotlight
         data-tone={feature.tone}
         className={`${CARD_SURFACE} grid gap-12 p-8 md:col-span-2 md:p-12 lg:grid-cols-[5fr_7fr] lg:gap-16`}
       >
-        <div className="flex flex-col justify-between gap-12">
+        <div className="flex flex-col justify-between gap-6">
           <CardHeading {...feature} />
           <CardDescription text={feature.description} />
         </div>
@@ -60,15 +63,14 @@ function ShowcaseCard({
   return (
     <article
       data-reveal
+      data-spotlight
       data-tone={feature.tone}
       style={{ "--delay": `${delay}ms` } as CSSProperties}
-      className={`${CARD_SURFACE} flex flex-col gap-12 p-8 md:p-12`}
+      className={`${CARD_SURFACE} flex flex-col gap-6 p-8 md:row-span-3 md:grid md:grid-rows-subgrid md:p-12`}
     >
-      <div className="grid gap-6">
-        <CardHeading {...feature} />
-        <CardDescription text={feature.description} />
-      </div>
-      <div className="mt-auto">{visual}</div>
+      <CardHeading {...feature} />
+      <CardDescription text={feature.description} />
+      <div className="mt-auto pt-6">{visual}</div>
     </article>
   );
 }
@@ -83,7 +85,7 @@ export function Showcase() {
         <ShowcaseCard feature={showcase.spotlight} layout="spotlight" />
         {showcase.pair.map((feature, index) => (
           <ShowcaseCard
-            key={feature.title}
+            key={feature.label}
             feature={feature}
             layout="stacked"
             delay={index * 90}

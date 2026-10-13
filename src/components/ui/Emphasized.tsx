@@ -1,12 +1,15 @@
-const EMPHASIS_MARK = "*";
+import type { ReactNode } from "react";
+import { splitEmphasis } from "@/util/emphasis";
+
+export function Emphasis({ children }: { children: ReactNode }) {
+  return <em className="pr-[0.06em] font-normal font-serif">{children}</em>;
+}
 
 export function Emphasized({ text }: { text: string }) {
-  return text.split(EMPHASIS_MARK).map((part, index) =>
-    index % 2 ? (
+  return splitEmphasis(text).map(({ text: part, emphasized }, index) =>
+    emphasized ? (
       // biome-ignore lint/suspicious/noArrayIndexKey: parts are static and positional
-      <em key={index} className="pr-[0.06em] font-normal font-serif">
-        {part}
-      </em>
+      <Emphasis key={index}>{part}</Emphasis>
     ) : (
       part
     ),

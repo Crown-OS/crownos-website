@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { type CSSProperties, type ReactNode, useState } from "react";
+import { Magnetic } from "@/components/motion";
 import { IconTile } from "@/components/ui";
 import { Visual } from "@/components/visuals";
 import type { Feature } from "@/data/feature";
@@ -20,13 +21,15 @@ function FaceHeader({
   return (
     <div className="flex items-start justify-between">
       {icon && <IconTile icon={icon} />}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="h-11 rounded-full bg-white/12 px-5 text-ui transition-colors duration-300 hover:bg-white/20"
-      >
-        {action}
-      </button>
+      <Magnetic pull={0.24}>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="h-11 rounded-full bg-white/12 px-5 text-ui transition-colors duration-300 hover:bg-white/20"
+        >
+          {action}
+        </button>
+      </Magnetic>
     </div>
   );
 }
@@ -44,6 +47,7 @@ function Face({
     <div
       aria-hidden={hidden}
       inert={hidden}
+      data-spotlight
       className={`${FACE} ${back ? "rotate-y-180" : ""}`}
     >
       {children}
@@ -88,8 +92,10 @@ export function FlipCard({
         </Face>
         <Face hidden={!flipped} back>
           <FaceHeader icon={icon} action="Close" onToggle={toggle} />
-          <h3 className="text-balance text-title text-trim">{title}</h3>
-          <p className="font-normal text-lead text-muted-strong">{detail}</p>
+          <div className="grid gap-4">
+            <h3 className="text-balance text-title text-trim">{title}</h3>
+            <p className="font-normal text-lead text-muted-strong">{detail}</p>
+          </div>
         </Face>
       </motion.div>
     </article>

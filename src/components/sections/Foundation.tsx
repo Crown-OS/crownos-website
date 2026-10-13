@@ -13,25 +13,30 @@ export function Foundation() {
         align="center"
         {...foundation.heading}
       />
-      <div className="mt-12 grid divide-y divide-border border-border border-y md:mt-24 md:grid-cols-3 md:divide-x md:divide-y-0">
+      <div className="mt-stack grid divide-y divide-border border-border border-y md:grid-cols-3 md:divide-x md:divide-y-0">
         {foundation.pillars.map(
           ({ label, title, description, visual }, index) => (
             <article
               key={title}
               data-reveal
+              data-spotlight
               style={{ "--delay": `${index * STAGGER_MS}ms` } as CSSProperties}
-              className="grid content-start justify-items-center gap-6 px-6 py-12 text-center md:px-8 lg:px-12 lg:py-16"
+              className="relative grid content-start justify-items-center gap-8 px-6 py-12 text-center md:gap-12 md:px-8 lg:px-12 lg:py-16"
             >
-              <div className="mb-6 size-48 md:mb-12 md:size-56">
+              <div className="size-48 md:size-56">
                 <Visual name={visual} />
               </div>
-              <p className="font-mono text-micro text-faint uppercase">
-                {label}
-              </p>
-              <h3 className="text-balance text-title text-trim">{title}</h3>
-              <p className="max-w-sm text-pretty font-normal text-lead text-muted">
-                {description}
-              </p>
+              <div className="grid justify-items-center gap-4">
+                <hgroup className="grid justify-items-center gap-3">
+                  <p className="font-mono text-micro text-faint uppercase text-trim">
+                    {label}
+                  </p>
+                  <h3 className="text-balance text-title text-trim">{title}</h3>
+                </hgroup>
+                <p className="max-w-sm text-pretty font-normal text-lead text-muted">
+                  {description}
+                </p>
+              </div>
             </article>
           ),
         )}
