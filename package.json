@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && bun scripts/early-hints.ts",
     "start": "next start",
-    "deploy": "next build && wrangler deploy",
-    "preview": "next build && wrangler dev",
+    "deploy": "bun run build && wrangler deploy",
+    "preview": "bun run build && wrangler dev",
     "lint": "biome check",
     "format": "biome format --write",
     "frames": "bun scripts/encode-frames.ts"

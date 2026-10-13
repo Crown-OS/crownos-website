@@ -254,3 +254,8 @@
     0 28px 56px -16px rgb(0 0 0 / 0.55),
     0 72px 128px -40px rgb(0 0 0 / 0.6);
 }
+
+@utility defer-render {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100svh;
+}
