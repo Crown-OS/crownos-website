@@ -1,0 +1,71 @@
+@utility text-sweep {
+  --sweep-band:
+    var(--color-sweep-sky) 35%, var(--color-sweep-blue) 42.5%,
+    var(--color-sweep-pink) 50%, var(--color-sweep-red) 57.5%,
+    var(--color-sweep-orange) 65%;
+  position: relative;
+  background-image: linear-gradient(
+    90deg,
+    var(--color-foreground) 33.33%,
+    var(--sweep-band),
+    var(--color-foreground) 66.67%
+  );
+  background-size: 300% 100%;
+  background-position: 0 0;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.text-sweep::before,
+.text-sweep::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  background-image: linear-gradient(
+    90deg,
+    transparent 33.33%,
+    var(--sweep-band),
+    transparent 66.67%
+  );
+  background-size: inherit;
+  background-position: inherit;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  mix-blend-mode: plus-lighter;
+  pointer-events: none;
+}
+
+.text-sweep::before {
+  filter: blur(0.08em);
+}
+
+.text-sweep::after {
+  filter: blur(0.3em) saturate(1.4);
+  opacity: 0.85;
+}
+
+.js [data-shown] .text-sweep {
+  animation: text-sweep var(--sweep-cycle, 6s) linear var(--sweep-at, 0s)
+    infinite;
+}
+
+@keyframes text-sweep {
+  0% {
+    background-position: 100% 0;
+    animation-timing-function: var(--ease-in-out-sine);
+  }
+  65%,
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .js [data-shown] .text-sweep {
+    animation: none;
+  }
+}

@@ -1,3 +1,4 @@
-export { Caret } from "./Caret";
-export { Eyebrow } from "./Eyebrow";
-export { PillLink, type PillTone } from "./PillLink";
+export { Emphasized } from "./Emphasized";
+export { IconTile } from "./IconTile";
+export { Section } from "./Section";
+export { SectionHeading } from "./SectionHeading";

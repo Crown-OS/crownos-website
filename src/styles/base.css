@@ -26,6 +26,7 @@
     z-index: 60;
     pointer-events: none;
     opacity: 0.07;
+    mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.4 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
 
@@ -49,5 +50,128 @@
   :focus-visible {
     outline: 1px solid var(--color-foreground);
     outline-offset: 4px;
+  }
+}
+
+@utility text-trim {
+  text-box: trim-both cap alphabetic;
+}
+
+@layer base {
+  [data-tone="dawn"] {
+    --tone-start: #1fb0e6;
+    --tone-mid: #4a3fdc;
+    --tone-end: #9257d6;
+  }
+
+  [data-tone="dusk"] {
+    --tone-start: #1d7fe8;
+    --tone-mid: #3b4fe0;
+    --tone-end: #7b52d6;
+  }
+
+  [data-tone="tide"] {
+    --tone-start: #8fd0ff;
+    --tone-mid: #1f6fe0;
+    --tone-end: #0b2a8f;
+  }
+
+  [data-tone="ember"] {
+    --tone-start: #e2577a;
+    --tone-mid: #c9502f;
+    --tone-end: #eb9d4c;
+  }
+
+  [data-tone="iris"] {
+    --tone-start: #26b6dc;
+    --tone-mid: #5a58e2;
+    --tone-end: #9a5ae0;
+  }
+
+  [data-tone="lagoon"] {
+    --tone-start: #2fb3b8;
+    --tone-mid: #3fd27a;
+    --tone-end: #1f9fb0;
+  }
+
+  [data-tone="violet"] {
+    --tone-start: #a991ff;
+    --tone-mid: #8138ff;
+    --tone-end: #3b0099;
+  }
+
+  [data-tone="crimson"] {
+    --tone-start: #ff8a7a;
+    --tone-mid: #ff3e3e;
+    --tone-end: #932c2c;
+  }
+
+  [data-tone="indigo"] {
+    --tone-start: #7c99ff;
+    --tone-mid: #1d47ff;
+    --tone-end: #4f1fae;
+  }
+}
+
+@utility aurora {
+  background:
+    linear-gradient(155deg, #16151c 12%, transparent 52%),
+    radial-gradient(60% 75% at 12% 100%, var(--tone-start), transparent 72%),
+    radial-gradient(55% 70% at 52% 62%, var(--tone-mid), transparent 72%),
+    radial-gradient(70% 90% at 100% 35%, var(--tone-end), transparent 72%),
+    color-mix(in oklab, var(--tone-mid) 55%, #16151c);
+}
+
+@utility glow {
+  background:
+    radial-gradient(
+      circle farthest-side at 50% 100%,
+      color-mix(in srgb, var(--tone-mid) 50%, transparent) 10%,
+      color-mix(in srgb, var(--tone-end) 12%, transparent)
+    ), var(--color-card);
+}
+
+@utility icon-tile {
+  color: #f2f2f4;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--tone-end, #26262b) 28%, #1c1c20),
+    #0e0e11
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 12px 24px -12px rgb(0 0 0 / 0.9);
+
+  & > svg {
+    filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.5));
+  }
+}
+
+@utility font-content {
+  font-family: var(--font-inter);
+  --text-display--letter-spacing: -0.04em;
+  --text-headline--letter-spacing: -0.035em;
+  --text-tagline--letter-spacing: -0.025em;
+  --text-title--letter-spacing: -0.025em;
+  --text-lead--letter-spacing: -0.011em;
+  --text-ui--letter-spacing: -0.011em;
+}
+
+@layer base {
+  /* biome-ignore lint/correctness/noUnknownProperty: corner-shape ships in Chromium 139+ */
+  @supports (corner-shape: squircle) {
+    :root {
+      --radius-card: 2.4rem;
+      --radius-tile: 1.6rem;
+      --radius-badge: 3.2rem;
+      --radius-window: 1.2rem;
+    }
+
+    .squircle {
+      /* biome-ignore lint/correctness/noUnknownProperty: corner-shape ships in Chromium 139+ */
+      corner-shape: squircle;
+    }
   }
 }

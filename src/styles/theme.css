@@ -1,9 +1,11 @@
 @theme {
-  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-clash-display), ui-sans-serif, system-ui, sans-serif;
+  --font-inter:
+    var(--font-inter-variable), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
   --font-mono: var(--font-fragment-mono), ui-monospace, monospace;
 
-  --color-ink: #0b0b0b;
+  --color-ink: #040404;
   --color-pitch: #050505;
   --color-gray-950: #0a0a0a;
   --color-gray-900: #111111;
@@ -17,25 +19,23 @@
   --color-gray-300: #d4d4d4;
   --color-gray-200: #e5e5e5;
   --color-gray-100: #f5f5f5;
-  --color-paper: #ecebe8;
+  --color-paper: #f9f9fb;
 
-  --color-background: #111111;
-  --color-background-elev: #161616;
-  --color-card: #181818;
+  --color-background: #040404;
+  --color-background-elev: #0c0c0c;
+  --color-card: #141414;
   --color-foreground: #ffffff;
-  --color-muted: rgb(255 255 255 / 0.55);
+  --color-muted: #aaaaaa;
   --color-muted-strong: rgb(255 255 255 / 0.75);
-  --color-faint: rgb(255 255 255 / 0.32);
-  --color-border: rgb(255 255 255 / 0.12);
-  --color-border-strong: rgb(255 255 255 / 0.22);
+  --color-faint: rgb(170 170 170 / 0.5);
+  --color-border: rgb(255 255 255 / 0.08);
+  --color-border-strong: rgb(255 255 255 / 0.12);
   --color-accent: #ffffff;
-  --color-accent-fg: #111111;
+  --color-accent-fg: #040404;
 
-  --color-brand-red: #ff0a36;
-  --color-brand-coral: #ff5a3c;
-  --color-brand-blush: #e89ab8;
-  --color-brand-orchid: #b765dd;
-  --color-brand-violet: #6a00d4;
+  --color-brand: #148eff;
+  --color-brand-light: #a1d2ff;
+  --color-brand-deep: #0852e7;
 
   --color-sweep-sky: #82bcff;
   --color-sweep-blue: #2483ff;
@@ -46,12 +46,18 @@
   --text-mega: clamp(4rem, 17vw, 19rem);
   --text-mega--line-height: 0.8;
   --text-mega--letter-spacing: -0.065em;
+  --text-hero: clamp(3.5rem, 15vw, 18rem);
+  --text-hero--line-height: 0.9;
+  --text-hero--letter-spacing: -0.045em;
   --text-display: clamp(2.6rem, 6.3vw, 6.25rem);
   --text-display--line-height: 0.94;
   --text-display--letter-spacing: -0.055em;
   --text-headline: clamp(2rem, 4.4vw, 4.4rem);
   --text-headline--line-height: 0.98;
   --text-headline--letter-spacing: -0.05em;
+  --text-tagline: clamp(1.5rem, 2.6vw, 2.6rem);
+  --text-tagline--line-height: 1.15;
+  --text-tagline--letter-spacing: -0.035em;
   --text-title: clamp(1.4rem, 1.95vw, 1.85rem);
   --text-title--line-height: 1.1;
   --text-title--letter-spacing: -0.045em;
@@ -73,52 +79,14 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
   --radius-2xl: 2rem;
+  --radius-card: 1.5rem;
+  --radius-tile: 1rem;
+  --radius-badge: 2rem;
+  --radius-window: 0.75rem;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-in-out-circ: cubic-bezier(0.85, 0, 0.15, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-in-out-sine: cubic-bezier(0.37, 0, 0.63, 1);
-
-  --animate-float: float 12s ease-in-out infinite;
-  --animate-float-slow: float 16s ease-in-out -3s infinite;
-  --animate-pulse-glow: pulse-glow 1.2s ease-in-out infinite;
-  --animate-caret: blink 1s steps(2, jump-none) infinite;
-  --animate-spin-slow: spin 28s linear infinite;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -10px, 0);
-  }
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes blink {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes gradient-pan {
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
 }

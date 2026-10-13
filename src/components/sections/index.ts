@@ -1,8 +1,8 @@
-export { Download } from "./Download";
-export { Ecosystem } from "./Ecosystem";
+export { Beta } from "./Beta";
+export { Comparison } from "./Comparison";
+export { Foundation } from "./Foundation";
 export { Hero } from "./Hero";
-export { MarqueeBand } from "./MarqueeBand";
-export { OurVision } from "./OurVision";
-export { Pillars } from "./Pillars";
-export { Solutions } from "./Solutions";
-export { SystemShowcase } from "./SystemShowcase";
+export { Interactions } from "./Interactions";
+export { Personalize } from "./Personalize";
+export { Showcase } from "./Showcase";
+export { Trust } from "./Trust";

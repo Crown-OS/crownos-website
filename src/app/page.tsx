@@ -1,12 +1,12 @@
 import {
-  Download,
-  Ecosystem,
+  Beta,
+  Comparison,
+  Foundation,
   Hero,
-  MarqueeBand,
-  OurVision,
-  Pillars,
-  Solutions,
-  SystemShowcase,
+  Interactions,
+  Personalize,
+  Showcase,
+  Trust,
 } from "@/components/sections";
 import { Footer, Navbar } from "@/components/site";
 
@@ -16,13 +16,15 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-        <MarqueeBand />
-        <OurVision />
-        <Solutions />
-        <Pillars />
-        <Ecosystem />
-        <SystemShowcase />
-        <Download />
+        <div className="font-content">
+          <Showcase />
+          <Personalize />
+          <Interactions />
+          <Foundation />
+          <Comparison />
+          <Trust />
+          <Beta />
+        </div>
       </main>
       <Footer />
     </>

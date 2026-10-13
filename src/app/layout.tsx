@@ -1,12 +1,25 @@
 import type { Metadata, Viewport } from "next";
-import { Fragment_Mono, Instrument_Serif, Inter_Tight } from "next/font/google";
+import { Fragment_Mono, Instrument_Serif, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import Script from "next/script";
 import type { ReactNode } from "react";
-import { Cursor, RevealObserver, SmoothScroll } from "@/components/motion";
+import {
+  Cursor,
+  IntroLoader,
+  RevealObserver,
+  SmoothScroll,
+} from "@/components/motion";
 import "./globals.css";
 
-const sans = Inter_Tight({
-  variable: "--font-inter-tight",
+const sans = localFont({
+  src: "../fonts/ClashDisplay-Variable.woff2",
+  variable: "--font-clash-display",
+  weight: "200 700",
+  display: "swap",
+});
+
+const inter = Inter({
+  variable: "--font-inter-variable",
   subsets: ["latin"],
   display: "swap",
 });
@@ -35,19 +48,26 @@ export const metadata: Metadata = {
     "CrownOS is a monochromatic, Arch-based Linux distribution built for performance, open source values and a calm, AI-ready desktop ecosystem.",
 };
 
-export const viewport: Viewport = { themeColor: "#111111" };
+export const viewport: Viewport = { themeColor: "#040404" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${serif.variable} ${mono.variable}`}
+      className={`${sans.variable} ${inter.variable} ${serif.variable} ${mono.variable}`}
+      data-intro="pending"
       suppressHydrationWarning
     >
       <body>
         <Script id="motion-flag" strategy="beforeInteractive">
           {"document.documentElement.classList.add('js')"}
         </Script>
+        <noscript>
+          <style>
+            {":root{overflow:visible!important}.intro{display:none!important}"}
+          </style>
+        </noscript>
+        <IntroLoader />
         <SmoothScroll>
           {children}
           <Cursor />
