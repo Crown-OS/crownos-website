@@ -43,3 +43,6 @@ next-env.d.ts
 
 # cloudflare
 .wrangler/
+
+# source assets (not deployed)
+/assets-src/
