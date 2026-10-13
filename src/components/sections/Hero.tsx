@@ -65,12 +65,12 @@ export function Hero() {
       <div
         ref={stageRef}
         data-intro-stage
+        data-tone="mono"
         className="sticky top-0 h-svh overflow-clip px-gutter pt-20 text-center md:pt-32"
       >
         <div
           aria-hidden
-          data-tone="dawn"
-          className="aurora absolute inset-0 -z-10 [mask-image:linear-gradient(to_bottom,transparent,#000_40%,#000_80%,transparent)]"
+          className="aurora fade-y absolute inset-0 -z-10"
         />
         <motion.div
           ref={copyRef}

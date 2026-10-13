@@ -55,14 +55,25 @@ export function ScrollSequence({
       const frame = frames[index];
       if (!frame || (index === drawnIndex && !force)) return;
       drawnIndex = index;
+      const { crop } = sequence;
       const { x, y, width, height } = containRect(
-        frame.naturalWidth,
-        frame.naturalHeight,
+        crop.width,
+        crop.height,
         canvas.width,
         canvas.height,
       );
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(frame, x, y, width, height);
+      context.drawImage(
+        frame,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
+        x,
+        y,
+        width,
+        height,
+      );
     };
 
     const resize = new ResizeObserver(([entry]) => {

@@ -15,9 +15,8 @@ export const hero = {
       count: 240,
       extension: "webp",
       digits: 4,
-      width: 1600,
-      height: 1196,
-      restingTop: 0.61,
+      crop: { x: 180, y: 200, width: 1240, height: 880 },
+      restingTop: 0.602,
     } satisfies FrameSequence,
   },
 } as const;

@@ -70,6 +70,17 @@
     --tone-end: #7b52d6;
   }
 
+  [data-tone="mono"] {
+    --tone-start: #b9b9c1;
+    --tone-mid: #5a5a63;
+    --tone-end: #303037;
+    --color-sweep-sky: #8d8d96;
+    --color-sweep-blue: #d4d4da;
+    --color-sweep-pink: #ffffff;
+    --color-sweep-red: #d4d4da;
+    --color-sweep-orange: #8d8d96;
+  }
+
   [data-tone="tide"] {
     --tone-start: #8fd0ff;
     --tone-mid: #1f6fe0;
@@ -120,6 +131,23 @@
     radial-gradient(55% 70% at 52% 62%, var(--tone-mid), transparent 72%),
     radial-gradient(70% 90% at 100% 35%, var(--tone-end), transparent 72%),
     color-mix(in oklab, var(--tone-mid) 55%, #16151c);
+}
+
+@utility fade-y {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 0 0 / 0.3) 12%,
+    rgb(0 0 0 / 0.7) 24%,
+    #000 38%,
+    #000 52%,
+    rgb(0 0 0 / 0.86) 62%,
+    rgb(0 0 0 / 0.62) 72%,
+    rgb(0 0 0 / 0.36) 81%,
+    rgb(0 0 0 / 0.15) 89%,
+    rgb(0 0 0 / 0.04) 95%,
+    transparent
+  );
 }
 
 @utility glow {

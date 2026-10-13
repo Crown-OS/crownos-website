@@ -3,8 +3,7 @@ export type FrameSequence = {
   count: number;
   extension: "webp" | "avif" | "jpg" | "png";
   digits: number;
-  width: number;
-  height: number;
+  crop: Rect;
   restingTop: number;
 };
 
@@ -64,10 +63,10 @@ export function containRect(
 }
 
 export function restingOffset(
-  { width, height, restingTop }: FrameSequence,
+  { crop, restingTop }: FrameSequence,
   box: { width: number; height: number },
   targetTop: number,
 ) {
-  const frame = containRect(width, height, box.width, box.height);
+  const frame = containRect(crop.width, crop.height, box.width, box.height);
   return targetTop - (frame.y + restingTop * frame.height);
 }
