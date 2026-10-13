@@ -2,30 +2,30 @@ import type { Feature, SectionCopy } from "./feature";
 
 export const foundation = {
   heading: {
-    title: "Arch at the core. *CachyOS* in the kernel",
-    lead: "CrownOS keeps Arch Linux as its base and ships linux-cachyos, a kernel tuned for responsiveness and throughput, so the hardware you already own feels faster.",
+    title: "Built on Arch. *Engineered* by us",
+    lead: "We started with Arch Linux, lean and trusted, then rebuilt the graphics stack from the compositor up.",
   },
   pillars: [
     {
-      label: "Scheduler",
-      title: "What you touch runs first",
+      label: "Crown Compositor",
+      title: "Smooth on modest hardware",
       description:
-        "A tuned EEVDF scheduler and a 1000 Hz tick give the window you are using the next slice of CPU, so typing, dragging and audio stay smooth while a build runs behind them.",
+        "A Wayland compositor written in Rust and tuned for low memory. Rendering is fully GPU accelerated with direct scanout, so an idle frame costs almost nothing.",
+      visual: "compositor-layers",
+    },
+    {
+      label: "CrownUI",
+      title: "No stutter, even on first launch",
+      description:
+        "Our UI framework for Wayland, built on the Impeller renderer. Shaders are compiled ahead of time, so the first animation is as fluid as the hundredth.",
+      visual: "crownui-blocks",
+    },
+    {
+      label: "CachyOS Kernel",
+      title: "Faster on the hardware you own",
+      description:
+        "We ship linux-cachyos: a tuned EEVDF scheduler with a 1000 Hz tick, compiled with Clang ThinLTO and AutoFDO profiling, so the desktop stays responsive under load and hot code runs tighter.",
       visual: "scheduler-lanes",
-    },
-    {
-      label: "Compiler",
-      title: "Compiled for the chip you own",
-      description:
-        "Built with Clang ThinLTO and profiled with AutoFDO and Propeller, with builds for x86-64-v3, x86-64-v4 and Zen 4, so hot paths use the instructions your processor actually has.",
-      visual: "compiler-die",
-    },
-    {
-      label: "Memory & I/O",
-      title: "Quick even under pressure",
-      description:
-        "MGLRU tuning protects the apps you are working in from being evicted, while ADIOS disk scheduling and BBRv3 networking keep storage and downloads responsive on a busy system.",
-      visual: "memory-pages",
     },
   ],
 } as const satisfies { heading: SectionCopy; pillars: readonly Feature[] };

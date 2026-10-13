@@ -3,7 +3,8 @@ import type { VisualKey } from "@/data/feature";
 import { AccessoryHub } from "./AccessoryHub";
 import { ConfigTree } from "./ConfigTree";
 import { DeviceMesh } from "./DeviceMesh";
-import { CompilerDie, MemoryPages, SchedulerLanes } from "./KernelArt";
+import { SchedulerLanes } from "./KernelArt";
+import { CompositorLayers, CrownUIBlocks } from "./LineArt";
 import { Migration } from "./Migration";
 import { PhysicsDrag } from "./PhysicsDrag";
 import { PluginSandbox } from "./PluginSandbox";
@@ -23,9 +24,9 @@ const VISUALS = {
   "physics-drag": PhysicsDrag,
   "second-screen": SecondScreen,
   "remote-agents": RemoteAgents,
+  "compositor-layers": CompositorLayers,
+  "crownui-blocks": CrownUIBlocks,
   "scheduler-lanes": SchedulerLanes,
-  "compiler-die": CompilerDie,
-  "memory-pages": MemoryPages,
 } satisfies Record<VisualKey, ComponentType>;
 
 export function Visual({ name }: { name: VisualKey }) {

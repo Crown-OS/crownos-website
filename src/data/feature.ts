@@ -9,9 +9,9 @@ export type VisualKey =
   | "physics-drag"
   | "second-screen"
   | "remote-agents"
-  | "scheduler-lanes"
-  | "compiler-die"
-  | "memory-pages";
+  | "compositor-layers"
+  | "crownui-blocks"
+  | "scheduler-lanes";
 
 export type IconKey =
   | "folder"
