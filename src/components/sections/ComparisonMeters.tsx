@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import type { MeterTab } from "@/data/comparison";
 
 const FILL_SPRING = { type: "spring", stiffness: 70, damping: 20 } as const;
@@ -21,7 +21,7 @@ export function ComparisonMeters({ tab }: { tab: MeterTab }) {
             </p>
             <div className="meter-segments relative h-6 md:h-8">
               <span className="absolute inset-0 bg-white/10" />
-              <motion.span
+              <m.span
                 initial={{ scaleX: 0 }}
                 whileInView={{ scaleX: value / tab.scale }}
                 viewport={{ once: true }}

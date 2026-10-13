@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useScroll, useTransform } from "motion/react";
+import { useScroll, useTransform } from "motion/react";
+import * as m from "motion/react-m";
 import { type CSSProperties, useRef } from "react";
 import { ScrollSequence, SplitLetters } from "@/components/motion";
 import { hero } from "@/data/hero";
@@ -88,13 +89,13 @@ export function Hero() {
         className="sticky top-0 h-svh overflow-clip px-gutter pt-20 text-center md:pt-32"
       >
         <div aria-hidden className="fade-y absolute inset-0 -z-10 isolate">
-          <motion.div
+          <m.div
             style={{ x: swooshX, y: swooshY, scale: swooshScale }}
             className="hero-swoosh absolute -inset-[15%]"
           />
           <div className="hero-grain absolute inset-0" />
         </div>
-        <motion.div
+        <m.div
           ref={copyRef}
           style={{
             y: headlineY,
@@ -119,15 +120,15 @@ export function Hero() {
             />
           </hgroup>
           <HeroSlogan />
-        </motion.div>
-        <motion.div style={{ y: laptopY }} className="absolute inset-0 z-10">
+        </m.div>
+        <m.div style={{ y: laptopY }} className="absolute inset-0 z-10">
           <ScrollSequence
             sequence={hero.laptop.sequence}
             progress={frameProgress}
             label={hero.laptop.label}
             className="size-full"
           />
-        </motion.div>
+        </m.div>
       </div>
     </section>
   );

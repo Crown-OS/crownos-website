@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { useInView, useReducedMotion } from "motion/react";
+import * as m from "motion/react-m";
 import { useEffect, useRef, useState } from "react";
 import { WindowChrome } from "./WindowChrome";
 
@@ -66,7 +67,7 @@ export function TilingToggle() {
             }`}
           >
             {mode === option && (
-              <motion.span
+              <m.span
                 layoutId="layout-mode-indicator"
                 transition={SPRING}
                 className="absolute inset-0 rounded-full bg-paper"
@@ -77,7 +78,7 @@ export function TilingToggle() {
         ))}
       </fieldset>
       {LAYOUTS[mode].map((box, index) => (
-        <motion.div
+        <m.div
           key={WINDOW_TITLES[index]}
           initial={false}
           animate={box}
@@ -85,7 +86,7 @@ export function TilingToggle() {
           className="absolute flex flex-col overflow-hidden squircle rounded-window border border-white/12 bg-gray-850 shadow-[0_24px_48px_-24px_rgb(0_0_0/0.8)]"
         >
           <WindowChrome title={WINDOW_TITLES[index]} />
-        </motion.div>
+        </m.div>
       ))}
     </div>
   );

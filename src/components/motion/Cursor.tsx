@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useMotionValue, useSpring } from "motion/react";
+import { useMotionValue, useSpring } from "motion/react";
+import * as m from "motion/react-m";
 import { useEffect, useState } from "react";
 import { FINE_POINTER } from "@/util/pointer";
 import { useMediaQuery } from "@/util/use-media-query";
@@ -52,24 +53,24 @@ export function Cursor() {
   if (!finePointer) return null;
 
   return (
-    <motion.div
+    <m.div
       aria-hidden
       className="pointer-events-none fixed top-0 left-0 z-[70] mix-blend-difference"
       style={{ x: followX, y: followY }}
     >
-      <motion.div
+      <m.div
         className="-translate-x-1/2 -translate-y-1/2 grid size-[4.5rem] place-items-center rounded-full bg-white"
         initial={false}
         animate={{ scale: active ? 1 : 0.14, opacity: visible ? 1 : 0 }}
         transition={MORPH}
       >
-        <motion.span
+        <m.span
           className="font-mono text-[0.7rem] text-black uppercase"
           animate={{ opacity: label && active ? 1 : 0 }}
         >
           {label}
-        </motion.span>
-      </motion.div>
-    </motion.div>
+        </m.span>
+      </m.div>
+    </m.div>
   );
 }

@@ -1,6 +1,7 @@
 export { Cursor } from "./Cursor";
 export { IntroLoader } from "./IntroLoader";
 export { Magnetic } from "./Magnetic";
+export { MotionProvider } from "./MotionProvider";
 export { Parallax } from "./Parallax";
 export { PointerSpotlight } from "./PointerSpotlight";
 export { RevealObserver } from "./RevealObserver";

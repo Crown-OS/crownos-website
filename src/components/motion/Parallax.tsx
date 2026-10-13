@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useScroll, useTransform } from "motion/react";
+import { useScroll, useTransform } from "motion/react";
+import * as m from "motion/react-m";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { prefersReducedMotion } from "@/util/reduced-motion";
 
@@ -28,8 +29,8 @@ export function Parallax({
   useEffect(() => setEnabled(!prefersReducedMotion()), []);
 
   return (
-    <motion.div ref={ref} style={{ y: enabled ? y : 0 }} className={className}>
+    <m.div ref={ref} style={{ y: enabled ? y : 0 }} className={className}>
       {children}
-    </motion.div>
+    </m.div>
   );
 }

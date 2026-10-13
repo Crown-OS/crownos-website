@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import { useState } from "react";
 import { RevealText } from "@/components/motion";
 import { Section } from "@/components/ui";
@@ -50,7 +50,7 @@ export function Comparison() {
                 }`}
               >
                 {selected && (
-                  <motion.span
+                  <m.span
                     layoutId="comparison-tab-indicator"
                     transition={TAB_SPRING}
                     className="absolute inset-0 rounded-full bg-paper"
@@ -63,7 +63,7 @@ export function Comparison() {
         </div>
       </div>
 
-      <motion.div
+      <m.div
         key={active.id}
         id={PANEL_ID}
         role="tabpanel"
@@ -81,7 +81,7 @@ export function Comparison() {
         <p className="mt-8 max-w-3xl font-normal text-faint text-sm">
           {active.note}
         </p>
-      </motion.div>
+      </m.div>
     </Section>
   );
 }

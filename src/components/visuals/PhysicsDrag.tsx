@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  motion,
   useMotionValue,
   useSpring,
   useTransform,
   useVelocity,
 } from "motion/react";
+import * as m from "motion/react-m";
 import { useRef } from "react";
 import { WindowChrome } from "./WindowChrome";
 
@@ -46,7 +46,7 @@ export function PhysicsDrag() {
       ref={boundsRef}
       className="relative size-full overflow-hidden bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] bg-size-[20px_20px]"
     >
-      <motion.div
+      <m.div
         drag
         dragConstraints={boundsRef}
         dragElastic={0.2}
@@ -58,7 +58,7 @@ export function PhysicsDrag() {
         className="absolute top-[18%] left-[16%] flex h-[46%] w-[68%] cursor-grab touch-none flex-col overflow-hidden squircle rounded-window border border-white/14 bg-gray-850 shadow-[0_32px_64px_-24px_rgb(0_0_0/0.9)] active:cursor-grabbing"
       >
         <WindowChrome title="fling me" />
-      </motion.div>
+      </m.div>
       <SpringReadout />
       <p className="absolute right-[6%] bottom-[6%] font-mono text-[10px] text-white/45 uppercase">
         Drag the window

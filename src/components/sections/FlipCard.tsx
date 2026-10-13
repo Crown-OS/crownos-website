@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "motion/react";
+import * as m from "motion/react-m";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { Magnetic } from "@/components/motion";
 import { IconTile } from "@/components/ui";
@@ -74,7 +74,7 @@ export function FlipCard({
       style={{ "--delay": `${delay}ms` } as CSSProperties}
       className="relative aspect-[4/5] perspective-[1800px] sm:aspect-[3/4] lg:aspect-[4/5]"
     >
-      <motion.div
+      <m.div
         initial={false}
         animate={{ rotateY: flipped ? 180 : 0 }}
         transition={FLIP_SPRING}
@@ -97,7 +97,7 @@ export function FlipCard({
             <p className="font-normal text-lead text-muted-strong">{detail}</p>
           </div>
         </Face>
-      </motion.div>
+      </m.div>
     </article>
   );
 }

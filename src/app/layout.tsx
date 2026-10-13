@@ -5,6 +5,7 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import {
   Cursor,
+  MotionProvider,
   PointerSpotlight,
   RevealObserver,
   SmoothScroll,
@@ -87,11 +88,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </style>
         </noscript>
         <SmoothScroll>
-          <div aria-hidden className="scroll-progress" />
-          {children}
-          <Cursor />
-          <PointerSpotlight />
-          <RevealObserver />
+          <MotionProvider>
+            <div aria-hidden className="scroll-progress" />
+            {children}
+            <Cursor />
+            <PointerSpotlight />
+            <RevealObserver />
+          </MotionProvider>
         </SmoothScroll>
       </body>
     </html>

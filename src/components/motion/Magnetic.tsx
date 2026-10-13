@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useMotionValue, useSpring } from "motion/react";
+import { useMotionValue, useSpring } from "motion/react";
+import * as m from "motion/react-m";
 import type { PointerEvent, ReactNode } from "react";
 import { FINE_POINTER } from "@/util/pointer";
 import { prefersReducedMotion } from "@/util/reduced-motion";
@@ -39,13 +40,13 @@ export function Magnetic({
   };
 
   return (
-    <motion.span
+    <m.span
       className={className}
       style={{ x, y }}
       onPointerMove={attract}
       onPointerLeave={release}
     >
       {children}
-    </motion.span>
+    </m.span>
   );
 }
