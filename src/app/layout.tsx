@@ -5,7 +5,6 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import {
   Cursor,
-  IntroLoader,
   PointerSpotlight,
   RevealObserver,
   SmoothScroll,
@@ -76,7 +75,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       className={`${sans.variable} ${inter.variable} ${serif.variable} ${mono.variable}`}
-      data-intro="pending"
       suppressHydrationWarning
     >
       <body>
@@ -88,7 +86,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {":root{overflow:visible!important}.intro{display:none!important}"}
           </style>
         </noscript>
-        <IntroLoader />
         <SmoothScroll>
           <div aria-hidden className="scroll-progress" />
           {children}

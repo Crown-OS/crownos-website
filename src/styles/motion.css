@@ -267,16 +267,11 @@
   display: none;
 }
 
-:root:is(
-    [data-intro="pending"],
-    [data-intro="dropping"],
-    [data-intro="leaving"]
-  )
-  .intro {
+.intro:not([data-phase="done"]) {
   display: block;
 }
 
-:root:is([data-intro="pending"], [data-intro="dropping"]) {
+:root:has(.intro:is([data-phase="pending"], [data-phase="dropping"])) {
   overflow: hidden;
 }
 
@@ -290,7 +285,7 @@
   transition-delay: 0s;
 }
 
-[data-intro="leaving"] .intro-curtain {
+.intro[data-phase="leaving"] .intro-curtain {
   transform: translate3d(0, -100%, 0);
 }
 
@@ -300,7 +295,7 @@
     transform 1s var(--ease-in-out-circ);
 }
 
-[data-intro="leaving"] .intro-content {
+.intro[data-phase="leaving"] .intro-content {
   opacity: 0;
   transform: translate3d(0, -12svh, 0);
 }
@@ -311,7 +306,7 @@
   animation: crown-vibrate var(--intro-vibrate-ms) linear infinite;
 }
 
-:root:is([data-intro="dropping"], [data-intro="leaving"]) .intro-crown {
+.intro:is([data-phase="dropping"], [data-phase="leaving"]) .intro-crown {
   animation: crown-drop var(--intro-drop-ms) linear forwards;
 }
 
@@ -368,25 +363,22 @@
   transition: transform 1.6s var(--ease-out-expo) 0.2s;
 }
 
-:root:is([data-intro="pending"], [data-intro="dropping"]) [data-intro-stage] {
+:root:has(.intro:is([data-phase="pending"], [data-phase="dropping"]))
+  [data-intro-stage] {
   transform: scale(1.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root:is(
-      [data-intro="pending"],
-      [data-intro="dropping"],
-      [data-intro="leaving"]
-    )
-    .intro {
+  .intro:not([data-phase="done"]) {
     display: none;
   }
 
-  :root:is([data-intro="pending"], [data-intro="dropping"]) {
+  :root:has(.intro:is([data-phase="pending"], [data-phase="dropping"])) {
     overflow: visible;
   }
 
-  :root:is([data-intro="pending"], [data-intro="dropping"]) [data-intro-stage] {
+  :root:has(.intro:is([data-phase="pending"], [data-phase="dropping"]))
+    [data-intro-stage] {
     transform: none;
   }
 }

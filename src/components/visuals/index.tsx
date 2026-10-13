@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import type { VisualKey } from "@/data/feature";
 import { AccessoryHub } from "./AccessoryHub";
 import { AgentWindow } from "./AgentWindow";
-import { ConfigTree } from "./ConfigTree";
+import { ConfigEditor } from "./editor/ConfigEditor";
 import { CompositorLayers, CrownUIBlocks } from "./LineArt";
 import { LinkWindow } from "./LinkWindow";
 import { MigrationTerminal } from "./MigrationTerminal";
@@ -10,15 +10,15 @@ import { PhysicsDrag } from "./PhysicsDrag";
 import { ProcessorChip } from "./ProcessorChip";
 import { RemoteAgents } from "./RemoteAgents";
 import { SecondScreen } from "./SecondScreen";
-import { ThemedApps } from "./ThemedApps";
+import { SettingsWindow } from "./settings/SettingsWindow";
 import { TilingToggle } from "./TilingToggle";
 
 const VISUALS = {
   "agent-window": AgentWindow,
   "link-window": LinkWindow,
   "migration-terminal": MigrationTerminal,
-  "config-tree": ConfigTree,
-  "themed-apps": ThemedApps,
+  "config-editor": ConfigEditor,
+  "settings-window": SettingsWindow,
   "accessory-hub": AccessoryHub,
   "tiling-toggle": TilingToggle,
   "physics-drag": PhysicsDrag,

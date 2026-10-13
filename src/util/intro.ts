@@ -4,7 +4,8 @@ const REVEAL_EVENT = "crownos:intro-reveal";
 let revealsReleased = false;
 
 export function setIntroPhase(phase: IntroPhase) {
-  document.documentElement.dataset.intro = phase;
+  const loader = document.querySelector<HTMLElement>(".intro");
+  if (loader) loader.dataset.phase = phase;
 }
 
 export function releaseReveals() {

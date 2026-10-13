@@ -1,0 +1,58 @@
+export type TreeEntry = { name: string; kind: "folder" | "file" };
+
+const CONFIG_FILES = [
+  "appearance",
+  "bar",
+  "bluetooth",
+  "clipboard",
+  "compositor",
+  "display",
+  "dock",
+  "glass",
+  "input",
+  "keybinds",
+  "lock",
+  "notifications",
+  "power",
+  "sound",
+  "theme",
+  "wifi",
+];
+
+export const configEditor = {
+  project: "crownos",
+  branch: "main",
+  openFile: "appearance.ron",
+  tree: [
+    { name: ".git", kind: "folder" },
+    ...CONFIG_FILES.map(
+      (name): TreeEntry => ({ name: `${name}.ron`, kind: "file" }),
+    ),
+  ] satisfies TreeEntry[],
+  source: [
+    "(",
+    "    dark_mode: true,",
+    "    accent: Purple,",
+    "    transparency: 0.0,",
+    '    wallpaper: "~/Pictures/wallpapers/shorekeeper.jpg",',
+    "    bar_height: 40,",
+    "    gaps_inner: 8,",
+    "    gaps_outer: 8,",
+    "    border_width: 4,",
+    "    border_radius: 16,",
+    "    animations: Standard,",
+    "    titlebar_height: 40,",
+    "    snap: true,",
+    "    appmenu: true,",
+    "    blur: true,",
+    "    blur_passes: 4,",
+    "    blur_size: 1.5,",
+    "    blur_noise: 0.01,",
+    '    cursor_theme: "",',
+    '    icon_theme: "",',
+    ")",
+  ],
+  activeLine: 10,
+  breadcrumb: ["~", ".config", "crownos", "appearance.ron"],
+  status: ["Ln 10, Col 23", "UTF-8", "RON"],
+} as const;

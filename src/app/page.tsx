@@ -1,3 +1,4 @@
+import { IntroLoader } from "@/components/motion";
 import {
   Beta,
   Comparison,
@@ -13,6 +14,7 @@ import { Footer, Navbar, StructuredData } from "@/components/site";
 export default function Home() {
   return (
     <>
+      <IntroLoader />
       <StructuredData />
       <Navbar />
       <main>

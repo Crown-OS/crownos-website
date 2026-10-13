@@ -40,6 +40,12 @@ function observeReveals() {
 }
 
 export function RevealObserver() {
-  useEffect(() => onRevealsReleased(observeReveals), []);
+  useEffect(
+    () =>
+      document.querySelector(".intro")
+        ? onRevealsReleased(observeReveals)
+        : observeReveals(),
+    [],
+  );
   return null;
 }

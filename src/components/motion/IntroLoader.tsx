@@ -100,7 +100,13 @@ export function IntroLoader() {
   }, []);
 
   return (
-    <div aria-hidden className="intro" style={CROWN_TIMING} data-lenis-prevent>
+    <div
+      aria-hidden
+      className="intro"
+      style={CROWN_TIMING}
+      data-phase="pending"
+      data-lenis-prevent
+    >
       <div ref={backCurtainRef} className="intro-curtain bg-paper" />
       <div
         ref={frontCurtainRef}

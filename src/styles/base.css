@@ -75,11 +75,6 @@
     --tone-start: #b9b9c1;
     --tone-mid: #5a5a63;
     --tone-end: #303037;
-    --color-sweep-sky: #8d8d96;
-    --color-sweep-blue: #d4d4da;
-    --color-sweep-pink: #ffffff;
-    --color-sweep-red: #d4d4da;
-    --color-sweep-orange: #8d8d96;
   }
 
   [data-tone="tide"] {
@@ -132,6 +127,12 @@
     radial-gradient(55% 70% at 52% 62%, var(--tone-mid), transparent 72%),
     radial-gradient(70% 90% at 100% 35%, var(--tone-end), transparent 72%),
     color-mix(in oklab, var(--tone-mid) 55%, #16151c);
+}
+
+@utility text-lift {
+  text-shadow:
+    0 0.02em 0.08em rgb(0 0 0 / 0.1),
+    0 0.06em 0.6em rgb(0 0 0 / 0.1);
 }
 
 @utility fade-y {

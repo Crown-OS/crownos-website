@@ -24,7 +24,7 @@ export const foundation = {
       label: "CachyOS Kernel",
       title: "Faster on the hardware you own",
       description:
-        "We ship linux-cachyos: a tuned EEVDF scheduler with a 1000 Hz tick, compiled with Clang ThinLTO and AutoFDO profiling, so the desktop stays responsive under load and hot code runs tighter.",
+        "We ship linux-cachyos: a tuned EEVDF scheduler with a 1000 Hz tick, compiled with Clang ThinLTO and AutoFDO profiling, so the desktop stays responsive under load.",
       visual: "processor-chip",
     },
   ],
