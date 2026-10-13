@@ -8,11 +8,12 @@ import {
   Showcase,
   Trust,
 } from "@/components/sections";
-import { Footer, Navbar } from "@/components/site";
+import { Footer, Navbar, StructuredData } from "@/components/site";
 
 export default function Home() {
   return (
     <>
+      <StructuredData />
       <Navbar />
       <main>
         <Hero />

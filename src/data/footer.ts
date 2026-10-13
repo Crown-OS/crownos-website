@@ -17,7 +17,7 @@ export const footer = {
     ],
     [
       { label: "Community", href: "/community" },
-      { label: "GitHub", href: "https://github.com" },
+      { label: "GitHub", href: "https://github.com/Crown-OS" },
     ],
   ] satisfies NavLink[][],
 } as const;

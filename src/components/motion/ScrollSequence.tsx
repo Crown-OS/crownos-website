@@ -2,6 +2,7 @@
 
 import type { MotionValue } from "motion/react";
 import { useEffect, useRef } from "react";
+import { preload } from "react-dom";
 import {
   coarseToFineOrder,
   containRect,
@@ -9,6 +10,7 @@ import {
   frameUrl,
   nearestLoaded,
 } from "@/util/frame-sequence";
+import { whenIdle } from "@/util/idle";
 
 const MAX_PIXEL_RATIO = 2;
 const PARALLEL_REQUESTS = 6;
@@ -39,6 +41,7 @@ export function ScrollSequence({
   className,
 }: ScrollSequenceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  preload(frameUrl(sequence, 0), { as: "image", fetchPriority: "high" });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -48,6 +51,7 @@ export function ScrollSequence({
     const frames: (HTMLImageElement | undefined)[] = new Array(sequence.count);
     let drawnIndex = -1;
     let active = true;
+    let cancelStreaming = () => {};
 
     const draw = (force = false) => {
       const target = Math.round(progress.get() * (sequence.count - 1));
@@ -104,15 +108,18 @@ export function ScrollSequence({
     decodeFrame(frameUrl(sequence, firstIndex), "high").then((frame) => {
       if (!frame) return;
       store(firstIndex, frame);
-      for (let worker = 0; worker < PARALLEL_REQUESTS; worker++) {
-        streamRemaining();
-      }
+      cancelStreaming = whenIdle(() => {
+        for (let worker = 0; worker < PARALLEL_REQUESTS; worker++) {
+          streamRemaining();
+        }
+      });
     });
 
     const unsubscribe = progress.on("change", () => draw());
 
     return () => {
       active = false;
+      cancelStreaming();
       unsubscribe();
       resize.disconnect();
     };

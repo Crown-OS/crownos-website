@@ -10,6 +10,7 @@ import {
   RevealObserver,
   SmoothScroll,
 } from "@/components/motion";
+import { site } from "@/data/site";
 import "./globals.css";
 
 const sans = localFont({
@@ -28,7 +29,7 @@ const inter = Inter({
 const serif = Instrument_Serif({
   variable: "--font-instrument-serif",
   weight: "400",
-  style: ["normal", "italic"],
+  style: "italic",
   subsets: ["latin"],
   display: "swap",
 });
@@ -38,18 +39,37 @@ const mono = Fragment_Mono({
   weight: "400",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "CrownOS · An AI-ready Arch Linux distribution",
-    template: "%s",
+  metadataBase: new URL(site.url),
+  title: { default: site.title, template: `%s · ${site.name}` },
+  description: site.description,
+  applicationName: site.name,
+  keywords: [...site.keywords],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: site.name,
+    title: site.title,
+    description: site.description,
+    locale: "en_US",
   },
-  description:
-    "CrownOS is a monochromatic, Arch-based Linux distribution built for performance, open source values and a calm, AI-ready desktop ecosystem.",
+  twitter: {
+    card: "summary_large_image",
+    title: site.title,
+    description: site.description,
+  },
+  robots: { index: true, follow: true },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
-export const viewport: Viewport = { themeColor: "#040404" };
+export const viewport: Viewport = {
+  themeColor: site.background,
+  colorScheme: "dark",
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
