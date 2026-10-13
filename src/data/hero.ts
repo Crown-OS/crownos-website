@@ -11,11 +11,15 @@ export const hero = {
   laptop: {
     label: "A CrownOS laptop opening to the desktop",
     sequence: {
-      path: "/crownbook-mocks",
-      count: 240,
-      extension: "webp",
+      path: "/sequences/crownbook/v1",
+      frames: 145,
+      timeline: 240,
       digits: 4,
-      crop: { x: 180, y: 200, width: 1240, height: 880 },
+      size: { width: 1240, height: 880 },
+      tiers: [
+        { width: 828, media: "(max-width: 480px)" },
+        { width: 1240, media: "(min-width: 481px)" },
+      ],
       restingTop: 0.602,
     } satisfies FrameSequence,
   },

@@ -6,7 +6,7 @@ export { PointerSpotlight } from "./PointerSpotlight";
 export { RevealObserver } from "./RevealObserver";
 export { RevealText } from "./RevealText";
 export { RollText } from "./RollText";
-export { ScrollSequence } from "./ScrollSequence";
 export { SmoothScroll } from "./SmoothScroll";
 export { SplitLetters } from "./SplitLetters";
 export { SplitWords } from "./SplitWords";
+export { ScrollSequence } from "./sequence/ScrollSequence";

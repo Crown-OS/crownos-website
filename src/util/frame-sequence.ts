@@ -1,18 +1,30 @@
+export type Size = { width: number; height: number };
+export type Rect = Size & { x: number; y: number };
+export type FrameTier = { width: number; media: string };
+
 export type FrameSequence = {
   path: string;
-  count: number;
-  extension: "webp" | "avif" | "jpg" | "png";
+  frames: number;
+  timeline: number;
   digits: number;
-  crop: Rect;
+  size: Size;
+  tiers: readonly FrameTier[];
   restingTop: number;
 };
 
-export type Rect = { x: number; y: number; width: number; height: number };
-
 export const frameUrl = (
-  { path, extension, digits }: FrameSequence,
+  { path, digits }: FrameSequence,
+  { width }: FrameTier,
   index: number,
-) => `${path}/${String(index + 1).padStart(digits, "0")}.${extension}`;
+) => `${path}/${width}/${String(index + 1).padStart(digits, "0")}.avif`;
+
+export const frameAt = (
+  { frames, timeline }: FrameSequence,
+  progress: number,
+) => Math.min(Math.round(progress * (timeline - 1)), frames - 1);
+
+export const tierFor = ({ tiers }: FrameSequence) =>
+  tiers.find(({ media }) => window.matchMedia(media).matches) ?? tiers[0];
 
 export function coarseToFineOrder(count: number) {
   const order: number[] = [];
@@ -42,31 +54,26 @@ export function nearestLoaded<T>(
   return -1;
 }
 
-export function containRect(
-  sourceWidth: number,
-  sourceHeight: number,
-  targetWidth: number,
-  targetHeight: number,
-): Rect {
+export function containRect(source: Size, target: Size): Rect {
   const scale = Math.min(
-    targetWidth / sourceWidth,
-    targetHeight / sourceHeight,
+    target.width / source.width,
+    target.height / source.height,
   );
-  const width = sourceWidth * scale;
-  const height = sourceHeight * scale;
+  const width = source.width * scale;
+  const height = source.height * scale;
   return {
-    x: (targetWidth - width) / 2,
-    y: (targetHeight - height) / 2,
+    x: (target.width - width) / 2,
+    y: (target.height - height) / 2,
     width,
     height,
   };
 }
 
 export function restingOffset(
-  { crop, restingTop }: FrameSequence,
-  box: { width: number; height: number },
+  { size, restingTop }: FrameSequence,
+  box: Size,
   targetTop: number,
 ) {
-  const frame = containRect(crop.width, crop.height, box.width, box.height);
+  const frame = containRect(size, box);
   return targetTop - (frame.y + restingTop * frame.height);
 }
