@@ -21,9 +21,7 @@ export function Interactions() {
             >
               <IconTile icon={icon} />
               <div className="grid gap-6">
-                <h3 className="text-balance text-headline text-trim">
-                  {title}
-                </h3>
+                <h3 className="text-balance text-tagline text-trim">{title}</h3>
                 <p className="text-pretty font-normal text-lead text-muted">
                   {description}
                 </p>
