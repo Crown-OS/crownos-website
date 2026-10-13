@@ -8,15 +8,19 @@ const STAGGER_MS = 90;
 export function Foundation() {
   return (
     <Section labelledBy="foundation-title">
-      <SectionHeading id="foundation-title" {...foundation.heading} />
-      <div className="mt-12 grid gap-12 md:mt-24 md:grid-cols-3 md:gap-0 md:divide-x md:divide-border">
+      <SectionHeading
+        id="foundation-title"
+        align="center"
+        {...foundation.heading}
+      />
+      <div className="mt-12 grid divide-y divide-border border-border border-y md:mt-24 md:grid-cols-3 md:divide-x md:divide-y-0">
         {foundation.pillars.map(
           ({ label, title, description, visual }, index) => (
             <article
               key={title}
               data-reveal
               style={{ "--delay": `${index * STAGGER_MS}ms` } as CSSProperties}
-              className="grid content-start gap-6 md:px-8 md:first:pl-0 md:last:pr-0"
+              className="grid content-start justify-items-center gap-6 px-6 py-12 text-center md:px-8 lg:px-12 lg:py-16"
             >
               <div className="mb-6 size-48 md:mb-12 md:size-56">
                 <Visual name={visual} />
@@ -25,7 +29,7 @@ export function Foundation() {
                 {label}
               </p>
               <h3 className="text-balance text-title text-trim">{title}</h3>
-              <p className="text-pretty font-normal text-lead text-muted">
+              <p className="max-w-sm text-pretty font-normal text-lead text-muted">
                 {description}
               </p>
             </article>

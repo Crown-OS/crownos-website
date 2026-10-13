@@ -2,13 +2,23 @@ import type { CSSProperties } from "react";
 import type { SectionCopy } from "@/data/feature";
 import { Emphasized } from "./Emphasized";
 
+type Alignment = "start" | "center";
+
+const ALIGNMENT_CLASSES: Record<Alignment, string> = {
+  start: "",
+  center: "mx-auto justify-items-center text-center",
+};
+
 export function SectionHeading({
   id,
   title,
   lead,
-}: SectionCopy & { id: string }) {
+  align = "start",
+}: SectionCopy & { id: string; align?: Alignment }) {
   return (
-    <header className="grid max-w-4xl gap-6 md:gap-8">
+    <header
+      className={`grid max-w-4xl gap-6 md:gap-8 ${ALIGNMENT_CLASSES[align]}`}
+    >
       <h2 id={id} data-reveal className="text-balance text-headline text-trim">
         <Emphasized text={title} />
       </h2>
