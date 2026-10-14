@@ -1,3 +1,5 @@
+import { matchesMedia } from "./media-query";
+
 export type Size = { width: number; height: number };
 export type Rect = Size & { x: number; y: number };
 export type FrameTier = { width: number; media: string };
@@ -24,7 +26,7 @@ export const frameAt = (
 ) => Math.min(Math.round(progress * (timeline - 1)), frames - 1);
 
 export const tierFor = ({ tiers }: FrameSequence) =>
-  tiers.find(({ media }) => window.matchMedia(media).matches) ?? tiers[0];
+  tiers.find(({ media }) => matchesMedia(media)) ?? tiers[0];
 
 export function coarseToFineOrder(count: number) {
   const order: number[] = [];

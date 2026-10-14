@@ -1,2 +1,4 @@
+import { matchesMedia } from "./media-query";
+
 export const prefersReducedMotion = () =>
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  matchesMedia("(prefers-reduced-motion: reduce)");

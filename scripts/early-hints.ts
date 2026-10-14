@@ -1,6 +1,7 @@
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile, readdir, readFile } from "node:fs/promises";
 
 const OUT_DIR = "out";
+const UNHINTED_PAGES = new Set(["404", "_not-found"]);
 const HINTED_ATTRIBUTES = [
   "as",
   "type",
@@ -8,6 +9,8 @@ const HINTED_ATTRIBUTES = [
   "fetchpriority",
   "media",
 ];
+const PRELOAD_TAG = /<link[^>]+rel="preload"[^>]*>/g;
+const STYLESHEET_TAG = /<link[^>]+rel="stylesheet"[^>]*>/g;
 
 const attributesOf = (tag: string) =>
   new Map(
@@ -17,7 +20,7 @@ const attributesOf = (tag: string) =>
     ]),
   );
 
-function linkHeader(tag: string) {
+function preloadHeader(tag: string) {
   const attributes = attributesOf(tag);
   const params = HINTED_ATTRIBUTES.filter((name) => attributes.has(name)).map(
     (name) =>
@@ -26,8 +29,37 @@ function linkHeader(tag: string) {
   return [`<${attributes.get("href")}>`, "rel=preload", ...params].join("; ");
 }
 
-const html = await readFile(`${OUT_DIR}/index.html`, "utf8");
-const preloads = html.match(/<link[^>]+rel="preload"[^>]*>/g) ?? [];
-const rule = ["", "/", ...preloads.map((tag) => `  Link: ${linkHeader(tag)}`)];
-await appendFile(`${OUT_DIR}/_headers`, `${rule.join("\n")}\n`);
-console.log(`Added ${preloads.length} Early Hints to ${OUT_DIR}/_headers`);
+const stylesheetHeader = (tag: string) =>
+  `<${attributesOf(tag).get("href")}>; rel=preload; as="style"`;
+
+const routeOf = (page: string) =>
+  page === "index" ? "/" : `/${page.replace(/\/index$/, "")}`;
+
+async function hintRule(file: string) {
+  const html = await readFile(`${OUT_DIR}/${file}`, "utf8");
+  const links = [
+    ...(html.match(STYLESHEET_TAG) ?? []).map(stylesheetHeader),
+    ...(html.match(PRELOAD_TAG) ?? []).map(preloadHeader),
+  ];
+  const route = routeOf(file.slice(0, -".html".length));
+  return {
+    links: links.length,
+    rule: [route, ...links.map((link) => `  Link: ${link}`)],
+  };
+}
+
+const pages = (await readdir(OUT_DIR, { recursive: true })).filter(
+  (file) =>
+    file.endsWith(".html") &&
+    !UNHINTED_PAGES.has(file.slice(0, -".html".length)),
+);
+const rules = await Promise.all(pages.sort().map(hintRule));
+const hinted = rules.filter(({ links }) => links > 0);
+
+await appendFile(
+  `${OUT_DIR}/_headers`,
+  hinted.map(({ rule }) => `\n${rule.join("\n")}\n`).join(""),
+);
+console.log(
+  `Added Early Hints for ${hinted.length} pages to ${OUT_DIR}/_headers`,
+);

@@ -10,7 +10,11 @@ import {
 } from "react";
 import { Tabs } from "@/components/ui";
 import { ALL_CATEGORIES, type CatalogMeta } from "@/data/catalog";
-import { matchesQuery, searchableText } from "@/util/catalog-search";
+import {
+  matchesTerms,
+  queryTerms,
+  searchableText,
+} from "@/util/catalog-search";
 import { SearchField } from "./SearchField";
 
 const CARD_TRANSITION = { duration: 0.7, ease: [0.16, 1, 0.3, 1] } as const;
@@ -51,10 +55,11 @@ export function CatalogBrowser<Meta extends CatalogMeta>({
     index,
     text: searchableText(entry),
   }));
+  const terms = queryTerms(deferredQuery);
   const visible = indexed.filter(
     ({ entry, text }) =>
       (category === ALL_CATEGORIES || entry.category === category) &&
-      matchesQuery(text, deferredQuery),
+      matchesTerms(text, terms),
   );
   const categories = uniqueCategories(entries).map((name) => ({
     id: name,
