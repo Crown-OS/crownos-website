@@ -31,6 +31,8 @@ const GLYPH_PATHS = {
     "M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM12 10a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
   hotspot:
     "M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5v.01M2 9a15 15 0 0 1 20 0",
+  "second-screen": "M2 5h13v9H2ZM6 18h5M8.5 14v4M18 9h4v11h-7v-3",
+  remote: "M5 8h8v13H5ZM8.5 18h1M16 6a4 4 0 0 1 4 4M16 2a8 8 0 0 1 8 8",
   terminal: "M4 17l6-5-6-5M12 19h8",
   lock: "M6 11h12v10H6ZM8 11V7a4 4 0 0 1 8 0v4",
   check: "m5 12 5 5 9-10",

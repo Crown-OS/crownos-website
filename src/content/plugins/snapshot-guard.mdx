@@ -1,0 +1,17 @@
+---
+name: Snapshot Guard
+description: Takes a Btrfs snapshot before every system update so a bad upgrade is one reboot away from undone.
+category: System
+shape: prism
+author: CrownOS Team
+version: "2.0.0"
+tags: [btrfs, pacman, rollback]
+---
+
+Snapshot Guard hooks into pacman and takes an atomic Btrfs snapshot before each transaction. Every snapshot appears in the boot menu, so you can boot straight into yesterday's system if an update misbehaves.
+
+## What it does
+
+- Pre-transaction snapshots with the package list attached
+- Automatic cleanup that keeps the last ten
+- One-click rollback from Settings

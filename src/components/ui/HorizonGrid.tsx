@@ -1,8 +1,4 @@
-import { SplitWords } from "@/components/motion";
-
-type HorizonGridProps = { label: string };
-
-export function HorizonGrid({ label }: HorizonGridProps) {
+export function HorizonGrid() {
   return (
     <div
       aria-hidden
@@ -11,13 +7,7 @@ export function HorizonGrid({ label }: HorizonGridProps) {
       <span className="horizon-pillar left-[12.5%]" />
       <span className="horizon-pillar right-[12.5%]" />
       <div className="horizon-floor">
-        <div className="horizon-plane">
-          <SplitWords
-            as="p"
-            lines={[label]}
-            className="horizon-label select-none font-display text-foreground/15 text-mega"
-          />
-        </div>
+        <div className="horizon-plane" />
         <div className="horizon-glow" />
       </div>
     </div>

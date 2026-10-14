@@ -1,7 +1,6 @@
 import { Magnetic, RevealText, RollText } from "@/components/motion";
 import { HorizonGrid, Section } from "@/components/ui";
 import { beta } from "@/data/beta";
-import { site } from "@/data/site";
 
 export function Beta() {
   return (
@@ -10,7 +9,7 @@ export function Beta() {
       labelledBy="beta-title"
       className="grid justify-items-center gap-10 overflow-clip pb-(--horizon-floor) text-center [--horizon-floor:24rem] md:gap-12"
     >
-      <HorizonGrid label={site.name} />
+      <HorizonGrid />
       <div className="grid justify-items-center gap-8">
         <RevealText
           id="beta-title"

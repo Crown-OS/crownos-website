@@ -1,0 +1,25 @@
+---
+name: Local Models
+description: Run open-weight language models on your own GPU and hand them to Crown Agent, with no data leaving the machine.
+category: AI
+shape: asterisk
+author: CrownOS Team
+version: "1.4.0"
+tags: [llm, ollama, offline, gpu]
+---
+
+Local Models pulls, quantises and serves open-weight models through a single system daemon. Crown Agent and any plugin that asks for a model get it over a local socket, so prompts and files never leave the machine.
+
+## What it does
+
+- Detects your GPU and picks the right backend: CUDA, ROCm or Vulkan
+- Downloads models on demand and shares one copy between apps
+- Unloads idle models after a timeout to free VRAM
+- Exposes an OpenAI-compatible endpoint on `localhost` for your own tools
+
+## Permissions
+
+| Scope | Why |
+| --- | --- |
+| GPU | Runs inference on your graphics card |
+| Network (opt-in) | Downloads model weights |

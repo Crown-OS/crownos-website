@@ -11,7 +11,7 @@ type FlipCardProps = Feature & { detail: string; delay: number };
 
 const FLIP_SPRING = { type: "spring", stiffness: 110, damping: 17 } as const;
 const FACE =
-  "glow squircle rounded-card absolute inset-0 flex flex-col gap-6 overflow-hidden p-6 backface-hidden md:p-8";
+  "glow squircle rounded-card absolute inset-0 flex flex-col gap-6 overflow-hidden border border-border-strong p-6 backface-hidden md:p-8";
 
 function FaceHeader({
   icon,

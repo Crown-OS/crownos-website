@@ -267,13 +267,15 @@
   inset: 0;
   z-index: 50;
   display: none;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 .intro:not([data-phase="done"]) {
   display: block;
 }
 
-:root:has(.intro:is([data-phase="pending"], [data-phase="dropping"])) {
+:root:has(.intro:not([data-phase="done"])) {
   overflow: hidden;
 }
 
@@ -375,7 +377,7 @@
     display: none;
   }
 
-  :root:has(.intro:is([data-phase="pending"], [data-phase="dropping"])) {
+  :root:has(.intro:not([data-phase="done"])) {
     overflow: visible;
   }
 

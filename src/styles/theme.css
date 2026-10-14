@@ -30,6 +30,8 @@
   --color-faint: rgb(170 170 170 / 0.5);
   --color-border: rgb(255 255 255 / 0.08);
   --color-border-strong: rgb(255 255 255 / 0.12);
+  --color-rule: #1a1a1a;
+  --color-rule-mark: #5c5c5c;
   --color-accent: #ffffff;
   --color-accent-fg: #040404;
 

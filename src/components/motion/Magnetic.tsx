@@ -3,8 +3,7 @@
 import { useMotionValue, useSpring } from "motion/react";
 import * as m from "motion/react-m";
 import type { PointerEvent, ReactNode } from "react";
-import { FINE_POINTER } from "@/util/pointer";
-import { prefersReducedMotion } from "@/util/reduced-motion";
+import { canFollowPointer } from "@/util/pointer";
 
 const MAGNET_SPRING = { stiffness: 260, damping: 18, mass: 0.6 };
 const DEFAULT_PULL = 0.32;
@@ -14,9 +13,6 @@ type MagneticProps = {
   className?: string;
   children: ReactNode;
 };
-
-const canAttract = () =>
-  window.matchMedia(FINE_POINTER).matches && !prefersReducedMotion();
 
 export function Magnetic({
   pull = DEFAULT_PULL,
@@ -29,7 +25,7 @@ export function Magnetic({
   const y = useSpring(offsetY, MAGNET_SPRING);
 
   const attract = (event: PointerEvent<HTMLSpanElement>) => {
-    if (!canAttract()) return;
+    if (!canFollowPointer()) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     offsetX.set((event.clientX - bounds.left - bounds.width / 2) * pull);
     offsetY.set((event.clientY - bounds.top - bounds.height / 2) * pull);

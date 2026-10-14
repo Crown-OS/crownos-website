@@ -1,0 +1,24 @@
+---
+name: Semantic Search
+description: Find files, mail and screenshots by what they mean rather than what they are called, indexed on device.
+category: AI
+shape: spark
+author: CrownOS Team
+version: "0.9.2"
+tags: [search, embeddings, files]
+---
+
+Semantic Search adds a meaning-aware index to the launcher. Type "receipt from the Lisbon trip" and it finds the PDF, the photo and the email thread, even when none of them use those words.
+
+## What it does
+
+- Builds embeddings in the background while you are idle, on battery only when plugged in
+- Reads text inside images and scanned PDFs
+- Keeps the whole index encrypted in your home directory
+
+## Permissions
+
+| Scope | Why |
+| --- | --- |
+| Files (read) | Indexes the folders you choose |
+| Local Models | Generates embeddings on device |

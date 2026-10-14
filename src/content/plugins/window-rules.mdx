@@ -1,0 +1,24 @@
+---
+name: Window Rules
+description: Declare where every app opens, how big it is and which workspace it lives on, in one readable file.
+category: Workspace
+shape: knot
+author: CrownOS Team
+version: "1.1.0"
+tags: [tiling, compositor, workspaces]
+---
+
+Window Rules lets the compositor remember your layout. Match windows by app, title or role and pin them to a workspace, a monitor or a tiling slot.
+
+## Example
+
+```ron
+(
+  rules: [
+    (app: "org.mozilla.firefox", workspace: 2, tile: Left),
+    (app: "com.spotify.Client", monitor: "DP-2", floating: true),
+  ],
+)
+```
+
+Rules reload live as you save the file, no logout needed.

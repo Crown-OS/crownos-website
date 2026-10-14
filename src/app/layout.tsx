@@ -80,7 +80,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body>
         <Script id="motion-flag" strategy="beforeInteractive">
-          {"document.documentElement.classList.add('js')"}
+          {
+            "document.documentElement.classList.add('js');history.scrollRestoration='manual'"
+          }
         </Script>
         <noscript>
           <style>

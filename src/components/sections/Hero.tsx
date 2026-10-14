@@ -5,10 +5,29 @@ import * as m from "motion/react-m";
 import { type CSSProperties, useRef } from "react";
 import { ScrollSequence, SplitLetters } from "@/components/motion";
 import { hero } from "@/data/hero";
+import { lineupSpan } from "@/util/device-still";
+import type { ScrollRange } from "@/util/scroll-range";
+import { useFittedScale } from "@/util/use-fitted-scale";
 import { useRestingOffset } from "@/util/use-resting-offset";
+import { HeroDevice } from "./HeroDevice";
+import { HeroEcosystem } from "./HeroEcosystem";
 
-const SEQUENCE_END = 0.85;
-const COPY_EXIT_END = 0.5;
+const TIMELINE = {
+  sequence: [0, 0.425],
+  copyExit: [0.02, 0.25],
+  zoomOut: [0.47, 0.72],
+  devicesIn: [0.5, 0.76],
+  ecosystemIn: [0.66, 0.88],
+} satisfies Record<string, ScrollRange>;
+const ZOOMED_HEIGHT_SHARE = 0.64;
+const ZOOMED_LIFT = "-17svh";
+const FRAME = hero.laptop.sequence.size;
+const LINEUP = lineupSpan(Object.values(hero.ecosystem.devices), FRAME);
+const LINEUP_SHIFT = `${LINEUP.offset * 100}%`;
+const FRAME_BOX = {
+  aspectRatio: `${FRAME.width} / ${FRAME.height}`,
+  width: `min(100cqw, 100cqh * ${FRAME.width / FRAME.height})`,
+} satisfies CSSProperties;
 const SLOGAN_TIMING = {
   "--delay": "550ms",
   "--sweep-at": "1600ms",
@@ -46,29 +65,38 @@ export function Hero() {
   });
   const frameProgress = useTransform(
     scrollYProgress,
-    [0, SEQUENCE_END],
+    TIMELINE.sequence,
     [0, 1],
   );
-  const headlineY = useTransform(
-    scrollYProgress,
-    [0, SEQUENCE_END],
-    ["0svh", "-45svh"],
-  );
-  const copyOpacity = useTransform(
-    scrollYProgress,
-    [0.04, COPY_EXIT_END],
-    [1, 0],
-  );
+  const headlineY = useTransform(scrollYProgress, TIMELINE.sequence, [
+    "0svh",
+    "-45svh",
+  ]);
+  const copyOpacity = useTransform(scrollYProgress, TIMELINE.copyExit, [1, 0]);
   const copyScale = useTransform(
     scrollYProgress,
-    [0, COPY_EXIT_END],
+    [0, TIMELINE.copyExit[1]],
     [1, 0.92],
   );
-  const copyBlur = useTransform(
-    scrollYProgress,
-    [0.04, COPY_EXIT_END],
-    ["blur(0px)", "blur(10px)"],
+  const copyBlur = useTransform(scrollYProgress, TIMELINE.copyExit, [
+    "blur(0px)",
+    "blur(10px)",
+  ]);
+  const zoomedScale = useFittedScale(
+    stageRef,
+    FRAME,
+    ZOOMED_HEIGHT_SHARE,
+    LINEUP.width,
   );
+  const zoomProgress = useTransform(scrollYProgress, TIMELINE.zoomOut, [0, 1]);
+  const stageScale = useTransform(
+    () => 1 + (zoomedScale.get() - 1) * zoomProgress.get(),
+  );
+  const lineupX = useTransform(zoomProgress, [0, 1], ["0%", LINEUP_SHIFT]);
+  const stageLift = useTransform(scrollYProgress, TIMELINE.zoomOut, [
+    "0svh",
+    ZOOMED_LIFT,
+  ]);
   const swooshX = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
   const swooshY = useTransform(scrollYProgress, [0, 1], ["4%", "-10%"]);
   const swooshScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
@@ -80,7 +108,7 @@ export function Hero() {
     <section
       ref={sectionRef}
       aria-labelledby="hero-title"
-      className="relative h-[280svh]"
+      className="relative h-[460svh]"
     >
       <div
         ref={stageRef}
@@ -121,14 +149,40 @@ export function Hero() {
           </hgroup>
           <HeroSlogan />
         </m.div>
-        <m.div style={{ y: laptopY }} className="absolute inset-0 z-10">
-          <ScrollSequence
-            sequence={hero.laptop.sequence}
-            progress={frameProgress}
-            label={hero.laptop.label}
-            className="size-full"
-          />
+        <m.div
+          style={{ scale: stageScale, y: stageLift }}
+          className="absolute inset-0 z-10 [container-type:size]"
+        >
+          <m.div
+            style={{ y: laptopY }}
+            className="grid size-full place-items-center"
+          >
+            <m.div className="relative" style={{ ...FRAME_BOX, x: lineupX }}>
+              <HeroDevice
+                device={hero.ecosystem.devices.tablet}
+                frame={FRAME}
+                progress={scrollYProgress}
+                range={TIMELINE.devicesIn}
+              />
+              <ScrollSequence
+                sequence={hero.laptop.sequence}
+                progress={frameProgress}
+                label={hero.laptop.label}
+                className="absolute inset-0"
+              />
+              <HeroDevice
+                device={hero.ecosystem.devices.phone}
+                frame={FRAME}
+                progress={scrollYProgress}
+                range={TIMELINE.devicesIn}
+              />
+            </m.div>
+          </m.div>
         </m.div>
+        <HeroEcosystem
+          progress={scrollYProgress}
+          range={TIMELINE.ecosystemIn}
+        />
       </div>
     </section>
   );

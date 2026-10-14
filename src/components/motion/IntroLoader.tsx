@@ -20,6 +20,7 @@ export function IntroLoader() {
   const crownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     if (prefersReducedMotion()) {
       setIntroPhase("done");
       releaseReveals();

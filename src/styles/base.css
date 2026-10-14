@@ -189,17 +189,6 @@
       center top / 3.5rem 3.5rem;
   }
 
-  .horizon-label {
-    position: absolute;
-    top: 2rem;
-    transform-origin: 50% 0;
-    transform: scaleY(2);
-    left: 33.333%;
-    width: 33.333%;
-    text-align: center;
-    white-space: nowrap;
-  }
-
   .horizon-glow {
     position: absolute;
     inset: 0 0 auto;
@@ -423,4 +412,72 @@
 @utility defer-render {
   content-visibility: auto;
   contain-intrinsic-size: auto 100svh;
+}
+
+@layer components {
+  .catalog-frame {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid var(--color-rule);
+
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    &::before {
+      inset: -1px -100vw;
+      border-block: 1px solid var(--color-rule);
+    }
+
+    &::after {
+      inset: -3rem -1px;
+      border-inline: 1px solid var(--color-rule);
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        #000 3rem,
+        #000 calc(100% - 3rem),
+        transparent
+      );
+    }
+  }
+
+  .corner-mark {
+    position: absolute;
+    z-index: 1;
+    width: 0.6875rem;
+    height: 0.6875rem;
+    translate: -50% -50%;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--color-rule-mark), var(--color-rule-mark)) center /
+      1px 100% no-repeat,
+      linear-gradient(var(--color-rule-mark), var(--color-rule-mark)) center /
+      100% 1px no-repeat;
+  }
+
+  .shape-spin {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      rotate 1.4s var(--ease-out-expo),
+      scale 1.4s var(--ease-out-expo);
+  }
+
+  .group:hover .shape-spin {
+    rotate: 28deg;
+    scale: 1.06;
+  }
+}
+
+@utility wallpaper {
+  background:
+    radial-gradient(75% 95% at 10% 100%, var(--tone-start), transparent 70%),
+    radial-gradient(60% 80% at 58% 58%, var(--tone-mid), transparent 72%),
+    radial-gradient(85% 110% at 100% 10%, var(--tone-end), transparent 72%),
+    color-mix(in oklab, var(--tone-mid) 45%, var(--tone-end));
 }
