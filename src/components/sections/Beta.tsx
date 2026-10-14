@@ -1,21 +1,17 @@
-import Link from "next/link";
 import { Magnetic, RevealText, RollText } from "@/components/motion";
-import { Section } from "@/components/ui";
+import { HorizonGrid, Section } from "@/components/ui";
 import { beta } from "@/data/beta";
+import { site } from "@/data/site";
 
 export function Beta() {
   return (
     <Section
       id="download"
       labelledBy="beta-title"
-      className="grid justify-items-center gap-10 overflow-clip text-center md:gap-12"
+      className="grid justify-items-center gap-10 overflow-clip pb-(--horizon-floor) text-center [--horizon-floor:24rem] md:gap-12"
     >
-      <div
-        aria-hidden
-        data-tone="dusk"
-        className="aurora pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[90%] [mask-image:linear-gradient(to_top,#000_15%,transparent)]"
-      />
-      <div className="grid justify-items-center gap-6">
+      <HorizonGrid label={site.name} />
+      <div className="grid justify-items-center gap-8">
         <RevealText
           id="beta-title"
           text={beta.title}
@@ -24,19 +20,21 @@ export function Beta() {
         />
         <p
           data-reveal
-          className="max-w-xl text-pretty font-normal text-lead text-muted"
+          className="max-w-md text-balance font-normal text-lead text-muted leading-normal"
         >
           {beta.lead}
         </p>
       </div>
       <Magnetic>
-        <Link
+        <a
           data-reveal
           href={beta.cta.href}
-          className="inline-flex h-14 items-center rounded-full bg-paper px-8 text-ink text-lead"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-primary h-14 px-8 font-medium text-lead"
         >
           <RollText text={beta.cta.label} />
-        </Link>
+        </a>
       </Magnetic>
     </Section>
   );

@@ -7,7 +7,7 @@ const STAGGER_MS = 80;
 export function Trust() {
   return (
     <Section labelledBy="trust-title">
-      <SectionHeading id="trust-title" {...trust.heading} />
+      <SectionHeading id="trust-title" align="center" {...trust.heading} />
       <div className="mt-stack grid border-border border-b md:grid-cols-2">
         {trust.points.map(({ icon, title, description }, index) => (
           <article
@@ -15,7 +15,7 @@ export function Trust() {
             data-reveal
             data-spotlight
             style={{ "--delay": `${index * STAGGER_MS}ms` } as CSSProperties}
-            className="relative grid content-start justify-items-start gap-8 border-border border-t py-8 md:p-8 md:odd:border-r md:odd:pl-0 md:even:pr-0 lg:py-12"
+            className="relative grid content-start justify-items-start gap-8 border-border border-t py-8 md:px-12 md:py-12 md:odd:border-r"
           >
             {icon && <IconTile icon={icon} />}
             <div className="grid gap-4">

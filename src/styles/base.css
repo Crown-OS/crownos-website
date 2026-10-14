@@ -152,6 +152,171 @@
   );
 }
 
+@layer components {
+  .horizon-pillar {
+    position: absolute;
+    top: 0;
+    bottom: var(--horizon-floor);
+    width: 1px;
+    background: linear-gradient(to top, rgb(255 255 255 / 0.2), transparent 85%);
+  }
+
+  .horizon-floor {
+    position: absolute;
+    inset: auto 0 0;
+    height: var(--horizon-floor);
+    perspective: 44rem;
+    perspective-origin: 50% 0;
+    mask-image: radial-gradient(
+      ellipse 80% 100% at 50% 0,
+      #000 35%,
+      transparent
+    );
+  }
+
+  .horizon-plane {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 300%;
+    height: 32rem;
+    transform-origin: 50% 0;
+    transform: rotateX(70deg);
+    background:
+      linear-gradient(to right, rgb(255 255 255 / 0.42) 1px, transparent 1px)
+      center top / 3.5rem 3.5rem,
+      linear-gradient(to bottom, rgb(255 255 255 / 0.42) 1px, transparent 1px)
+      center top / 3.5rem 3.5rem;
+  }
+
+  .horizon-label {
+    position: absolute;
+    top: 2rem;
+    transform-origin: 50% 0;
+    transform: scaleY(2);
+    left: 33.333%;
+    width: 33.333%;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .horizon-glow {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 6rem;
+    background: radial-gradient(
+      60% 100% at 50% 0,
+      rgb(255 255 255 / 0.16),
+      transparent 70%
+    );
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 1px;
+      background: linear-gradient(
+        to right,
+        transparent,
+        rgb(255 255 255 / 0.5),
+        transparent
+      );
+    }
+  }
+}
+
+@utility btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+  color: var(--btn-ink);
+  background-image: var(--btn-fill);
+  box-shadow:
+    0 0 0 1px var(--btn-ring),
+    0 1px 2px rgb(0 0 0 / 0.4);
+  transition:
+    box-shadow 0.15s ease,
+    color 0.15s ease,
+    transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  &::before {
+    background-image: var(--btn-fill-hover);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  &::after {
+    box-shadow: inset 0 1px 0 var(--btn-highlight);
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+
+  &:hover {
+    --btn-ring: var(--btn-ring-hover);
+  }
+
+  &:active {
+    background-image: var(--btn-fill-active);
+    transform: scale(0.98);
+    transition-duration: 0.15s, 0.15s, 0.22s;
+  }
+
+  &:active::before {
+    opacity: 0;
+  }
+}
+
+@utility btn-primary {
+  --btn-ink: var(--color-ink);
+  --btn-fill: linear-gradient(180deg, #f5f5f7, #d2d2d8);
+  --btn-fill-hover: linear-gradient(180deg, #ffffff, #f2f2f5);
+  --btn-fill-active: linear-gradient(180deg, #c8c8cf, #adadb6);
+  --btn-ring: #c2c2c9;
+  --btn-ring-hover: #ffffff;
+  --btn-highlight: rgb(255 255 255 / 0.9);
+}
+
+@utility btn-secondary {
+  --btn-ink: var(--color-foreground);
+  --btn-fill: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.16),
+    rgb(255 255 255 / 0.07)
+  );
+  --btn-fill-hover: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.24),
+    rgb(255 255 255 / 0.12)
+  );
+  --btn-fill-active: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.06),
+    rgb(255 255 255 / 0.03)
+  );
+  --btn-ring: rgb(255 255 255 / 0.14);
+  --btn-ring-hover: rgb(255 255 255 / 0.28);
+  --btn-highlight: rgb(255 255 255 / 0.22);
+}
+
 @utility meter-segments {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='5' height='100%25' rx='2.5'/%3E%3C/svg%3E");
   mask-size: 12px 100%;

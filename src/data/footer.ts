@@ -1,7 +1,6 @@
 export type NavLink = { label: string; href: string };
 
 export const footer = {
-  wordmark: "CrownOS",
   location: "Arch Linux · Rolling release",
   reach: ["Open source", "worldwide"],
   license: "GPL",

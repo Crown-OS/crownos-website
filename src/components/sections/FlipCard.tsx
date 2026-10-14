@@ -25,7 +25,7 @@ function FaceHeader({
         <button
           type="button"
           onClick={onToggle}
-          className="h-11 rounded-full bg-white/12 px-5 text-ui transition-colors duration-300 hover:bg-white/20"
+          className="btn btn-secondary h-11 px-5 text-ui"
         >
           {action}
         </button>

@@ -120,6 +120,8 @@
   inset: 0;
   z-index: 1;
   border-radius: inherit;
+  /* biome-ignore lint/correctness/noUnknownProperty: corner-shape ships in Chromium 139+ */
+  corner-shape: inherit;
   pointer-events: none;
   background: radial-gradient(
     32rem circle at var(--spot-x, 50%) var(--spot-y, 50%),

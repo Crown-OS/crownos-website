@@ -1,12 +1,12 @@
 import type { FrameSequence } from "@/util/frame-sequence";
 
 export const hero = {
-  eyebrow: "Meet",
+  eyebrow: "Introducing",
   headline: ["CrownOS"],
   slogan: {
     lead: "An",
     emphasis: "agent native",
-    trail: "desktop built on Linux kernel",
+    trail: "desktop OS built on Linux kernel",
   },
   laptop: {
     label: "A CrownOS laptop opening to the desktop",

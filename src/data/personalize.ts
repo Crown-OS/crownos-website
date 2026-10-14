@@ -3,7 +3,10 @@ import type { Feature, SectionCopy } from "./feature";
 type FlipFeature = Feature & { detail: string };
 
 export const personalize = {
-  heading: { title: "Endless customization" },
+  heading: {
+    title: "Endless agentic customization",
+    lead: "Change anything by editing a file, clicking a setting or asking an agent. Every route leads to the same plain config.",
+  },
   cards: [
     {
       icon: "folder",

@@ -20,13 +20,13 @@ function HeroSlogan() {
   return (
     <p
       data-reveal
-      className="mt-6 text-balance text-trim font-inter md:mt-12 font-normal text-muted-strong text-tagline tracking-[-0.045em]"
+      className="mt-6 text-balance text-trim font-inter md:mt-12 font-light text-muted-strong text-tagline tracking-[-0.03em] [font-kerning:normal] [text-rendering:optimizeLegibility]"
       style={SLOGAN_TIMING}
     >
       {lead}{" "}
       <span
         data-text={emphasis}
-        className="-mr-[0.06em] pr-[0.1em] font-normal font-serif text-[1.06em] text-sweep italic tracking-[-0.035em]"
+        className="pr-[0.03em] font-normal font-serif text-[1.16em] leading-none text-sweep italic tracking-[-0.005em] [word-spacing:0.06em]"
       >
         {emphasis}
       </span>{" "}

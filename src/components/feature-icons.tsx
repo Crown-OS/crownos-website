@@ -55,28 +55,6 @@ const Layout = (props: IconProps) => (
   </StrokeIcon>
 );
 
-const Spring = (props: IconProps) => (
-  <StrokeIcon {...props}>
-    <path d="M3 12c1.6-6 3.2-6 4.5 0s2.6 5 3.7 0 2.2-4 3 0 1.7 3 2.4 0 1.5-2 2.1 0 .8 1 1.3 0" />
-  </StrokeIcon>
-);
-
-const Tablet = (props: IconProps) => (
-  <StrokeIcon {...props}>
-    <rect x="2" y="5" width="13" height="10" rx="1.5" />
-    <path d="M5.5 19h6M8.5 15v4" />
-    <rect x="17" y="8" width="5" height="11" rx="1.2" />
-  </StrokeIcon>
-);
-
-const Server = (props: IconProps) => (
-  <StrokeIcon {...props}>
-    <rect x="3" y="3.5" width="18" height="7" rx="2" />
-    <rect x="3" y="13.5" width="18" height="7" rx="2" />
-    <path d="M7 7h.01M7 17h.01M11 7h6M11 17h6" />
-  </StrokeIcon>
-);
-
 const Shield = (props: IconProps) => (
   <StrokeIcon {...props}>
     <path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V6z" />
@@ -110,9 +88,6 @@ export const FEATURE_ICONS = {
   swatches: Swatches,
   plug: Plug,
   layout: Layout,
-  spring: Spring,
-  tablet: Tablet,
-  server: Server,
   shield: Shield,
   code: Code,
   link: Link,

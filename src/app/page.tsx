@@ -4,7 +4,6 @@ import {
   Comparison,
   Foundation,
   Hero,
-  Interactions,
   Personalize,
   Showcase,
   Trust,
@@ -22,7 +21,6 @@ export default function Home() {
         <div className="font-content">
           <Showcase />
           <Personalize />
-          <Interactions />
           <Foundation />
           <Comparison />
           <Trust />

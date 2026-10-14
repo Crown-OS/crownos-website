@@ -16,7 +16,7 @@ export function Navbar() {
         <Magnetic>
           <Link
             href={primaryCta.href}
-            className="inline-flex h-11 items-center rounded-full bg-paper px-6 text-ink text-lead md:h-14 md:px-8"
+            className="btn btn-primary h-11 px-6 text-lead md:h-14 md:px-8"
           >
             <RollText text={primaryCta.label} />
           </Link>

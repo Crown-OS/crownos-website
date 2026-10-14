@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { GlobeIcon } from "@/components/icons";
-import { RollText, SplitWords } from "@/components/motion";
+import { RollText } from "@/components/motion";
 import { footer } from "@/data/footer";
 
 function InfoPlate() {
@@ -27,17 +27,6 @@ function InfoPlate() {
 export function Footer() {
   return (
     <footer className="relative z-10 bg-background">
-      <div
-        data-tone="dusk"
-        className="aurora overflow-clip px-gutter pt-[clamp(3rem,8vw,7rem)]"
-      >
-        <SplitWords
-          as="p"
-          lines={[footer.wordmark]}
-          className="translate-y-[0.14em] text-mega"
-        />
-      </div>
-
       <div className="grid gap-12 px-gutter pt-20 pb-10 md:grid-cols-12">
         <div className="grid gap-6 md:col-span-5">
           <InfoPlate />
