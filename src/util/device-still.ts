@@ -43,5 +43,5 @@ export function lineupSpan(devices: readonly DeviceStill[], frame: Size) {
   const boxes = devices.map((device) => deviceBox(device, frame));
   const left = Math.min(...boxes.map((box) => box.left));
   const right = Math.max(...boxes.map((box) => box.left + box.width));
-  return { width: right - left, offset: 0.5 - (left + right) / 2 };
+  return { width: right - left };
 }

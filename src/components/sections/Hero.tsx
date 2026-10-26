@@ -23,7 +23,6 @@ const ZOOMED_HEIGHT_SHARE = 0.64;
 const ZOOMED_LIFT = "-17svh";
 const FRAME = hero.laptop.sequence.size;
 const LINEUP = lineupSpan(Object.values(hero.ecosystem.devices), FRAME);
-const LINEUP_SHIFT = `${LINEUP.offset * 100}%`;
 const FRAME_BOX = {
   aspectRatio: `${FRAME.width} / ${FRAME.height}`,
   width: `min(100cqw, 100cqh * ${FRAME.width / FRAME.height})`,
@@ -92,7 +91,6 @@ export function Hero() {
   const stageScale = useTransform(
     () => 1 + (zoomedScale.get() - 1) * zoomProgress.get(),
   );
-  const lineupX = useTransform(zoomProgress, [0, 1], ["0%", LINEUP_SHIFT]);
   const stageLift = useTransform(scrollYProgress, TIMELINE.zoomOut, [
     "0svh",
     ZOOMED_LIFT,
@@ -157,7 +155,7 @@ export function Hero() {
             style={{ y: laptopY }}
             className="grid size-full place-items-center"
           >
-            <m.div className="relative" style={{ ...FRAME_BOX, x: lineupX }}>
+            <m.div className="relative" style={FRAME_BOX}>
               <HeroDevice
                 device={hero.ecosystem.devices.tablet}
                 frame={FRAME}
