@@ -27,7 +27,7 @@ export const hero = {
     finalBounds: { top: 0.078, bottom: 0.84 },
   },
   ecosystem: {
-    title: "Superpowered *together*",
+    title: "Superpowered together",
     lead: "Crown Link pairs your phone and tablet with the desktop, peer to peer and end-to-end encrypted.",
     features: [
       { icon: "clipboard", name: "Clipboard Sync" },
