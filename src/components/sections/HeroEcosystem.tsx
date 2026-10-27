@@ -2,9 +2,9 @@
 
 import { type MotionValue, useTransform } from "motion/react";
 import * as m from "motion/react-m";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Emphasized } from "@/components/ui/Emphasized";
-import { Glyph } from "@/components/visuals/window/Glyph";
+import { EcosystemIcon } from "@/components/visuals/ecosystem";
 import { hero } from "@/data/hero";
 import { type ScrollRange, staggered } from "@/util/scroll-range";
 
@@ -33,19 +33,24 @@ function Rise({
 }
 
 export function HeroEcosystem({
+  ref,
   progress,
   range,
 }: {
+  ref: Ref<HTMLDivElement>;
   progress: MotionValue<number>;
   range: ScrollRange;
 }) {
   const { title, lead, features } = hero.ecosystem;
-  const [heading, body, list] = [0, 1, 2].map((index) =>
+  const [heading, body, dock] = [0, 1, 2].map((index) =>
     staggered(range, index, 3, 0.4),
   );
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-gutter pb-12 text-center md:pb-16">
+    <div
+      ref={ref}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-gutter py-12 text-center md:py-16"
+    >
       <Rise progress={progress} range={heading}>
         <h2
           id="ecosystem-title"
@@ -61,17 +66,19 @@ export function HeroEcosystem({
       </Rise>
       <ul
         aria-label="Ecosystem features"
-        className="mt-6 flex max-w-4xl flex-wrap justify-center gap-2 md:mt-8 md:gap-3"
+        className="mt-8 grid w-full max-w-5xl grid-cols-4 gap-x-2 gap-y-6 md:mt-12 md:grid-cols-8 md:gap-x-4"
       >
         {features.map(({ icon, name }, index) => (
           <li key={name}>
             <Rise
               progress={progress}
-              range={staggered(list, index, features.length)}
-              className="flex h-9 items-center gap-2 rounded-full border border-border bg-white/[0.03] px-4 font-inter text-muted-strong text-ui md:h-10"
+              range={staggered(dock, index, features.length)}
+              className="flex flex-col items-center gap-3"
             >
-              <Glyph name={icon} className="size-4 text-muted" />
-              {name}
+              <EcosystemIcon name={icon} className="size-14 md:size-18" />
+              <span className="text-balance font-inter text-micro text-muted-strong leading-tight md:text-ui md:leading-tight">
+                {name}
+              </span>
             </Rise>
           </li>
         ))}

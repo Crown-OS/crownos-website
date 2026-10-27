@@ -17,7 +17,6 @@ export function PluginCard({
       <Tilt className="h-full">
         <Link
           href={`/plugins/${plugin.slug}`}
-          data-cursor="View"
           data-spotlight
           className="group relative flex aspect-[3/4] h-full flex-col bg-linear-to-b from-white/[0.04] to-transparent p-6 md:p-8"
         >

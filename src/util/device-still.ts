@@ -39,9 +39,23 @@ export function deviceBox(device: DeviceStill, frame: Size): FrameBox {
   };
 }
 
-export function lineupSpan(devices: readonly DeviceStill[], frame: Size) {
+export type VerticalBounds = { top: number; bottom: number };
+export type Lineup = VerticalBounds & { centeredWidth: number };
+
+export function lineupSpan(
+  devices: readonly DeviceStill[],
+  frame: Size,
+  anchor: VerticalBounds,
+): Lineup {
   const boxes = devices.map((device) => deviceBox(device, frame));
   const left = Math.min(...boxes.map((box) => box.left));
   const right = Math.max(...boxes.map((box) => box.left + box.width));
-  return { width: right - left };
+  return {
+    centeredWidth: 2 * Math.max(0.5 - left, right - 0.5),
+    top: Math.min(anchor.top, ...boxes.map((box) => box.top)),
+    bottom: Math.max(
+      anchor.bottom,
+      ...boxes.map((box) => box.top + box.height),
+    ),
+  };
 }

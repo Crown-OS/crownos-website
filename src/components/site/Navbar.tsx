@@ -10,7 +10,7 @@ export function Navbar() {
         aria-label="Primary"
         className="flex h-16 items-center justify-between px-gutter md:h-24"
       >
-        <Link href="/" aria-label="CrownOS home" data-cursor="Home">
+        <Link href="/" aria-label="CrownOS home">
           <CrownIcon className="h-6 w-auto md:h-8" />
         </Link>
         <Magnetic>

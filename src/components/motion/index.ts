@@ -1,4 +1,3 @@
-export { Cursor } from "./Cursor";
 export { IntroLoader } from "./IntroLoader";
 export { Magnetic } from "./Magnetic";
 export { MotionProvider } from "./MotionProvider";

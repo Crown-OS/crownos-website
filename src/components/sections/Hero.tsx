@@ -7,7 +7,7 @@ import { ScrollSequence, SplitLetters } from "@/components/motion";
 import { hero } from "@/data/hero";
 import { lineupSpan } from "@/util/device-still";
 import type { ScrollRange } from "@/util/scroll-range";
-import { useFittedScale } from "@/util/use-fitted-scale";
+import { useLineupFit } from "@/util/use-lineup-fit";
 import { useRestingOffset } from "@/util/use-resting-offset";
 import { HeroDevice } from "./HeroDevice";
 import { HeroEcosystem } from "./HeroEcosystem";
@@ -20,9 +20,12 @@ const TIMELINE = {
   ecosystemIn: [0.66, 0.88],
 } satisfies Record<string, ScrollRange>;
 const ZOOMED_HEIGHT_SHARE = 0.64;
-const ZOOMED_LIFT = "-17svh";
 const FRAME = hero.laptop.sequence.size;
-const LINEUP = lineupSpan(Object.values(hero.ecosystem.devices), FRAME);
+const LINEUP = lineupSpan(
+  Object.values(hero.ecosystem.devices),
+  FRAME,
+  hero.laptop.finalBounds,
+);
 const FRAME_BOX = {
   aspectRatio: `${FRAME.width} / ${FRAME.height}`,
   width: `min(100cqw, 100cqh * ${FRAME.width / FRAME.height})`,
@@ -57,6 +60,7 @@ export function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
+  const captionRef = useRef<HTMLDivElement>(null);
   const restingY = useRestingOffset(stageRef, copyRef, hero.laptop.sequence);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -81,20 +85,18 @@ export function Hero() {
     "blur(0px)",
     "blur(10px)",
   ]);
-  const zoomedScale = useFittedScale(
+  const zoomed = useLineupFit(
     stageRef,
+    captionRef,
     FRAME,
+    LINEUP,
     ZOOMED_HEIGHT_SHARE,
-    LINEUP.width,
   );
   const zoomProgress = useTransform(scrollYProgress, TIMELINE.zoomOut, [0, 1]);
   const stageScale = useTransform(
-    () => 1 + (zoomedScale.get() - 1) * zoomProgress.get(),
+    () => 1 + (zoomed.scale.get() - 1) * zoomProgress.get(),
   );
-  const stageLift = useTransform(scrollYProgress, TIMELINE.zoomOut, [
-    "0svh",
-    ZOOMED_LIFT,
-  ]);
+  const stageLift = useTransform(() => zoomed.lift.get() * zoomProgress.get());
   const swooshX = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
   const swooshY = useTransform(scrollYProgress, [0, 1], ["4%", "-10%"]);
   const swooshScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
@@ -178,6 +180,7 @@ export function Hero() {
           </m.div>
         </m.div>
         <HeroEcosystem
+          ref={captionRef}
           progress={scrollYProgress}
           range={TIMELINE.ecosystemIn}
         />

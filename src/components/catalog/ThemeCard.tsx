@@ -17,7 +17,6 @@ export function ThemeCard({
     <CatalogFrame className="h-full">
       <Link
         href={`/themes/${theme.slug}`}
-        data-cursor="Preview"
         data-spotlight
         className="group relative grid h-full content-start gap-8 bg-linear-to-b from-white/[0.04] to-transparent p-3 md:p-4"
       >

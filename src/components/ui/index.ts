@@ -1,3 +1,4 @@
+export { BeamBackdrop } from "./BeamBackdrop";
 export { Emphasized } from "./Emphasized";
 export { HorizonGrid } from "./HorizonGrid";
 export { IconTile } from "./IconTile";

@@ -12,7 +12,7 @@ export function Personalize() {
         align="center"
         {...personalize.heading}
       />
-      <div className="mt-stack grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-stack grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {personalize.cards.map((card, index) => (
           <FlipCard key={card.title} {...card} delay={index * STAGGER_MS} />
         ))}

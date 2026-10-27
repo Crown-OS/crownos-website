@@ -1,3 +1,5 @@
+import type { NavLink } from "./footer";
+
 export type VisualKey =
   | "agent-window"
   | "link-window"
@@ -34,6 +36,7 @@ export type Feature = {
   icon?: IconKey;
   visual?: VisualKey;
   tone?: Tone;
+  actions?: { primary: NavLink; secondary?: NavLink };
 };
 
 export type SectionCopy = {

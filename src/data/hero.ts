@@ -1,4 +1,4 @@
-import type { GlyphName } from "@/components/visuals/window/Glyph";
+import type { EcosystemIconName } from "@/components/visuals/ecosystem";
 import type { DeviceStill } from "@/util/device-still";
 import type { FrameSequence } from "@/util/frame-sequence";
 
@@ -24,9 +24,10 @@ export const hero = {
       ],
       restingTop: 0.602,
     } satisfies FrameSequence,
+    finalBounds: { top: 0.078, bottom: 0.84 },
   },
   ecosystem: {
-    title: "Superpowered Together",
+    title: "Superpowered *together*",
     lead: "Crown Link pairs your phone and tablet with the desktop, peer to peer and end-to-end encrypted.",
     features: [
       { icon: "clipboard", name: "Clipboard Sync" },
@@ -37,7 +38,7 @@ export const hero = {
       { icon: "second-screen", name: "Second Screen" },
       { icon: "hotspot", name: "Instant Hotspot" },
       { icon: "call", name: "Call Bridge" },
-    ] satisfies readonly { icon: GlyphName; name: string }[],
+    ] satisfies readonly { icon: EcosystemIconName; name: string }[],
     devices: {
       tablet: {
         label: "A CrownOS tablet beside the laptop",

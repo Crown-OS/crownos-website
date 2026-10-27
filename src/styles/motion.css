@@ -257,11 +257,6 @@
   }
 }
 
-.cursor-none,
-.cursor-none * {
-  cursor: none;
-}
-
 .intro {
   position: fixed;
   inset: 0;
