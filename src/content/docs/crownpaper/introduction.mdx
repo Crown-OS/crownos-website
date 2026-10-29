@@ -1,0 +1,51 @@
+---
+title: Introduction
+description: Crownpaper is the GPU wallpaper daemon for CrownOS and other Wayland desktops.
+---
+
+Crownpaper draws the desktop background on every output. It shows still images and video, and it
+moves between wallpapers with a cross-blur transition rendered on the GPU. When the screen is at rest
+the renderer is released, so the daemon costs almost nothing while you work.
+
+<Frame caption="Wrap screenshots in a Frame so they sit on the page like a device.">
+  ![A tablet showing a CrownOS wallpaper](/devices/v1/tablet-960.avif)
+</Frame>
+
+## What it supports
+
+<CardGroup cols={2}>
+  <Card title="Still wallpapers" icon="image">
+    JPEG, PNG, WebP and BMP, decoded once and cached for instant changes.
+  </Card>
+  <Card title="Video wallpapers" icon="zap">
+    VA-API hardware decoding in a separate `crownpaper-video` process.
+  </Card>
+  <Card title="GPU transitions" icon="sparkles">
+    A cross-blur between wallpapers, rendered with wgpu on Vulkan.
+  </Card>
+  <Card title="Typed IPC" icon="code">
+    One protocol definition generates the daemon handler and every client.
+  </Card>
+</CardGroup>
+
+## How it stays light
+
+- The GPU renderer is released shortly after a transition ends.
+- FFmpeg is loaded only while a video wallpaper plays, inside its own process.
+- Wallpapers you are about to show can be preloaded so `set` never waits on a decoder.
+
+<Tip>
+  Crownpaper runs on any compositor with `wlr-layer-shell`, `wp_viewporter` and `linux-dmabuf`,
+  such as Hyprland, Sway and Niri — not only on CrownOS.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/docs/crownpaper/quickstart">
+    Build the daemon and set your first wallpaper.
+  </Card>
+  <Card title="API reference" icon="terminal" href="/docs/crownpaper/api">
+    Drive the daemon from your own app.
+  </Card>
+</CardGroup>

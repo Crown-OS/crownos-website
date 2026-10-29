@@ -1,0 +1,52 @@
+---
+title: Protocol overview
+sidebarTitle: Overview
+description: Talk to the Crownpaper daemon over crownos-ipc with a typed Rust client.
+---
+
+Crownpaper exposes one service, `crownpaper`, on the brokerless crownos-ipc bus. The socket lives
+at `$XDG_RUNTIME_DIR/crownos/crownpaper.sock`, and peers are authenticated by the kernel when they
+connect.
+
+## Add the client
+
+The library crate holds only the protocol, so clients skip the daemon's graphics stack.
+
+```toml title="Cargo.toml"
+[dependencies]
+crownpaper = { git = "https://github.com/Crown-OS/crownpaper", default-features = false }
+```
+
+```rust title="main.rs"
+let mut client = crownpaper::Client::connect()?;
+let pending = client.set("/home/you/Pictures/dunes.webp".into(), 0.8)?;
+client.wait(pending, Some(Duration::from_secs(5)))?;
+```
+
+## Message kinds
+
+| Kind | Reply | Used for |
+| --- | --- | --- |
+| <Badge>call</Badge> | Yes | `set`, `ping` |
+| <Badge>notify</Badge> | No | `preload`, `unload`, `preload_renderer`, `unload_renderer`, `quit` |
+| <Badge>event</Badge> | Pushed | `Changed` |
+
+<Note>
+  Requests on one connection are handled in order. Send `ping` after a notification to know it
+  has been processed.
+</Note>
+
+## Stability
+
+From 1.0 the protocol follows semantic versioning. Every method has a selector hashed from its
+name and full signature, so a mismatched client gets an `UNKNOWN_METHOD` error instead of
+misdecoded data.
+
+<CardGroup cols={2}>
+  <Card title="set" icon="image" href="/docs/crownpaper/api/set">
+    Transition to a new wallpaper.
+  </Card>
+  <Card title="Changed" icon="bell" href="/docs/crownpaper/api/changed">
+    Follow the wallpaper on screen.
+  </Card>
+</CardGroup>

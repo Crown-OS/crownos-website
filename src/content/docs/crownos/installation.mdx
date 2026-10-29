@@ -1,0 +1,58 @@
+---
+title: Installation
+description: Download the CrownOS ISO, write it to a USB drive and install the desktop.
+---
+
+The installer configures and boots to a working desktop in under five minutes. You need a 64-bit
+PC, a USB drive and an internet connection.
+
+<Warning>
+  Installing CrownOS on a disk erases what is on it. Back up your files first, or use the
+  Migration Assistant to carry them over.
+</Warning>
+
+## Install
+
+<Steps>
+  <Step title="Download the ISO">
+    Get the latest beta image from the
+    [crownos-iso releases page](https://github.com/Crown-OS/crownos-iso/releases).
+  </Step>
+  <Step title="Write it to a USB drive">
+    <Tabs>
+      <Tab title="Linux">
+        Find your drive with `lsblk`, then write the image. Replace `/dev/sdX` with the whole
+        drive, not a partition.
+
+        ```bash
+        sudo dd if=crownos.iso of=/dev/sdX bs=4M status=progress oflag=sync
+        ```
+      </Tab>
+      <Tab title="macOS and Windows">
+        Use a graphical image writer such as balenaEtcher or Rufus and select the downloaded ISO.
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Boot from the drive">
+    Restart, open your firmware's boot menu and choose the USB drive. If the drive is not listed, you
+    may need to turn off Secure Boot in the firmware settings.
+  </Step>
+  <Step title="Run the installer">
+    Pick a disk, a user name and a password. The installer partitions the disk, installs the
+    packages and reboots into CrownOS.
+  </Step>
+</Steps>
+
+<Check>
+  When the lock screen appears, sign in with the account you created. The desktop is ready.
+</Check>
+
+## After installing
+
+Bring the system up to date before you start, since the ISO may be older than the repositories.
+
+```bash
+sudo pacman -Syu
+```
+
+See [How do I update CrownOS?](/docs/crownos/help/update-system) for more on updates.

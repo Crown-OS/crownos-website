@@ -1,0 +1,49 @@
+---
+title: Method name
+description: What the method does, in one sentence.
+api: CALL service.method
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Rust"
+client.method("argument").await?;
+```
+
+```bash title="CLI"
+service method argument
+```
+</RequestExample>
+
+<ResponseExample>
+```json title="Reply"
+{ "ok": null }
+```
+</ResponseExample>
+</ApiExamples>
+
+Describe when to call this method and what happens. Copy this file into an **API Reference** tab
+(`template: "api"`). The `api` frontmatter starts with one of `GET`, `POST`, `PUT`, `PATCH`,
+`DELETE`, `CALL`, `NOTIFY`, `EVENT` or `FN`, followed by the target.
+
+## Parameters
+
+<ParamField name="argument" type="String" required>
+  What the argument means and which values are valid.
+</ParamField>
+
+<ParamField name="options" type="Options">
+  An optional structure.
+
+  <Expandable title="fields">
+    <ParamField name="timeout" type="f32" default="1.0">
+      Seconds to wait.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Reply
+
+<ResponseField name="ok" type="()">
+  Returned once the request is accepted.
+</ResponseField>

@@ -1,0 +1,44 @@
+---
+title: How do I update CrownOS?
+sidebarTitle: Update the system
+description: Run a full system upgrade with pacman to get the latest packages and fixes.
+updated: "2026-10-28"
+---
+
+CrownOS is a rolling release. Run a full upgrade from a terminal to update every package, including
+the kernel and the desktop:
+
+```bash
+sudo pacman -Syu
+```
+
+## Update safely
+
+<Steps>
+  <Step title="Save your work">
+    Close apps with unsaved documents. Some updates restart desktop services.
+  </Step>
+  <Step title="Run the upgrade">
+    Run `sudo pacman -Syu` and review the list of packages before you confirm.
+  </Step>
+  <Step title="Restart if the kernel changed">
+    If `linux-cachyos` was updated, restart so the new kernel is loaded.
+  </Step>
+</Steps>
+
+<Warning>
+  Do not run partial upgrades such as `pacman -Sy <package>`. Installing a package against a
+  refreshed database without upgrading the rest of the system can break shared libraries.
+</Warning>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="How often should I update?">
+    Once a week is a good rhythm. Waiting months makes each upgrade larger and harder to review.
+  </Accordion>
+  <Accordion title="An update failed partway through. What now?">
+    Run `sudo pacman -Syu` again. pacman resumes from the packages that were not installed. If it
+    reports file conflicts, read the message carefully before forcing anything.
+  </Accordion>
+</AccordionGroup>

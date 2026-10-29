@@ -25,6 +25,9 @@ export function readFrontmatter(source: string, value: unknown) {
       : fail(key, "a non-empty string");
   };
 
+  const optionalText = (key: string) =>
+    value[key] === undefined ? undefined : text(key);
+
   const version = (key: string) => {
     const field = value[key];
     return typeof field === "number" ? String(field) : text(key);
@@ -63,7 +66,7 @@ export function readFrontmatter(source: string, value: unknown) {
   const group = (key: string) =>
     readFrontmatter(`${source} → ${key}`, value[key]);
 
-  return { text, version, list, oneOf, color, colors, group };
+  return { text, optionalText, version, list, oneOf, color, colors, group };
 }
 
 export type FrontmatterReader = ReturnType<typeof readFrontmatter>;

@@ -1,0 +1,33 @@
+---
+title: Crownpaper Help Center
+sidebarTitle: Overview
+description: Answers to the questions people ask most about Crownpaper.
+updated: "2026-10-28"
+---
+
+Start with the article that matches what you see. Each one ends with a way to reach the community
+if it does not solve the problem.
+
+<CardGroup cols={2}>
+  <Card title="Video wallpapers don't play" icon="zap" href="/docs/crownpaper/help/video-wallpapers">
+    Check hardware decoding and the video helper.
+  </Card>
+  <Card title="Change the startup wallpaper" icon="settings" href="/docs/crownpaper/configuration">
+    Set `wallpaper` in the appearance file.
+  </Card>
+</CardGroup>
+
+## Quick checks
+
+<AccordionGroup>
+  <Accordion title="Is the daemon running?">
+    Run `crownpaper ping`. It prints `pong` when the daemon is up.
+  </Accordion>
+  <Accordion title="Which compositors are supported?">
+    Any compositor with `wlr-layer-shell`, `wp_viewporter` and `linux-dmabuf`, such as Hyprland,
+    Sway and Niri.
+  </Accordion>
+  <Accordion title="How do I see more logs?">
+    Start the daemon with `RUST_LOG=crownpaper=debug`.
+  </Accordion>
+</AccordionGroup>

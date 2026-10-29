@@ -1,0 +1,27 @@
+---
+title: Changelog
+description: New features and fixes in each CrownUI release.
+---
+
+<Update label="2026-10-28" description="v0.1.1" tags={["Feature", "Fix"]}>
+  ## Added
+
+  - `crownui::run_windows` runs several windows from one app, each with its own UI.
+  - Layer surfaces switch keyboard focus per frame.
+
+  ## Fixed
+
+  - Popups paint in a top layer that escapes their ancestors' clips.
+  - Rounded clips of every layer are antialiased.
+
+  ## Project
+
+  - CI and crates.io publishing workflows. `cargo xtask bundle` publishes CrownUI as one crate.
+  - Licensed under MIT OR Apache-2.0.
+</Update>
+
+<Update label="2026-10-12" description="v0.1.0" tags={["Release"]}>
+  First version of CrownUI: declarative views, fine-grained signals, Tailwind-named styles,
+  DOM-named events and Impeller rendering on a dedicated thread. Release builds use thin LTO and
+  stripped symbols.
+</Update>

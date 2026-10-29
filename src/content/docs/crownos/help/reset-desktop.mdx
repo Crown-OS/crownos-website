@@ -1,0 +1,45 @@
+---
+title: How do I reset my desktop settings?
+sidebarTitle: Reset desktop settings
+description: Move a settings file aside so CrownOS recreates it with default values.
+updated: "2026-10-28"
+---
+
+Every settings section is a RON file in `~/.config/crownos/`. When a file is missing, CrownOS writes
+a fresh one with default values, so resetting a section means moving its file out of the way.
+
+## Reset one section
+
+To reset only the look of the desktop, move `appearance.ron` aside:
+
+```bash
+mv ~/.config/crownos/appearance.ron ~/.config/crownos/appearance.ron.bak
+```
+
+Open **Settings → Appearance** or sign out and back in. The file is recreated with defaults.
+
+## Reset everything
+
+<Danger>
+  This resets every CrownOS setting, including keybindings, displays and paired-device preferences.
+  Keep the backup until you have copied back anything you need.
+</Danger>
+
+```bash
+mv ~/.config/crownos ~/.config/crownos.bak
+```
+
+Sign out and back in to start with a default desktop.
+
+## Restore a backup
+
+Move the backup back over the new file:
+
+```bash
+mv ~/.config/crownos/appearance.ron.bak ~/.config/crownos/appearance.ron
+```
+
+<Tip>
+  Before you edit a settings file by hand, copy it first. A typo in RON makes the section fall back
+  to its defaults until it is fixed.
+</Tip>

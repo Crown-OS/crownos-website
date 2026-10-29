@@ -1,0 +1,53 @@
+---
+title: API overview
+sidebarTitle: Overview
+description: The entry points, handles and conventions shared by every CrownUI API.
+---
+
+Everything in this reference is exported from `crownui::prelude`. Import it once at the top of each
+file.
+
+```rust
+use crownui::prelude::*;
+```
+
+## Conventions
+
+- **Builders are lowercase nouns** such as `vstack`, `text` and `button`, and return an element you
+  chain modifiers on.
+- **Modifiers are Tailwind names** with literal values in logical pixels.
+- **Listeners use DOM names** and receive `(&mut Cx, &mut Event<T>)`. Events bubble, and handlers can
+  call `stop_propagation()` or `prevent_default()`.
+- **State is reached through `&mut Cx`**, which derefs to the reactive runtime.
+
+## Reference
+
+<CardGroup cols={2}>
+  <Card title="crownui::run" icon="rocket" href="/docs/crownui/api/run">
+    Open a window and run the app until it closes.
+  </Card>
+  <Card title="cx.signal" icon="zap" href="/docs/crownui/api/signal">
+    Create reactive state that updates only the views that read it.
+  </Card>
+</CardGroup>
+
+## Stability
+
+CrownUI is <Badge>pre-1.0</Badge>. Following Cargo's semver rules, a minor release such as 0.2 may
+change these APIs. Check the [changelog](/docs/crownui/changelog) before you upgrade.
+
+## Errors
+
+Entry points return `Result<(), RunError>`.
+
+<ResponseField name="RunError::Graphics" type="GraphicsError">
+  The graphics backend failed to initialize.
+</ResponseField>
+
+<ResponseField name="RunError::Platform" type="String">
+  The platform failed, for example when no Wayland compositor is reachable.
+</ResponseField>
+
+<ResponseField name="RunError::Thread" type="std::io::Error">
+  A thread could not be spawned.
+</ResponseField>

@@ -1,0 +1,79 @@
+---
+title: run
+description: Run a view in a window on Wayland, rendered by Impeller, until the window closes.
+api: FN crownui::run
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| text("Hello")),
+        AppConfig::new("Hello").size(480, 320),
+    )
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn run(root: impl View, config: AppConfig) -> Result<(), RunError>
+```
+</ResponseExample>
+</ApiExamples>
+
+`run` opens one window, lays it out with taffy and renders it with Impeller until the window closes.
+
+<Warning>
+  Call `run` from `main` before starting other threads. It limits the Vulkan loader to the
+  compositor's GPU driver through the process environment.
+</Warning>
+
+## Parameters
+
+<ParamField name="root" type="impl View" required>
+  The view to show. Usually a `component(|cx| ..)` whose closure builds the UI once.
+</ParamField>
+
+<ParamField name="config" type="AppConfig" required>
+  Window options, built from `AppConfig::new(title)`.
+
+  <Expandable title="builder methods">
+    <ParamField name="size" type="(u32, u32)">
+      Initial window size in logical pixels.
+    </ParamField>
+    <ParamField name="min_size" type="(u32, u32)">
+      Smallest size the window can be resized to.
+    </ParamField>
+    <ParamField name="app_id" type="impl Into<String>">
+      The Wayland app id used by the compositor and the launcher.
+    </ParamField>
+    <ParamField name="font" type="(Vec<u8>, Option<&str>)">
+      Registers a font, with an optional family alias.
+    </ParamField>
+    <ParamField name="layer" type="LayerOptions">
+      Turns the app into a panel, dock or overlay on the desktop shell.
+    </ParamField>
+    <ParamField name="mcp" type="bool">
+      Turns the in-app MCP server on or off.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+<ResponseField name="Ok(())" type="()">
+  The window was closed.
+</ResponseField>
+
+<ResponseField name="Err" type="RunError">
+  The graphics backend, the platform or a thread failed to start.
+</ResponseField>
+
+## Several windows
+
+`crownui::run_windows(vec![..])` takes `(AnyView, AppConfig)` pairs and runs until the last window
+closes. Each window has its own UI, so signals are not shared between them.

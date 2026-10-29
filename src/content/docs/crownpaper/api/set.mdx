@@ -1,0 +1,50 @@
+---
+title: set
+description: Transition the desktop to a new wallpaper.
+api: CALL crownpaper.set
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Rust"
+let pending = client.set(path, 0.8)?;
+client.wait(pending, Some(Duration::from_secs(5)))?;
+```
+
+```bash title="CLI"
+crownpaper set ~/Pictures/dunes.webp -d 0.8
+```
+</RequestExample>
+
+<ResponseExample>
+```bash title="CLI output"
+wallpaper set to /home/you/Pictures/dunes.webp
+```
+</ResponseExample>
+</ApiExamples>
+
+Replies as soon as the image is known to be decodable and the transition is queued — not when it
+finishes. The wallpaper that actually lands arrives as a [`Changed`](/docs/crownpaper/api/changed)
+event.
+
+## Parameters
+
+<ParamField name="path" type="String" required>
+  Absolute path to a still image or video. The daemon may run in a different working directory, so
+  resolve relative paths before sending them.
+</ParamField>
+
+<ParamField name="duration" type="f32" required>
+  Transition length in seconds. `0` swaps the wallpaper without a transition.
+</ParamField>
+
+## Reply
+
+<ResponseField name="()" type="unit">
+  Empty reply once the transition is queued. An undecodable file returns an error instead.
+</ResponseField>
+
+<Tip>
+  [Preload](/docs/crownpaper/api/preload) the next wallpaper first and `set` starts animating
+  immediately.
+</Tip>

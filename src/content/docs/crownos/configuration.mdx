@@ -1,0 +1,63 @@
+---
+title: Configuration
+description: Change how the desktop looks by editing plain RON files in ~/.config/crownos.
+---
+
+Every settings section is one RON file in `~/.config/crownos/`. The settings menu name and the file
+name are the same string, so **Display** lives in `display.ron` and **Appearance** in
+`appearance.ron`.
+
+<Tip>
+  Apps watch these files. Save an edit in your editor and the desktop updates without a restart.
+</Tip>
+
+## Appearance
+
+A missing file is created with defaults the first time an app reads it. Set only the keys you want
+to change.
+
+```ron title="~/.config/crownos/appearance.ron"
+(
+    dark_mode: true,
+    accent: Blue,
+    wallpaper: "/home/you/Pictures/wallpaper.jpg",
+    gaps_inner: 8,
+    gaps_outer: 8,
+    border_radius: 8,
+    animations: Smooth,
+    blur: true,
+)
+```
+
+### Keys
+
+| Key | Type | Default | What it changes |
+| --- | --- | --- | --- |
+| `dark_mode` | bool | `true` | Light or dark appearance |
+| `accent` | `Purple`, `Blue`, `Green`, `Orange`, `Pink` | `Purple` | Accent colour |
+| `wallpaper` | string | empty | Path to the desktop wallpaper |
+| `bar_height` | u32 | `32` | Height of the top bar in pixels |
+| `gaps_inner` | u16 | `8` | Pixels between tiled windows |
+| `gaps_outer` | u16 | `8` | Pixels between tiled windows and the screen edge |
+| `animations` | `None`, `Snappy`, `Standard`, `Smooth` | `Standard` | Animation profile |
+| `minimize_effect` | `Genie`, `Scale` | `Genie` | How windows minimise |
+| `close_effect` | `Dust`, `Shrink` | `Dust` | How closed windows leave the screen |
+| `blur` | bool | `true` | Background blur behind glass surfaces |
+
+### Window effects
+
+<AccordionGroup>
+  <Accordion title="Blur">
+    `blur_passes` (default `4`), `blur_size` (default `1.5`) and `blur_noise` (default `0.01`) tune
+    the background blur. More passes look smoother and cost more GPU time.
+  </Accordion>
+  <Accordion title="Cursor and icon themes">
+    `cursor_theme` names an XCursor theme under `/usr/share/icons`; `icon_theme` names a
+    freedesktop icon theme. Leave either empty to keep the system default.
+  </Accordion>
+</AccordionGroup>
+
+## Other sections
+
+Files such as `display.ron`, `input.ron`, `keybinds.ron`, `notification.ron` and `power.ron` follow
+the same pattern. Open the matching page in Settings to see every option, or edit the file by hand.

@@ -1,0 +1,53 @@
+---
+title: Introduction
+description: What CrownOS is, what it is built on and where to go next.
+---
+
+CrownOS is an agent native desktop built on the Linux kernel. It starts from CachyOS and Arch Linux,
+then replaces the layer you interact with: the compositor, the UI toolkit and the apps that ship with
+the desktop.
+
+<Info>
+  CrownOS is in public beta. Builds are published on the
+  [crownos-iso releases page](https://github.com/Crown-OS/crownos-iso/releases).
+</Info>
+
+## What is inside
+
+<CardGroup cols={3}>
+  <Card title="Crownpositor" icon="layers">
+    A Wayland compositor written in Rust and tuned for low memory, with fully GPU accelerated
+    rendering and direct scanout.
+  </Card>
+  <Card title="CrownUI" icon="sparkles" href="/docs/crownui/introduction">
+    The native UI toolkit, rendered by Impeller with shaders compiled ahead of time.
+  </Card>
+  <Card title="CachyOS kernel" icon="cpu">
+    linux-cachyos with the EEVDF scheduler, built with Clang ThinLTO and AutoFDO profiling.
+  </Card>
+</CardGroup>
+
+## Principles
+
+- **Performance first.** A full desktop that runs in under 1.2 GB of memory.
+- **Open source.** Every component is developed in the open under the
+  [Crown-OS organisation](https://github.com/Crown-OS).
+- **Calm by default.** A monochromatic interface you can reshape through themes, plugins and
+  plain-text configuration.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Install CrownOS" icon="download" href="/docs/crownos/installation">
+    Write the ISO to a USB drive and boot to a working desktop in minutes.
+  </Card>
+  <Card title="Connect your devices" icon="link" href="/docs/crownos/ecosystem">
+    Pair your phone and tablet with Crown Link.
+  </Card>
+  <Card title="Configure the desktop" icon="settings" href="/docs/crownos/configuration">
+    Change the accent, gaps, blur and animations in one RON file.
+  </Card>
+  <Card title="Help Center" icon="life-buoy" href="/docs/crownos/help">
+    Answers to the questions people ask most.
+  </Card>
+</CardGroup>

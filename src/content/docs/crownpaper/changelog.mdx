@@ -1,0 +1,37 @@
+---
+title: Changelog
+description: Every Crownpaper release, newest first.
+---
+
+<Update label="2026-10-28" description="v1.0.1" tags={["Packaging"]}>
+  ## Added
+
+  - Arch package published on every release, built by CI for the CrownOS ISO.
+</Update>
+
+<Update label="2026-10-27" description="v1.0.0" tags={["Release", "Performance"]}>
+  First stable release. The IPC protocol exposed by the `crownpaper` library crate is stable from
+  this version.
+
+  ## Added
+
+  - Still wallpapers (JPEG, PNG, WebP, BMP) and video wallpapers on every output.
+  - Cross-blur transition between wallpapers, rendered with wgpu on Vulkan.
+  - Video decoding in the separate `crownpaper-video` helper with VA-API hardware decoding and
+    zero-copy dmabuf presentation.
+  - `preload` / `unload` for instant wallpaper changes, and `preload-renderer` /
+    `unload-renderer` to control the GPU renderer lifetime.
+  - Typed client protocol in the library crate; build it without the graphics stack using
+    `default-features = false`.
+
+  ## Changed
+
+  | Metric | Before | After |
+  | --- | --- | --- |
+  | Cold start to first frame | 262 ms | 57 ms |
+  | Resident memory at rest | 153 MB | 42 MB |
+  | Peak memory, 7680×4320 JPEG | 378 MB | 99 MB |
+
+  - The daemon no longer depends on crownshell; it talks to Wayland directly.
+  - The GPU renderer is released shortly after a transition ends.
+</Update>

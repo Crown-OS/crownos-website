@@ -1,0 +1,42 @@
+---
+title: ping
+description: A round trip that proves the daemon is alive and has drained everything sent before it.
+api: CALL crownpaper.ping
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Rust"
+let pending = client.ping()?;
+client.wait(pending, Some(Duration::from_secs(5)))?;
+```
+
+```bash title="CLI"
+crownpaper ping
+```
+</RequestExample>
+
+<ResponseExample>
+```bash title="CLI output"
+pong
+```
+</ResponseExample>
+</ApiExamples>
+
+Requests on a connection are handled in order, so a `ping` reply also confirms that every
+notification sent before it was processed.
+
+## Parameters
+
+This method takes no parameters.
+
+## Reply
+
+<ResponseField name="()" type="unit">
+  Empty reply. A connection error means the daemon is not running.
+</ResponseField>
+
+<Danger>
+  `quit` is a notification too. Do not send it from a settings app — the desktop loses its
+  background until the daemon is started again.
+</Danger>

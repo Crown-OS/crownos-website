@@ -1,0 +1,62 @@
+---
+title: Page title
+description: One sentence that tells the reader what they will be able to do after this page.
+sidebarTitle: Short title
+---
+
+Open with two or three sentences of context. Say who the page is for and what they end up with.
+
+<Note>
+  Copy this file to `src/content/docs/<project>/<slug>.mdx`, then list the slug under a group in a
+  **Guides** tab (`template: "product"`) in `src/data/docs/<project>.ts`.
+</Note>
+
+## Before you begin
+
+- A requirement the reader needs
+- Another requirement, with a [link](/docs/crownos/installation)
+
+## Set it up
+
+<Steps>
+  <Step title="Install the package">
+    ```bash
+    sudo pacman -S crownos-example
+    ```
+  </Step>
+  <Step title="Enable the service">
+    ```bash
+    systemctl --user enable --now crownos-example
+    ```
+  </Step>
+</Steps>
+
+## Configure it
+
+<CodeGroup>
+```ron title="appearance.ron"
+{
+    accent: "#ffffff",
+}
+```
+
+```bash title="Terminal"
+crownctl reload appearance
+```
+</CodeGroup>
+
+<Tabs>
+  <Tab title="Desktop">Desktop specific instructions.</Tab>
+  <Tab title="Laptop">Laptop specific instructions.</Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Related guide" icon="book" href="/docs/crownos/configuration">
+    What the reader learns next.
+  </Card>
+  <Card title="API reference" icon="code" href="/docs/crownpaper/api">
+    Where the reader goes for details.
+  </Card>
+</CardGroup>

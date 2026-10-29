@@ -1,0 +1,47 @@
+---
+title: Video wallpapers don't play
+description: Still images work but videos stay blank or fall back to the previous wallpaper.
+updated: "2026-10-28"
+---
+
+Video wallpapers need the `crownpaper-video` helper, FFmpeg and a working VA-API driver. If any of
+them is missing, still images keep working and videos fail.
+
+## Fix it
+
+<Steps>
+  <Step title="Check the helper is installed next to the daemon">
+    ```bash
+    ls "$(dirname "$(command -v crownpaper)")"/crownpaper-video
+    ```
+
+    If the file is missing, reinstall both binaries from `target/release`.
+  </Step>
+  <Step title="Check hardware decoding">
+    ```bash
+    vainfo
+    ```
+
+    `vainfo` should list a driver and decode profiles. Install the VA-API driver for your GPU if it
+    reports an error.
+  </Step>
+  <Step title="Read the daemon log">
+    ```bash
+    RUST_LOG=crownpaper=debug crownpaper daemon
+    ```
+
+    Then run `crownpaper set` with the video again and look for decoder errors.
+  </Step>
+</Steps>
+
+## Common questions
+
+<AccordionGroup>
+  <Accordion title="Does a video wallpaper keep FFmpeg loaded all the time?">
+    No. Decoding runs in the separate `crownpaper-video` process, which runs only while a video
+    plays.
+  </Accordion>
+  <Accordion title="Which formats work?">
+    Anything your FFmpeg build and VA-API driver can decode. H.264 and HEVC are the safest choices.
+  </Accordion>
+</AccordionGroup>

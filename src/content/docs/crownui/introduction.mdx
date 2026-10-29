@@ -1,0 +1,65 @@
+---
+title: Introduction
+description: CrownUI is a declarative UI toolkit for Rust and the native toolkit of CrownOS.
+---
+
+CrownUI lets you build views once in a SwiftUI style, drive them with fine-grained signals, style
+them with Tailwind names and handle DOM-named events. Impeller renders every frame on a dedicated
+thread, and one semantic tree serves screen readers, tests and AI agents.
+
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let count = cx.signal(0);
+            vstack((
+                text(bind(move |rt| format!("Count: {}", count.get(rt)))).text_size(24.0),
+                button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+            ))
+            .p(24.0)
+            .gap(12.0)
+        }),
+        AppConfig::new("Counter"),
+    )
+}
+```
+
+## Why CrownUI
+
+<CardGroup cols={2}>
+  <Card title="Names you already know" icon="book">
+    SwiftUI nouns for views, Tailwind classes for styles, DOM names for events.
+  </Card>
+  <Card title="Fine-grained updates" icon="zap">
+    Views are built once. When a signal changes, only the properties that read it update.
+  </Card>
+  <Card title="Animations that never stutter" icon="sparkles">
+    A dedicated render thread runs every animation on its own clock.
+  </Card>
+  <Card title="Built for AI agents" icon="cpu">
+    An in-app MCP server lets agents read the UI tree, click and type.
+  </Card>
+</CardGroup>
+
+## No macros in the authoring API
+
+Every view, modifier and event is a plain Rust function or method. rust-analyzer can complete them,
+show their types and jump to their source, and agents see the same real types.
+
+## Rendering
+
+CrownUI renders with Impeller, the engine behind Flutter. It runs on Vulkan with a GLES fallback,
+draws one-pixel analytic edges on rounded shapes at any scale and supports backdrop blur.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/docs/crownui/quickstart">
+    Install the native libraries and run your first app.
+  </Card>
+  <Card title="API reference" icon="code" href="/docs/crownui/api">
+    Every entry point and handle, with examples.
+  </Card>
+</CardGroup>

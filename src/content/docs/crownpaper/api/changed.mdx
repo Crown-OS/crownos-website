@@ -1,0 +1,35 @@
+---
+title: Changed
+description: Pushed to every subscriber with the wallpaper that is now on screen.
+api: EVENT crownpaper.Changed
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Subscribe"
+client.subscribe_blocking::<crownpaper::Changed>(Some(Duration::from_secs(5)))?;
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Handle"
+while let Some(changed) = client.next_event::<crownpaper::Changed>() {
+    println!("now showing {}", changed.path);
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`Changed` fires after a transition lands, so a wallpaper picker can show the real state even when
+another app changed the wallpaper.
+
+## Payload
+
+<ResponseField name="path" type="String" required>
+  Absolute path of the wallpaper now on screen.
+</ResponseField>
+
+<Info>
+  A slow subscriber loses events instead of blocking the daemon. Treat `Changed` as the latest
+  state, not as a complete history.
+</Info>

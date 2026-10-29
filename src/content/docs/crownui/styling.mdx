@@ -1,0 +1,72 @@
+---
+title: Styling
+description: Style views with Tailwind-named methods, state variants and spring transitions.
+---
+
+Style methods use Tailwind class names with literal values in logical pixels.
+
+```rust
+text("Hello")
+    .p(16.0)
+    .rounded(8.0)
+    .bg(rgb(0x3b82f6))
+    .text_color(WHITE)
+    .hover(|style| style.bg(rgb(0x2563eb)))
+    .dark(|style| style.bg(rgb(0x1e293b)))
+    .transition(Spring::snappy())
+```
+
+## From Tailwind to CrownUI
+
+| Tailwind | Method |
+| --- | --- |
+| `p-4 px-4 py-2` | `.p(16.0) .px(16.0) .py(8.0)` |
+| `gap gap-x gap-y` | `.gap() .gap_x() .gap_y()` |
+| `bg-*` | `.bg(color)` |
+| `text-*` | `.text_color(color) .text_size(px)` |
+| `rounded` | `.rounded()` |
+| `shadow-md` | `.shadow(Shadow::md())` |
+| `opacity-* backdrop-blur-*` | `.opacity(0.5) .backdrop_blur(24.0)` |
+| `hover: dark:` | `.hover(\|s\| ..) .dark(\|s\| ..)` |
+
+## Variants
+
+Variants such as `hover`, `active`, `focus`, `focus_visible`, `when_disabled` and `dark` take paint
+properties. `.transition(..)` animates every change in the subtree with a spring or a timing curve.
+
+<Tabs>
+  <Tab title="Spring">
+    ```rust
+    button("Save").hover(|style| style.scale(1.04)).transition(Spring::snappy())
+    ```
+  </Tab>
+  <Tab title="Curve">
+    ```rust
+    button("Save").hover(|style| style.opacity(0.8)).transition(Curve::ease_in_out(200))
+    ```
+  </Tab>
+</Tabs>
+
+## Glass materials
+
+On CrownOS, `.material(Material::thin())` asks the compositor to render glass behind a view.
+
+<Info>
+  CrownUI still runs on other Wayland compositors. It only uses CrownOS protocols such as
+  compositor glass when the compositor offers them.
+</Info>
+
+## Themed widgets
+
+The `kit` module adds the themed CrownOS widgets. `provide_configured_theme` reads the desktop's
+light or dark mode and accent colour and follows edits while the app runs.
+
+```rust
+use crownui::{kit::{provide_configured_theme, section, setting_row, toggle}, prelude::*};
+
+component(|cx| {
+    provide_configured_theme(cx);
+    let wifi = cx.signal(true);
+    section("Network", (setting_row("Wi-Fi", toggle(wifi)),))
+})
+```

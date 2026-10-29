@@ -1,0 +1,77 @@
+---
+title: Quickstart
+description: Install the native libraries, add CrownUI to a project and open your first window.
+---
+
+CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor.
+
+## Install
+
+<Steps>
+  <Step title="Install the native libraries">
+    <CodeGroup>
+    ```bash title="Arch Linux"
+    sudo pacman -S base-devel wayland wayland-protocols libxkbcommon \
+      vulkan-icd-loader vulkan-headers mesa fontconfig freetype2 dbus
+    ```
+
+    ```bash title="Debian and Ubuntu"
+    sudo apt install build-essential pkg-config libwayland-dev wayland-protocols \
+      libxkbcommon-dev libvulkan-dev libegl1-mesa-dev libgbm-dev \
+      libfontconfig-dev libfreetype-dev libdbus-1-dev
+    ```
+    </CodeGroup>
+  </Step>
+  <Step title="Add the crate">
+    ```bash
+    cargo new hello && cd hello
+    cargo add crownui
+    ```
+  </Step>
+  <Step title="Write the app">
+    ```rust title="src/main.rs" {6-9}
+    use crownui::prelude::*;
+
+    fn main() -> Result<(), crownui::RunError> {
+        crownui::run(
+            component(|cx| {
+                let count = cx.signal(0);
+                vstack((
+                    text(bind(move |rt| format!("Count: {}", count.get(rt)))),
+                    button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+                ))
+                .p(24.0)
+                .gap(12.0)
+            }),
+            AppConfig::new("Counter"),
+        )
+    }
+    ```
+  </Step>
+  <Step title="Run it">
+    ```bash
+    cargo run
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The first build downloads the Impeller SDK (about 23 MB) into `.impeller_cache/`. Set
+  `IMPELLER_CACHE_DIR` to a vendored copy for offline builds, and enable the `static` feature to
+  link Impeller into your binary.
+</Note>
+
+## Features
+
+| Feature | Default | What it adds |
+| --- | --- | --- |
+| `wayland` | yes | The Wayland platform |
+| `impeller` | yes | The Impeller renderer on Vulkan with a GLES fallback |
+| `tokio` | yes | Async tasks through `cx.spawn` |
+| `mcp` | yes | An in-app MCP server so AI agents can drive the app |
+| `accessibility` | yes | Screen reader support through AT-SPI |
+| `static` | no | Links libimpeller statically |
+
+## Next steps
+
+Learn how [signals drive updates](/docs/crownui/state), then [style your views](/docs/crownui/styling).

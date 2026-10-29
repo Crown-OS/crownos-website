@@ -1,0 +1,69 @@
+---
+title: Quickstart
+description: Build Crownpaper, start the daemon and change your wallpaper from the command line.
+---
+
+This guide takes you from a fresh clone to a running daemon in a few minutes.
+
+## Requirements
+
+| Dependency | Why it is needed |
+| --- | --- |
+| A Wayland compositor | `wlr-layer-shell`, `wp_viewporter` and `linux-dmabuf` |
+| A Vulkan GPU driver | Renders the transition |
+| `libturbojpeg` | Fast JPEG decoding, found through `pkg-config` |
+| FFmpeg and VA-API drivers | Only for video wallpapers |
+
+## Install
+
+<Steps>
+  <Step title="Clone the sibling crates">
+    Crownpaper builds against `crownos-ipc` and `crownos-config`, expected next to it.
+
+    ```bash
+    git clone https://github.com/Crown-OS/crownpaper.git
+    git clone https://github.com/Crown-OS/crownos-ipc.git
+    git clone https://github.com/Crown-OS/crownos-config.git
+    ```
+  </Step>
+  <Step title="Build and install both binaries">
+    ```bash
+    cd crownpaper
+    cargo build --release
+    install -Dm755 target/release/crownpaper target/release/crownpaper-video -t ~/.local/bin
+    ```
+
+    <Warning>
+      Install `crownpaper` and `crownpaper-video` side by side. The daemon starts the video helper
+      from its own directory.
+    </Warning>
+  </Step>
+  <Step title="Start the daemon">
+    ```bash
+    crownpaper daemon --image ~/Pictures/wallpaper.jpg --duration 1.2
+    ```
+
+    Without `--image` the daemon reads `wallpaper` from `~/.config/crownos/appearance.ron`.
+  </Step>
+</Steps>
+
+## Change the wallpaper
+
+<CodeGroup>
+```bash title="Set"
+crownpaper set ~/Pictures/dunes.webp -d 0.8
+```
+
+```bash title="Preload, then set"
+crownpaper preload ~/Pictures/dunes.webp ~/Pictures/city.mp4
+crownpaper set ~/Pictures/city.mp4
+```
+
+```bash title="Health check"
+crownpaper ping
+```
+</CodeGroup>
+
+<Check>
+  `crownpaper ping` prints `pong` once the daemon has handled everything sent before it.
+</Check>

@@ -1,0 +1,60 @@
+---
+title: State
+description: Signals, memos and bindings drive fine-grained updates without a virtual DOM.
+---
+
+`component` runs its closure once to build the view. The closure never runs again. Updates happen
+because a property reads a signal inside `bind`, so only that property changes when the signal
+changes.
+
+## Signals
+
+- `cx.signal(value)` creates a `Signal<T>`. Read it with `get`, `with` or `with2`. Write it with
+  `set` or `update`.
+- `cx.memo(..)` derives a value and recomputes only when its inputs change.
+- `bind(move |rt| ..)` turns any expression into a reactive property.
+
+Any property accepts a literal, a `Signal`, a `Memo` or a `bind`.
+
+```rust
+let count = cx.signal(0);
+text(bind(move |rt| format!("Count: {}", count.get(rt))))
+```
+
+## Read first, then write
+
+Because `Cx` derefs to the runtime, reads and writes both need `&mut`. Read the value into a local
+first, then write.
+
+```rust
+let initial = todo.with(cx, |todo| todo.done);
+let done = cx.signal(initial);
+```
+
+<Tip>
+  There is no `Rc`, `RefCell` or `Mutex` anywhere in the framework. State lives in one runtime that
+  you reach through `&mut Cx`.
+</Tip>
+
+## Lists and structure
+
+<AccordionGroup>
+  <Accordion title="show">
+    `show(condition, then, otherwise)` mounts one of two branches and unmounts the hidden one.
+  </Accordion>
+  <Accordion title="for_each">
+    `for_each(items, key, row)` renders a keyed list and gives each row its own signal.
+  </Accordion>
+  <Accordion title="lazy_for_each and lazy_vstack">
+    Mount only the visible rows of a long list.
+  </Accordion>
+  <Accordion title="keyed and error_boundary">
+    `keyed(..)` rebuilds a branch when a derived value changes. `error_boundary(..)` catches a
+    panicking component and shows a fallback.
+  </Accordion>
+</AccordionGroup>
+
+## Async work
+
+With the default `tokio` feature, `cx.spawn(future, on_done)` runs a future off the UI thread and
+calls `on_done` with its result back on the UI thread.

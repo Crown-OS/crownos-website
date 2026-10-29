@@ -1,0 +1,62 @@
+---
+title: signal
+description: Create a reactive value in the current scope and read or write it through the runtime.
+api: FN cx.signal
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Counter"
+let count = cx.signal(0);
+
+button("+1").on_click(move |cx, _| {
+    count.update(cx, |count| *count += 1)
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn signal<T: 'static>(&mut self, value: T) -> Signal<T>
+```
+</ResponseExample>
+</ApiExamples>
+
+`signal` stores `value` in the current scope and returns a `Signal<T>` handle. The handle is `Copy`,
+so closures can capture it by value. The value is dropped when its scope is disposed.
+
+## Parameters
+
+<ParamField name="value" type="T: 'static" required>
+  The initial value.
+</ParamField>
+
+## Signal methods
+
+<ResponseField name="get" type="fn(self, &mut Runtime) -> T">
+  Clones the value and subscribes the running observer. Panics when the signal's scope was disposed.
+</ResponseField>
+
+<ResponseField name="try_get" type="fn(self, &mut Runtime) -> Option<T>">
+  Clones the value, or returns `None` when the signal was disposed.
+</ResponseField>
+
+<ResponseField name="with" type="fn(self, &mut Runtime, impl FnOnce(&T) -> R) -> R">
+  Lends the value to a closure and subscribes the running observer.
+</ResponseField>
+
+<ResponseField name="with_untracked" type="fn(self, &Runtime, impl FnOnce(&T) -> R) -> R">
+  Lends the value without subscribing anything.
+</ResponseField>
+
+<ResponseField name="set" type="fn(self, &mut Runtime, T)">
+  Replaces the value and marks subscribers dirty.
+</ResponseField>
+
+<ResponseField name="update" type="fn(self, &mut Runtime, impl FnOnce(&mut T))">
+  Mutates the value in place and marks subscribers dirty.
+</ResponseField>
+
+<Tip>
+  Use `try_get` and `try_set` in callbacks that can outlive the component that created the signal.
+</Tip>

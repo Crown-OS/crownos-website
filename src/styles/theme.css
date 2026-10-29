@@ -66,6 +66,9 @@
   --text-lead: clamp(1.05rem, 1.25vw, 1.2rem);
   --text-lead--line-height: 1.32;
   --text-lead--letter-spacing: -0.02em;
+  --text-body: 1rem;
+  --text-body--line-height: 1.75;
+  --text-body--letter-spacing: -0.011em;
   --text-ui: 0.9375rem;
   --text-ui--line-height: 1;
   --text-ui--letter-spacing: -0.025em;

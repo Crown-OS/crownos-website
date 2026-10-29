@@ -1,0 +1,55 @@
+---
+title: Configuration
+description: Choose the startup wallpaper, tune transitions and control how much memory Crownpaper keeps.
+---
+
+Crownpaper has no config file of its own. It reads the shared CrownOS appearance file and takes
+everything else as command-line flags.
+
+## Startup wallpaper
+
+```ron title="~/.config/crownos/appearance.ron" {2}
+{
+    wallpaper: "/home/you/.backgrounds/wallpaper.jpg",
+}
+```
+
+`--image` on `crownpaper daemon` overrides this value for one session.
+
+## Transition length
+
+Every `set` takes an optional duration in seconds. The daemon's default comes from `--duration`.
+
+<Tabs>
+  <Tab title="Per change">
+    ```bash
+    crownpaper set ~/Pictures/dunes.webp -d 2
+    ```
+  </Tab>
+  <Tab title="Default">
+    ```bash
+    crownpaper daemon --duration 0.6
+    ```
+  </Tab>
+</Tabs>
+
+## Memory
+
+The renderer and decoded images are released when nothing needs them. Hold them on purpose when
+you know a change is coming, such as in a wallpaper picker.
+
+| Command | Effect |
+| --- | --- |
+| `crownpaper preload <paths>…` | Decode wallpapers into the cache for an instant `set` |
+| `crownpaper unload <paths>…` | Drop preloaded wallpapers |
+| `crownpaper preload-renderer` | Keep the GPU renderer warm |
+| `crownpaper unload-renderer` | Let the renderer be released at rest |
+
+## Logging
+
+Set `RUST_LOG` before starting the daemon. Press <Kbd>Ctrl</Kbd> <Kbd>C</Kbd> or run
+`crownpaper quit` to stop it.
+
+```bash
+RUST_LOG=crownpaper=debug crownpaper daemon
+```

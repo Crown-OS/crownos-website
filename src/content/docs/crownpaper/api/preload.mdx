@@ -1,0 +1,49 @@
+---
+title: preload
+description: Decode wallpapers into the GPU cache so a later set is instant.
+api: NOTIFY crownpaper.preload
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Rust"
+client.preload(vec![dunes, city])?;
+let pending = client.ping()?;
+client.wait(pending, Some(Duration::from_secs(5)))?;
+```
+
+```bash title="CLI"
+crownpaper preload ~/Pictures/dunes.webp ~/Pictures/city.mp4
+```
+</RequestExample>
+
+<ResponseExample>
+```bash title="CLI output"
+preloaded 2 wallpaper(s)
+```
+</ResponseExample>
+</ApiExamples>
+
+A notification: the daemon does not reply. Follow it with [`ping`](/docs/crownpaper/api/ping) when
+you need to know the images are ready.
+
+## Parameters
+
+<ParamField name="paths" type="Vec<String>" required>
+  Absolute paths to decode. Paths already in the cache are skipped.
+</ParamField>
+
+## Related notifications
+
+<AccordionGroup>
+  <Accordion title="unload(paths: Vec<String>)">
+    Drops preloaded wallpapers from the cache.
+  </Accordion>
+  <Accordion title="preload_renderer()">
+    Brings the GPU renderer up and keeps it warm, so the next `set` animates without paying for
+    device creation.
+  </Accordion>
+  <Accordion title="unload_renderer()">
+    Lets the renderer be released again once the screen is at rest.
+  </Accordion>
+</AccordionGroup>
