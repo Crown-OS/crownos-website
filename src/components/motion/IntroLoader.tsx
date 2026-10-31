@@ -114,9 +114,7 @@ export function IntroLoader() {
         className="intro-curtain intro-curtain-front flex flex-col justify-end bg-ink px-gutter pb-[clamp(1.25rem,3svh,2rem)]"
       >
         <div className="intro-content flex items-end justify-between">
-          <span className="font-mono text-micro text-muted uppercase">
-            {intro.label}
-          </span>
+          <span className="text-xl text-muted">{intro.label}</span>
           <span ref={counterRef} className="text-headline tabular-nums">
             000
           </span>

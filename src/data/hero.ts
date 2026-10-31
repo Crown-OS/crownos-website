@@ -25,6 +25,7 @@ export const hero = {
       restingTop: 0.602,
     } satisfies FrameSequence,
     finalBounds: { top: 0.078, bottom: 0.84 },
+    deskEdge: 0.52,
   },
   ecosystem: {
     title: "Superpowered together",

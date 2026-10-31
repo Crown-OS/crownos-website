@@ -10,12 +10,14 @@ const MAX_PIXEL_RATIO = 2;
 type ShaderCanvasProps = {
   fragment: string;
   resolutionScale?: number;
+  animated?: boolean;
   className?: string;
 };
 
 export function ShaderCanvas({
   fragment,
   resolutionScale = 1,
+  animated = true,
   className,
 }: ShaderCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -51,19 +53,19 @@ export function ShaderCanvas({
       canvas.height = Math.round(height * pixelRatio);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(resolution, canvas.width, canvas.height);
-      draw(performance.now());
+      draw(animated ? performance.now() : 0);
     };
 
     const sizeObserver = new ResizeObserver(resize);
     sizeObserver.observe(canvas);
-    const stop = runWhileVisible(canvas, draw);
+    const stop = animated ? runWhileVisible(canvas, draw) : () => {};
 
     return () => {
       stop();
       sizeObserver.disconnect();
       pointer.dispose();
     };
-  }, [fragment, resolutionScale]);
+  }, [fragment, resolutionScale, animated]);
 
   return (
     <canvas

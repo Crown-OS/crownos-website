@@ -3,8 +3,13 @@
 import { useScroll, useTransform } from "motion/react";
 import * as m from "motion/react-m";
 import { type CSSProperties, useRef } from "react";
-import { ScrollSequence, SplitLetters } from "@/components/motion";
+import {
+  ScrollSequence,
+  ShaderCanvas,
+  SplitLetters,
+} from "@/components/motion";
 import { hero } from "@/data/hero";
+import { SYNTHESIS_SHADER } from "@/shaders/synthesis";
 import { lineupSpan } from "@/util/device-still";
 import type { ScrollRange } from "@/util/scroll-range";
 import { useLineupFit } from "@/util/use-lineup-fit";
@@ -20,6 +25,7 @@ const TIMELINE = {
   ecosystemIn: [0.66, 0.88],
 } satisfies Record<string, ScrollRange>;
 const ZOOMED_HEIGHT_SHARE = 0.64;
+const SHADER_RESOLUTION = 0.5;
 const FRAME = hero.laptop.sequence.size;
 const LINEUP = lineupSpan(
   Object.values(hero.ecosystem.devices),
@@ -30,6 +36,9 @@ const FRAME_BOX = {
   aspectRatio: `${FRAME.width} / ${FRAME.height}`,
   width: `min(100cqw, 100cqh * ${FRAME.width / FRAME.height})`,
 } satisfies CSSProperties;
+const DESK_EDGE = {
+  "--desk-edge": `${hero.laptop.deskEdge * 100}%`,
+} as CSSProperties;
 const SLOGAN_TIMING = {
   "--delay": "550ms",
   "--sweep-at": "1600ms",
@@ -61,7 +70,7 @@ export function Hero() {
   const stageRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const captionRef = useRef<HTMLDivElement>(null);
-  const restingY = useRestingOffset(stageRef, copyRef, hero.laptop.sequence);
+  const laptopRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -100,8 +109,12 @@ export function Hero() {
   const swooshX = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
   const swooshY = useTransform(scrollYProgress, [0, 1], ["4%", "-10%"]);
   const swooshScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
-  const laptopY = useTransform(
-    () => restingY.get() * (1 - frameProgress.get()),
+  useRestingOffset(
+    stageRef,
+    copyRef,
+    laptopRef,
+    hero.laptop.sequence,
+    frameProgress,
   );
 
   return (
@@ -119,8 +132,14 @@ export function Hero() {
         <div aria-hidden className="fade-y absolute inset-0 -z-10 isolate">
           <m.div
             style={{ x: swooshX, y: swooshY, scale: swooshScale }}
-            className="hero-swoosh absolute -inset-[15%]"
-          />
+            className="absolute -inset-[15%]"
+          >
+            <ShaderCanvas
+              fragment={SYNTHESIS_SHADER}
+              resolutionScale={SHADER_RESOLUTION}
+              animated={false}
+            />
+          </m.div>
           <div className="hero-grain absolute inset-0" />
         </div>
         <m.div
@@ -153,11 +172,9 @@ export function Hero() {
           style={{ scale: stageScale, y: stageLift }}
           className="absolute inset-0 z-10 [container-type:size]"
         >
-          <m.div
-            style={{ y: laptopY }}
-            className="grid size-full place-items-center"
-          >
+          <div ref={laptopRef} className="grid size-full place-items-center">
             <m.div className="relative" style={FRAME_BOX}>
+              <div aria-hidden className="hero-desk" style={DESK_EDGE} />
               <HeroDevice
                 device={hero.ecosystem.devices.tablet}
                 frame={FRAME}
@@ -177,7 +194,7 @@ export function Hero() {
                 range={TIMELINE.devicesIn}
               />
             </m.div>
-          </m.div>
+          </div>
         </m.div>
         <HeroEcosystem
           ref={captionRef}
