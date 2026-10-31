@@ -54,7 +54,7 @@ export function HeroEcosystem({
       <Rise progress={progress} range={heading}>
         <h2
           id="ecosystem-title"
-          className="text-balance text-headline text-trim"
+          className="text-balance font-inter text-headline text-trim"
         >
           <Emphasized text={title} />
         </h2>

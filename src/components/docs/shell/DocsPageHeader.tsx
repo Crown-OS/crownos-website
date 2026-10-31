@@ -23,16 +23,14 @@ function ApiEndpoint({ api }: { api: ApiSignature }) {
 
 export function DocsPageHeader({ meta }: { meta: DocMeta }) {
   return (
-    <header className="grid gap-6">
-      <div className="grid gap-3">
-        <p className="font-mono text-faint text-micro uppercase">
-          {meta.group}
-        </p>
+    <header className="grid gap-3">
+      <div className="grid gap-0">
+        <p className="text-faint text-sm">{meta.group}</p>
         <h1 className="text-balance font-display text-foreground text-tagline">
           {meta.title}
         </h1>
       </div>
-      <p className="max-w-2xl text-pretty text-lead text-muted leading-normal">
+      <p className="max-w-2xl text-lg font-normal text-muted leading-normal">
         {meta.description}
       </p>
       {meta.api && <ApiEndpoint api={meta.api} />}

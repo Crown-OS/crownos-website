@@ -41,7 +41,7 @@ function HeroSlogan() {
   return (
     <p
       data-reveal
-      className="mt-6 text-balance text-trim font-inter md:mt-12 font-light text-muted-strong text-tagline tracking-[-0.03em] [font-kerning:normal] [text-rendering:optimizeLegibility]"
+      className="mt-6 text-balance text-trim font-inter md:mt-12 font-normal text-muted-strong text-tagline tracking-[-0.03em] [font-kerning:normal] [text-rendering:optimizeLegibility]"
       style={SLOGAN_TIMING}
     >
       {lead}{" "}
@@ -136,7 +136,7 @@ export function Hero() {
           <hgroup className="flex flex-col items-center gap-3 md:gap-6">
             <p
               data-reveal
-              className="text-headline text-muted-strong text-trim"
+              className="text-headline font-inter text-muted-strong text-trim"
             >
               {hero.eyebrow}
             </p>

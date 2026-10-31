@@ -121,6 +121,8 @@ export function FlipCard({
             </div>
           )}
         </Face>
+
+        <div className="w-full squircle rounded-2xl h-44 bg-linear-to-b from-transparent to-black to-bg-neutral-800 absolute bottom-0"></div>
         <Face hidden={!flipped} back>
           <FaceIntro icon={icon} title={title}>
             {detail}

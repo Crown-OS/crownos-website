@@ -3,22 +3,22 @@ import { site } from "./site";
 
 export const showcase = {
   spotlight: {
-    label: "Rich Plugin System",
+    label: "Rich System Apps",
     description:
-      "A plugin system reaches every surface of CrownOS: panels, windows, shortcuts and system apps. Describe a change and an AI agent writes the plugin, runs it in a sandbox and touches only what you grant it.",
+      "All Systems Softwares are rebuilt from scratch for seamless user experience and consistent performance with CrownUI, our custom UI framework ",
     visual: "agent-window",
     icon: "plug",
     tone: "ember",
     actions: {
-      primary: { label: "Browse plugins", href: "/plugins" },
-      secondary: { label: "Build your own", href: site.repository },
+      primary: { label: "Explore Apps", href: "/docs" },
+      secondary: { label: "App Store", href: site.repository },
     },
   },
   pair: [
     {
-      label: "Crown Link",
+      label: "CrownLink",
       description:
-        "Crown Link, our encrypted peer-to-peer protocol, pairs your phone, tablet and remote machines. Clipboard, notifications, files, calls and running agents move between them without a cloud in the middle.",
+        "Custom multi device connectivity engine powered by LLTS protocol pairs your phone, tablet and remote machines. Clipboard, notifications, files, calls and running agents move between them through preconfigured Tailscale network.",
       visual: "link-window",
       icon: "link",
       tone: "iris",
