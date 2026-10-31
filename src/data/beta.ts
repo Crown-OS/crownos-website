@@ -1,3 +1,4 @@
+import { latestIsoUrl } from "./download";
 import type { NavLink } from "./footer";
 
 export const beta = {
@@ -5,6 +6,6 @@ export const beta = {
   lead: "Installs, configures and boots to a working desktop that runs in under 1.2 GB of memory.",
   cta: {
     label: "Try out beta",
-    href: "https://github.com/Crown-OS/crownos-iso/releases",
+    href: latestIsoUrl,
   } satisfies NavLink,
 } as const;

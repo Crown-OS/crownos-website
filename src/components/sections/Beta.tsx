@@ -28,8 +28,6 @@ export function Beta() {
         <a
           data-reveal
           href={beta.cta.href}
-          target="_blank"
-          rel="noopener noreferrer"
           className="btn btn-primary h-14 px-8 font-medium text-lead"
         >
           <RollText text={beta.cta.label} />

@@ -1,3 +1,5 @@
+import { latestIsoUrl } from "./download";
+
 export type NavLink = { label: string; href: string };
 
 export const footer = {
@@ -8,7 +10,7 @@ export const footer = {
   columns: [
     [
       { label: "Features", href: "/features" },
-      { label: "Download", href: "/download" },
+      { label: "Download", href: latestIsoUrl },
     ],
     [
       { label: "Docs", href: "/docs" },
