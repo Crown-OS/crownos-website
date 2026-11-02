@@ -66,19 +66,23 @@ export function HeroEcosystem({
       </Rise>
       <ul
         aria-label="Ecosystem features"
-        className="mt-8 grid w-full max-w-5xl grid-cols-4 gap-x-2 gap-y-6 md:mt-12 md:grid-cols-8 md:gap-x-4"
+        className="mt-7 grid w-full max-w-5xl grid-cols-2 gap-2 text-left sm:grid-cols-4 md:mt-8 md:gap-3"
       >
         {features.map(({ icon, name }, index) => (
-          <li key={name}>
+          <li key={name} className="min-w-0">
             <Rise
               progress={progress}
               range={staggered(dock, index, features.length)}
-              className="flex flex-col items-center gap-3"
+              className="h-full"
             >
-              <EcosystemIcon name={icon} className="size-14 md:size-18" />
-              <span className="text-balance font-inter text-micro text-muted-strong leading-tight md:text-ui md:leading-tight">
-                {name}
-              </span>
+              <div className="group relative flex min-h-[5.25rem] h-full items-center gap-3 overflow-hidden rounded-card border border-white/[0.09] bg-white/[0.025] px-3 py-3 transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.055] md:min-h-[5.5rem] md:gap-3.5 md:px-4">
+                <span className="icon-tile squircle grid size-10 shrink-0 place-items-center rounded-tile md:size-11">
+                  <EcosystemIcon name={icon} className="size-7 md:size-8" />
+                </span>
+                <span className="text-balance font-inter text-micro text-muted-strong leading-snug md:text-ui md:leading-snug">
+                  {name}
+                </span>
+              </div>
             </Rise>
           </li>
         ))}
