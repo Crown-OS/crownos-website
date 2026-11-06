@@ -40,3 +40,10 @@ export function createFullscreenProgram(
 
   return (name: string) => gl.getUniformLocation(program, name);
 }
+
+export function glslVec3(hex: string) {
+  const channels = [1, 3, 5].map((start) =>
+    (Number.parseInt(hex.slice(start, start + 2), 16) / 255).toFixed(4),
+  );
+  return `vec3(${channels.join(", ")})`;
+}

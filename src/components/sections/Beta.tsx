@@ -7,10 +7,11 @@ export function Beta() {
     <Section
       id="download"
       labelledBy="beta-title"
-      className="grid justify-items-center gap-10 overflow-clip pb-(--horizon-floor) text-center [--horizon-floor:24rem] md:gap-12"
+      edge="open-end"
+      className="grid justify-items-center gap-8 overflow-clip pb-(--horizon-floor) text-center [--horizon-floor:24rem] md:gap-10 lg:pt-30"
     >
       <HorizonGrid />
-      <div className="grid justify-items-center gap-8">
+      <div className="grid justify-items-center gap-8 md:gap-10">
         <RevealText
           id="beta-title"
           text={beta.title}
@@ -19,7 +20,7 @@ export function Beta() {
         />
         <p
           data-reveal
-          className="max-w-md text-balance font-normal text-lead text-muted leading-normal"
+          className="max-w-md text-balance font-normal text-lead text-muted text-trim"
         >
           {beta.lead}
         </p>
@@ -28,7 +29,7 @@ export function Beta() {
         <a
           data-reveal
           href={beta.cta.href}
-          className="btn btn-primary h-14 px-8 font-medium text-lead"
+          className="btn btn-primary font-display mb-12 h-12 min-w-44 px-6 font-medium text-ui md:mb-16 md:h-14 md:px-8 md:text-lead"
         >
           <RollText text={beta.cta.label} />
         </a>

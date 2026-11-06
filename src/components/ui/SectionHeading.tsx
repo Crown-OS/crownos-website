@@ -17,7 +17,7 @@ export function SectionHeading({
 }: SectionCopy & { id: string; align?: Alignment }) {
   return (
     <header
-      className={`grid max-w-4xl gap-6 md:gap-8 ${ALIGNMENT_CLASSES[align]}`}
+      className={`grid max-w-3xl gap-6 md:gap-7 ${ALIGNMENT_CLASSES[align]}`}
     >
       <RevealText
         id={id}
@@ -27,7 +27,7 @@ export function SectionHeading({
       {lead && (
         <p
           data-reveal
-          className="max-w-2xl text-pretty font-normal text-lead text-muted text-trim"
+          className="max-w-xl text-pretty font-normal text-lead text-muted text-trim"
           style={{ "--delay": "90ms" } as CSSProperties}
         >
           {lead}

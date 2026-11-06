@@ -9,6 +9,7 @@ import {
   Trust,
 } from "@/components/sections";
 import { Footer, Navbar, StructuredData } from "@/components/site";
+import { SeamedSections } from "@/components/ui";
 
 export default function Home() {
   return (
@@ -18,13 +19,15 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-        <div className="font-content">
-          <Showcase />
-          <Personalize />
-          <Foundation />
-          <Comparison />
-          <Trust />
-          <Beta />
+        <div className="landing-type">
+          <SeamedSections>
+            <Showcase />
+            <Personalize />
+            <Foundation />
+            <Comparison />
+            <Trust />
+            <Beta />
+          </SeamedSections>
         </div>
       </main>
       <Footer />

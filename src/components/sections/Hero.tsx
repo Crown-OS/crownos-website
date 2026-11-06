@@ -2,13 +2,14 @@
 
 import { useScroll, useTransform } from "motion/react";
 import * as m from "motion/react-m";
-import { type CSSProperties, useRef } from "react";
+import { type CSSProperties, useMemo, useRef } from "react";
 import {
   ScrollSequence,
   ShaderCanvas,
   SplitLetters,
 } from "@/components/motion";
 import { hero } from "@/data/hero";
+import { horizonGlowShader } from "@/shaders/horizon-glow";
 import { SYNTHESIS_SHADER } from "@/shaders/synthesis";
 import { lineupSpan } from "@/util/device-still";
 import type { ScrollRange } from "@/util/scroll-range";
@@ -21,8 +22,8 @@ const TIMELINE = {
   sequence: [0, 0.425],
   copyExit: [0.02, 0.25],
   zoomOut: [0.47, 0.72],
-  devicesIn: [0.5, 0.76],
   ecosystemIn: [0.66, 0.88],
+  devicesIn: [0.5, 0.76],
 } satisfies Record<string, ScrollRange>;
 const ZOOMED_HEIGHT_SHARE = 0.64;
 const SHADER_RESOLUTION = 0.5;
@@ -39,6 +40,16 @@ const FRAME_BOX = {
 const DESK_EDGE = {
   "--desk-edge": `${hero.laptop.deskEdge * 100}%`,
 } as CSSProperties;
+const GLOW = hero.laptop.glow;
+const GLOW_HEIGHT = GLOW.above + GLOW.below;
+const GLOW_SHADER = horizonGlowShader(GLOW);
+const GLOW_RESOLUTION = 0.25;
+const GLOW_BOX = {
+  ...DESK_EDGE,
+  "--glow-width": `${GLOW.span * 100}%`,
+  "--glow-aspect": `${GLOW.span} / ${GLOW_HEIGHT}`,
+  "--glow-lift": `${(-GLOW.above / GLOW_HEIGHT) * 100}%`,
+} as CSSProperties;
 const SLOGAN_TIMING = {
   "--delay": "550ms",
   "--sweep-at": "1600ms",
@@ -50,13 +61,13 @@ function HeroSlogan() {
   return (
     <p
       data-reveal
-      className="mt-6 text-balance text-trim font-inter md:mt-12 font-normal text-muted-strong text-tagline tracking-[-0.03em] [font-kerning:normal] [text-rendering:optimizeLegibility]"
+      className="mt-6 text-balance text-trim font-inter md:mt-12 font-normal text-white [text-shadow:0_1px_6px_rgb(0_0_0/0.25)] text-tagline tracking-[-0.03em] [font-kerning:normal] [text-rendering:optimizeLegibility]"
       style={SLOGAN_TIMING}
     >
       {lead}{" "}
       <span
         data-text={emphasis}
-        className="pr-[0.03em] font-normal font-serif text-[1.16em] leading-none text-sweep italic tracking-[-0.005em] [word-spacing:0.06em]"
+        className="pr-[0.03em] font-normal font-serif text-[1.16em] leading-none text-sweep italic [text-shadow:none] tracking-[-0.005em] [word-spacing:0.06em]"
       >
         {emphasis}
       </span>{" "}
@@ -71,6 +82,7 @@ export function Hero() {
   const copyRef = useRef<HTMLDivElement>(null);
   const captionRef = useRef<HTMLDivElement>(null);
   const laptopRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -109,10 +121,11 @@ export function Hero() {
   const swooshX = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
   const swooshY = useTransform(scrollYProgress, [0, 1], ["4%", "-10%"]);
   const swooshScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
+  const liftedRefs = useMemo(() => [laptopRef, glowRef], []);
   useRestingOffset(
     stageRef,
     copyRef,
-    laptopRef,
+    liftedRefs,
     hero.laptop.sequence,
     frameProgress,
   );
@@ -142,6 +155,23 @@ export function Hero() {
           </m.div>
           <div className="hero-grain absolute inset-0" />
         </div>
+        <m.div
+          aria-hidden
+          style={{ scale: stageScale, y: stageLift }}
+          className="-z-5 absolute inset-0 [container-type:size]"
+        >
+          <div ref={glowRef} className="grid size-full place-items-center">
+            <div className="relative" style={FRAME_BOX}>
+              <div className="hero-glow" style={GLOW_BOX}>
+                <ShaderCanvas
+                  fragment={GLOW_SHADER}
+                  resolutionScale={GLOW_RESOLUTION}
+                  animated={false}
+                />
+              </div>
+            </div>
+          </div>
+        </m.div>
         <m.div
           ref={copyRef}
           style={{

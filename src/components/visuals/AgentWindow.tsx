@@ -135,7 +135,7 @@ function AgentCursor() {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="ml-3 rounded-full bg-brand px-3 py-1.5 font-medium text-sm text-white shadow-[0_6px_16px_-4px_rgb(20_142_255/0.6)]">
+      <span className="ml-3 rounded-full bg-brand px-3 py-1.5 font-medium text-sm text-white shadow-[0_6px_16px_-4px_color-mix(in_srgb,var(--color-brand)_60%,transparent)]">
         Only what it needs
       </span>
     </div>

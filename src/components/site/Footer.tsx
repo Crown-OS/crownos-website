@@ -26,8 +26,8 @@ function InfoPlate() {
 
 export function Footer() {
   return (
-    <footer className="relative z-10 bg-background">
-      <div className="grid gap-12 px-gutter pt-20 pb-10 md:grid-cols-12">
+    <footer className="relative z-10 -mt-48 md:-mt-56">
+      <div className="mx-auto grid max-w-frame gap-12 border-border px-frame-x pt-20 pb-10 md:grid-cols-12 lg:border-x">
         <div className="grid gap-6 md:col-span-5">
           <InfoPlate />
           <p className="text-ui text-muted uppercase">{footer.copyright}</p>

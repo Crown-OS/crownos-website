@@ -38,6 +38,14 @@ const LOGOS: Record<OsId, (props: LogoProps) => ReactElement> = {
   macos: (props) => <GlyphLogo path={MACOS_PATH} {...props} />,
 };
 
-export function OsLogo({ os, ...props }: LogoProps & { os: OsId }) {
-  return LOGOS[os](props);
+const BRAND_COLORS: Record<OsId, string> = {
+  crownos: "#ffffff",
+  ubuntu: "#e95420",
+  fedora: "#51a2da",
+  windows: "#0078d4",
+  macos: "#a2aaad",
+};
+
+export function OsLogo({ os, style, ...props }: LogoProps & { os: OsId }) {
+  return LOGOS[os]({ ...props, style: { color: BRAND_COLORS[os], ...style } });
 }

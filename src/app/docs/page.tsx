@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DocIcon, DocsFrame, DocsHeader } from "@/components/docs";
+import { GitHubIcon } from "@/components/icons";
 import { RevealText } from "@/components/motion";
 import { docsProjects } from "@/data/docs";
 import { loadAllDocs } from "@/util/docs";
 import { firstPageHref, searchEntries } from "@/util/docs-navigation";
-import { GitHubIcon } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "Documentation",

@@ -5,19 +5,22 @@ import { type FrameSequence, restingOffset } from "./frame-sequence";
 export function useRestingOffset(
   stageRef: RefObject<HTMLElement | null>,
   copyRef: RefObject<HTMLElement | null>,
-  targetRef: RefObject<HTMLElement | null>,
+  targetRefs: readonly RefObject<HTMLElement | null>[],
   sequence: FrameSequence,
   progress: MotionValue<number>,
 ) {
   useEffect(() => {
     const stage = stageRef.current;
     const copy = copyRef.current;
-    const target = targetRef.current;
-    if (!stage || !copy || !target) return;
+    const targets = targetRefs.map((ref) => ref.current);
+    if (!stage || !copy || targets.some((target) => !target)) return;
 
     let resting = 0;
     const settle = () => {
-      target.style.translate = `0 ${resting * (1 - progress.get())}px`;
+      const translate = `0 ${resting * (1 - progress.get())}px`;
+      for (const target of targets) {
+        if (target) target.style.translate = translate;
+      }
     };
     const measure = () => {
       resting = restingOffset(
@@ -35,5 +38,5 @@ export function useRestingOffset(
       resize.disconnect();
       unsubscribe();
     };
-  }, [stageRef, copyRef, targetRef, sequence, progress]);
+  }, [stageRef, copyRef, targetRefs, sequence, progress]);
 }

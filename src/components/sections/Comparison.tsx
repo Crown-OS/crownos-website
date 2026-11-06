@@ -19,11 +19,7 @@ export function Comparison() {
 
   return (
     <Section labelledBy="comparison-title">
-      <SectionHeading
-        id="comparison-title"
-        align="center"
-        {...comparison.heading}
-      />
+      <SectionHeading id="comparison-title" {...comparison.heading} />
       <Tabs
         label="Comparison"
         options={comparison.tabs}
@@ -31,7 +27,7 @@ export function Comparison() {
         onChange={setActiveId}
         idPrefix={TAB_ID_PREFIX}
         panelId={PANEL_ID}
-        className="mt-12 justify-center md:mt-16"
+        className="mt-stack"
       />
 
       <m.div

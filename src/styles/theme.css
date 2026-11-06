@@ -78,7 +78,13 @@
 
   --spacing-gutter: clamp(1rem, 3.4vw, 3.125rem);
   --spacing-section: clamp(6rem, 10vw, 9rem);
-  --spacing-stack: clamp(3rem, 5vw, 4.5rem);
+  --spacing-stack: 3rem;
+  --spacing-frame-x: 1.5rem;
+  --spacing-frame-y: 3rem;
+  --spacing-seam: 4rem;
+  --spacing-grid: 1.5rem;
+
+  --container-frame: 77.5rem;
 
   --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;
