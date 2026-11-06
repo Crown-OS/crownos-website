@@ -2,11 +2,12 @@ import type { NavLink } from "./footer";
 
 export type VisualKey =
   | "agent-window"
-  | "link-window"
-  | "migration-terminal"
+  | "system-apps"
+  | "crownlink"
+  | "migration-assistant"
   | "config-editor"
   | "settings-window"
-  | "accessory-hub"
+  | "installed-plugins"
   | "compositor-layers"
   | "crownui-blocks"
   | "processor-chip";
@@ -21,13 +22,7 @@ export type IconKey =
   | "link"
   | "rewind";
 
-export type Tone =
-  | "ember"
-  | "iris"
-  | "lagoon"
-  | "violet"
-  | "crimson"
-  | "indigo";
+export type Tone = "mono" | "horizon";
 
 export type Feature = {
   label?: string;

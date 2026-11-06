@@ -3,6 +3,11 @@
     color-scheme: dark;
     background: var(--color-background);
     scrollbar-gutter: stable;
+    --grain-tile: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='1.8 0 0 0 -0.4  1.8 0 0 0 -0.4  1.8 0 0 0 -0.4  0 0 0 0 1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  button {
+    font-family: var(--font-sans);
   }
 
   body {
@@ -75,6 +80,19 @@
     --tone-start: #b9b9c1;
     --tone-mid: #5a5a63;
     --tone-end: #303037;
+    --tone-vivid: #7a7a84;
+  }
+
+  [data-tone="horizon"] {
+    --tone-start: #fb9aac;
+    --tone-mid: #00a2ca;
+    --tone-end: #003a7f;
+    --tone-vivid: #f32462;
+    --tone-crest: #f32462;
+    --tone-core: #fb9aac;
+    --tone-body: #00a2ca;
+    --tone-fade: #003a7f;
+    --tone-tail: #0f063c;
   }
 
   [data-tone="tide"] {
@@ -87,42 +105,36 @@
     --tone-start: #e2577a;
     --tone-mid: #c9502f;
     --tone-end: #eb9d4c;
-    --tone-vivid: #ff5a1f;
   }
 
   [data-tone="iris"] {
     --tone-start: #26b6dc;
     --tone-mid: #5a58e2;
     --tone-end: #9a5ae0;
-    --tone-vivid: #4f46ff;
   }
 
   [data-tone="lagoon"] {
     --tone-start: #2fb3b8;
     --tone-mid: #3fd27a;
     --tone-end: #1f9fb0;
-    --tone-vivid: #12d16f;
   }
 
   [data-tone="violet"] {
     --tone-start: #a991ff;
     --tone-mid: #8138ff;
     --tone-end: #3b0099;
-    --tone-vivid: #8b3dff;
   }
 
   [data-tone="crimson"] {
     --tone-start: #ff8a7a;
     --tone-mid: #ff3e3e;
     --tone-end: #932c2c;
-    --tone-vivid: #ff2e4d;
   }
 
   [data-tone="indigo"] {
     --tone-start: #7c99ff;
     --tone-mid: #1d47ff;
     --tone-end: #4f1fae;
-    --tone-vivid: #2f5bff;
   }
 }
 
@@ -223,6 +235,7 @@
 @utility btn {
   position: relative;
   isolation: isolate;
+  font-family: var(--font-inter);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -372,49 +385,74 @@
     0 48px 96px -48px rgb(0 0 0 / 0.9);
 }
 
-@utility beam-surface {
-  --vivid: var(--tone-vivid, var(--tone-mid));
-  background: linear-gradient(
-    180deg,
-    var(--vivid) 2rem,
-    color-mix(in oklab, var(--vivid) 45%, #18181b) 11rem,
-    #18181b 24rem,
-    #121214
-  );
+@utility mono-surface {
+  isolation: isolate;
+  contain: paint;
+  background: var(--color-card);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.2),
     inset 0 0 0 1px rgb(255 255 255 / 0.05);
 }
 
-@utility beam-rays {
-  --beam: rgb(255 255 255 / 0.13);
-  --beam-stops:
-    transparent 2.5rem, var(--beam) 2.5rem 4rem, transparent 4rem 10.5rem,
-    var(--beam) 10.5rem 12rem, transparent 12rem;
+@utility pocket-sky {
   background:
-    linear-gradient(135deg, var(--beam-stops)) left / 24rem 100% no-repeat,
-    linear-gradient(225deg, var(--beam-stops)) right / 24rem 100% no-repeat;
-  mask-image: linear-gradient(to bottom, #000 10%, transparent 75%);
+    radial-gradient(60% 70% at 8% 0%, rgb(255 255 255 / 0.26), transparent 70%),
+    radial-gradient(45% 55% at 94% 8%, rgb(255 255 255 / 0.16), transparent 70%),
+    radial-gradient(55% 35% at 58% 30%, rgb(0 0 0 / 0.4), transparent 70%),
+    linear-gradient(165deg, #48484f, #26262b 50%, #33333a);
+}
+
+@utility pocket-halo {
+  position: absolute;
+  inset: 4.25rem 1.5rem auto;
+  height: 7rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    var(--tone-crest),
+    var(--tone-core) 38%,
+    var(--tone-body) 72%,
+    var(--tone-fade)
+  );
+  filter: blur(1.75rem);
+  opacity: 0.55;
   pointer-events: none;
 }
 
-@utility beam-dust {
-  --dust: color-mix(in oklab, var(--tone-vivid, var(--tone-start)) 60%, white);
-  background-image:
-    radial-gradient(circle, var(--dust) 0.6px, transparent 1.2px),
-    radial-gradient(circle, rgb(255 255 255 / 0.6) 0.5px, transparent 1px),
-    radial-gradient(circle, var(--dust) 0.5px, transparent 1px);
-  background-size:
-    47px 19px,
-    71px 29px,
-    103px 23px;
-  background-position:
-    0 0,
-    13px 7px,
-    31px 11px;
-  mask-image: linear-gradient(to top, #000, transparent);
-  opacity: 0.55;
-  pointer-events: none;
+@utility pocket-sleeve {
+  background: linear-gradient(180deg, #131315, #0a0a0b);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06),
+    0 -0.25rem 1.5rem -0.5rem rgb(0 0 0 / 0.6);
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 3.5rem;
+    background: linear-gradient(transparent, rgb(0 0 0 / 0.6));
+    pointer-events: none;
+  }
+}
+
+@utility pocket-panel {
+  background: linear-gradient(180deg, #1c1c1f, #151517);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 100%;
+    height: 0.75rem;
+    background: #1c1c1f;
+    mask-image: radial-gradient(55% 100% at 50% 0%, transparent 99%, #000);
+  }
+}
+
+@utility readout-value {
+  background: linear-gradient(180deg, #fff 30%, rgb(255 255 255 / 0.62));
+  background-clip: text;
+  color: transparent;
 }
 
 @utility font-content {
@@ -430,6 +468,83 @@
 @utility font-display {
   font-family: var(--font-sans);
   --text-title--letter-spacing: -0.03em;
+}
+
+@layer base {
+  @media (width >= 48rem) {
+    :root {
+      --spacing-frame-x: 2.5rem;
+      --spacing-frame-y: 4rem;
+      --spacing-stack: 4rem;
+    }
+  }
+
+  @media (width >= 64rem) {
+    :root {
+      --spacing-frame-x: 5rem;
+      --spacing-frame-y: 5rem;
+      --spacing-stack: 4.5rem;
+      --spacing-seam: 5rem;
+      --spacing-grid: 1.25rem;
+    }
+  }
+}
+
+@utility landing-type {
+  font-family: var(--font-inter);
+  --text-ui--letter-spacing: -0.011em;
+  --text-lead--letter-spacing: -0.011em;
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.035em;
+  --text-headline: 2.25rem;
+  --text-headline--line-height: 1.1;
+  --text-headline--letter-spacing: -0.025em;
+  --text-tagline: 1.75rem;
+  --text-tagline--line-height: 1.25;
+  --text-tagline--letter-spacing: -0.022em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.3;
+  --text-title--letter-spacing: -0.02em;
+  --text-lead: 1.0625rem;
+  --text-lead--line-height: 1.5;
+  --text-body--line-height: 1.5;
+
+  @media (width >= 48rem) {
+    --text-display: 3.5rem;
+    --text-headline: 3rem;
+    --text-tagline: 2rem;
+    --text-title: 1.5rem;
+    --text-lead: 1.125rem;
+  }
+
+  @media (width >= 64rem) {
+    --text-display: 4rem;
+  }
+}
+
+@layer components {
+  .section-seam {
+    position: relative;
+    height: var(--spacing-seam);
+
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      background: var(--color-border);
+    }
+
+    &::before {
+      inset: 50% 0 auto;
+      height: 1px;
+    }
+
+    &::after {
+      inset: 0 auto 0 50%;
+      width: 1px;
+    }
+  }
 }
 
 @layer base {

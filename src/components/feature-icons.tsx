@@ -1,9 +1,9 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import type { IconKey } from "@/data/feature";
 
-type IconProps = SVGProps<SVGSVGElement>;
+export type IconProps = SVGProps<SVGSVGElement>;
 
-function StrokeIcon({
+export function StrokeIcon({
   children,
   ...props
 }: IconProps & { children: ReactNode }) {
@@ -103,5 +103,11 @@ export const CheckIcon = (props: IconProps) => (
 export const DashIcon = (props: IconProps) => (
   <StrokeIcon {...props}>
     <path d="M7 12h10" />
+  </StrokeIcon>
+);
+
+export const ArrowUpRightIcon = (props: IconProps) => (
+  <StrokeIcon {...props}>
+    <path d="M7 17 17 7M8.5 7H17v8.5" />
   </StrokeIcon>
 );

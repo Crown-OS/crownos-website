@@ -1,6 +1,20 @@
 import { Section } from "@/components/ui";
 import { showcase } from "@/data/showcase";
-import { ShowcaseCard } from "./ShowcaseCard";
+import { PocketCard } from "./pocket/PocketCard";
+
+const STAGGER_MS = 90;
+
+type RailEdge = "top" | "bottom";
+
+function Rail({ edge }: { edge: RailEdge }) {
+  const placement = edge === "top" ? "bottom-full" : "top-full hidden md:block";
+  return (
+    <span
+      aria-hidden
+      className={`absolute left-1/2 h-frame-y w-px -translate-x-1/2 bg-border-strong ${placement}`}
+    />
+  );
+}
 
 export function Showcase() {
   return (
@@ -8,20 +22,21 @@ export function Showcase() {
       <h2 id="showcase-title" className="sr-only">
         Highlights
       </h2>
-      <div className="grid gap-6 md:grid-cols-2">
-        <ShowcaseCard
-          feature={showcase.spotlight}
-          size="wide"
-          rails={["top", "bottom"]}
-        />
+      <div className="grid gap-grid md:grid-cols-2">
+        <div className="relative grid md:col-span-2">
+          <Rail edge="top" />
+          <Rail edge="bottom" />
+          <PocketCard {...showcase.spotlight} size="wide" />
+        </div>
         {showcase.pair.map((feature, index) => (
-          <ShowcaseCard
-            key={feature.label}
-            feature={feature}
-            size="compact"
-            rails={["bottom"]}
-            delay={index * 90}
-          />
+          <div key={feature.title} className="relative grid">
+            <Rail edge="bottom" />
+            <PocketCard
+              {...feature}
+              size="tall"
+              delay={(index + 1) * STAGGER_MS}
+            />
+          </div>
         ))}
       </div>
     </Section>

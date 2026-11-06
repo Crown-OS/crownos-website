@@ -1,6 +1,5 @@
-import type { Feature, SectionCopy } from "./feature";
-
-type FlipFeature = Feature & { detail: string };
+import type { SectionCopy } from "./feature";
+import type { PocketFeature } from "./pocket";
 
 export const personalize = {
   heading: {
@@ -10,33 +9,38 @@ export const personalize = {
   cards: [
     {
       icon: "folder",
-      title: "Customizing your system with configs",
-      description:
-        "Use our advanced config manager to customize everything from one folder",
-      detail:
-        "Keybindings, displays, power, network, animations and plugins are plain TOML files in a single folder. The Settings app writes the same files, so you can click, edit by hand, version with git or carry them to a new machine.",
+      title: "Config files",
       visual: "config-editor",
-      tone: "violet",
+      readout: {
+        label: "Everything in one folder",
+        prefix: "~/",
+        value: ".config",
+      },
+      action: {
+        label: "Read the config docs",
+        href: "/docs/crownos/configuration",
+      },
     },
     {
       icon: "swatches",
-      title: "Customizing through the Settings App",
-      description:
-        "Customize your system with the user friendly parameters that we expose",
-      detail:
-        "Files, Terminal, Settings and the other system apps are built on CrownUI, so one theme.toml changes typography, corner radius, density and contrast across all of them at once.",
+      title: "Settings App",
       visual: "settings-window",
-      tone: "crimson",
+      readout: { label: "One theme restyles", value: "Every app" },
+      action: { label: "Browse themes", href: "/themes" },
     },
     {
       icon: "plug",
-      title: "Customizing by plugins",
-      description:
-        "Install a plugin from our App store that can customize everything",
-      detail:
-        "Drivers, firmware and tuned profiles ship ready for printers, drawing tablets, controllers, audio interfaces, webcams and docks, applied the moment you connect them.",
-      visual: "accessory-hub",
-      tone: "indigo",
+      title: "Plugins",
+      visual: "installed-plugins",
+      readout: {
+        label: "Installed from the App Store",
+        count: "plugins",
+        suffix: "plugins",
+      },
+      action: { label: "Browse plugins", href: "/plugins" },
     },
   ],
-} as const satisfies { heading: SectionCopy; cards: readonly FlipFeature[] };
+} as const satisfies {
+  heading: SectionCopy;
+  cards: readonly PocketFeature[];
+};

@@ -1,20 +1,37 @@
 import { Section, SectionHeading } from "@/components/ui";
 import { personalize } from "@/data/personalize";
-import { FlipCard } from "./FlipCard";
+import type { CatalogCount, PocketReadout } from "@/data/pocket";
+import { loadPlugins } from "@/util/catalog";
+import { PocketCard } from "./pocket/PocketCard";
 
 const STAGGER_MS = 90;
 
-export function Personalize() {
+async function loadCounts(): Promise<Record<CatalogCount, number>> {
+  return { plugins: (await loadPlugins()).length };
+}
+
+function resolveReadout(
+  readout: PocketReadout,
+  counts: Record<CatalogCount, number>,
+) {
+  if ("value" in readout) return readout;
+  const { count, ...rest } = readout;
+  return { ...rest, value: String(counts[count]) };
+}
+
+export async function Personalize() {
+  const counts = await loadCounts();
   return (
     <Section labelledBy="personalize-title">
-      <SectionHeading
-        id="personalize-title"
-        align="center"
-        {...personalize.heading}
-      />
-      <div className="mt-stack grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <SectionHeading id="personalize-title" {...personalize.heading} />
+      <div className="mt-stack grid grid-cols-1 gap-grid md:grid-cols-2 lg:grid-cols-3">
         {personalize.cards.map((card, index) => (
-          <FlipCard key={card.title} {...card} delay={index * STAGGER_MS} />
+          <PocketCard
+            key={card.title}
+            {...card}
+            readout={resolveReadout(card.readout, counts)}
+            delay={index * STAGGER_MS}
+          />
         ))}
       </div>
     </Section>
