@@ -12,7 +12,8 @@ import {
 const DECODED_BYTE_BUDGET = 96 * 1024 * 1024;
 const BYTES_PER_PIXEL = 4;
 const PARALLEL_FETCHES = 6;
-const PARALLEL_DECODES = 2;
+const PARALLEL_DECODES = 3;
+const LOOK_BEHIND = 1;
 
 type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -27,6 +28,7 @@ export class FramePlayer {
   readonly #aborter = new AbortController();
   #decodedCount = 0;
   #target = 0;
+  #direction = 1;
   #drawn = -1;
 
   constructor(context: Context2D, sequence: FrameSequence, tier: FrameTier) {
@@ -53,7 +55,10 @@ export class FramePlayer {
   }
 
   seek(progress: number) {
-    this.#target = frameAt(this.#sequence, progress);
+    const target = frameAt(this.#sequence, progress);
+    if (target !== this.#target)
+      this.#direction = Math.sign(target - this.#target);
+    this.#target = target;
     this.#render();
   }
 
@@ -62,6 +67,7 @@ export class FramePlayer {
     if (canvas.width === width && canvas.height === height) return;
     canvas.width = width;
     canvas.height = height;
+    this.#context.imageSmoothingQuality = "high";
     this.#drawn = -1;
     this.#render();
   }
@@ -102,12 +108,18 @@ export class FramePlayer {
   }
 
   *#decodeWindow() {
-    const radius = Math.floor(this.#capacity / 2) - 1;
+    const ahead = this.#capacity - LOOK_BEHIND - 2;
     yield this.#target;
-    for (let distance = 1; distance <= radius; distance++) {
-      yield this.#target + distance;
-      yield this.#target - distance;
+    for (let distance = 1; distance <= ahead; distance++) {
+      yield this.#target + this.#direction * distance;
+      if (distance <= LOOK_BEHIND)
+        yield this.#target - this.#direction * distance;
     }
+  }
+
+  #evictionRank(index: number) {
+    const offset = (index - this.#target) * this.#direction;
+    return offset >= -LOOK_BEHIND ? Math.abs(offset) : this.#capacity - offset;
   }
 
   #scheduleDecodes() {
@@ -142,7 +154,7 @@ export class FramePlayer {
         if (
           bitmap &&
           (farthest < 0 ||
-            Math.abs(index - this.#target) > Math.abs(farthest - this.#target))
+            this.#evictionRank(index) > this.#evictionRank(farthest))
         ) {
           farthest = index;
         }

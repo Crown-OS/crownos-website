@@ -7,8 +7,8 @@ import { frameUrl } from "../src/util/frame-sequence";
 
 const SOURCE_DIR = "assets-src/crownbook-mocks";
 const PUBLIC_DIR = "public";
-const SOURCE_CROP = { left: 180, top: 200, width: 1240, height: 880 };
-const AVIF = { quality: 80, effort: 9, chromaSubsampling: "4:4:4" } as const;
+const SOURCE_CROP = { left: 360, top: 400, width: 2480, height: 1760 };
+const AVIF = { quality: 80, effort: 4, chromaSubsampling: "4:4:4" } as const;
 
 const sequence = hero.laptop.sequence;
 const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest();

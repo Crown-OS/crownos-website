@@ -1,4 +1,4 @@
-import type { EcosystemIconName } from "@/components/visuals/ecosystem";
+import type { HorizonGlowGeometry } from "@/shaders/horizon-glow";
 import type { DeviceStill } from "@/util/device-still";
 import type { FrameSequence } from "@/util/frame-sequence";
 
@@ -13,33 +13,34 @@ export const hero = {
   laptop: {
     label: "A CrownOS laptop opening to the desktop",
     sequence: {
-      path: "/sequences/crownbook/v2",
+      path: "/sequences/crownbook/v7",
       frames: 145,
       timeline: 240,
       digits: 4,
       size: { width: 1240, height: 880 },
       tiers: [
-        { width: 828, media: "(max-width: 480px)" },
-        { width: 1240, media: "(min-width: 481px)" },
+        { width: 828, media: "(width <= 480px)" },
+        {
+          width: 1240,
+          media:
+            "(width > 480px) and (resolution <= 1dppx) and (height <= 880px)",
+        },
+        {
+          width: 1860,
+          media:
+            "(width > 480px) and (resolution <= 1dppx) and (height > 880px), (width > 480px) and (1dppx < resolution <= 1.5dppx)",
+        },
+        { width: 2480, media: "(width > 480px) and (resolution > 1.5dppx)" },
       ],
       restingTop: 0.602,
     } satisfies FrameSequence,
     finalBounds: { top: 0.078, bottom: 0.84 },
     deskEdge: 0.52,
+    glow: { span: 3, above: 0.8, below: 0.3 } satisfies HorizonGlowGeometry,
   },
   ecosystem: {
     title: "Superpowered together",
-    lead: "Crown Link pairs your phone and tablet with the desktop, peer to peer and end-to-end encrypted.",
-    features: [
-      { icon: "clipboard", name: "Clipboard Sync" },
-      { icon: "camera", name: "Camera Share" },
-      { icon: "remote", name: "Remote Phone Access" },
-      { icon: "folder", name: "Quick File Sharing" },
-      { icon: "bell", name: "Notification Sync" },
-      { icon: "second-screen", name: "Second Screen" },
-      { icon: "hotspot", name: "Instant Hotspot" },
-      { icon: "call", name: "Call Bridge" },
-    ] satisfies readonly { icon: EcosystemIconName; name: string }[],
+    lead: "Crown Link pairs your phone, tablet and desktop, end-to-end encrypted. Share clipboard, files, notifications, calls and camera without cloud accounts.",
     devices: {
       tablet: {
         label: "A CrownOS tablet beside the laptop",
