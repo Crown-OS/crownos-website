@@ -1,3 +1,4 @@
+import type { LoadProgressListener } from "./FramePlayer";
 import type { PlayerCommand, PlayerSetup } from "./player-host";
 import { createPlayerHost } from "./player-host";
 
@@ -6,11 +7,18 @@ export type PlayerChannel = {
   close: () => void;
 };
 
-function openInWorker(canvas: HTMLCanvasElement, setup: PlayerSetup) {
+function openInWorker(
+  canvas: HTMLCanvasElement,
+  setup: PlayerSetup,
+  onLoadProgress: LoadProgressListener,
+) {
   const worker = new Worker(new URL("./frame.worker.ts", import.meta.url), {
     type: "module",
     name: "frame-sequence",
   });
+  worker.addEventListener("message", (event: MessageEvent<number>) =>
+    onLoadProgress(event.data),
+  );
   const offscreen = canvas.transferControlToOffscreen();
   worker.postMessage({ type: "init", canvas: offscreen, ...setup }, [
     offscreen,
@@ -21,8 +29,12 @@ function openInWorker(canvas: HTMLCanvasElement, setup: PlayerSetup) {
   };
 }
 
-function openOnMainThread(canvas: HTMLCanvasElement, setup: PlayerSetup) {
-  const host = createPlayerHost();
+function openOnMainThread(
+  canvas: HTMLCanvasElement,
+  setup: PlayerSetup,
+  onLoadProgress: LoadProgressListener,
+) {
+  const host = createPlayerHost(onLoadProgress);
   host({ type: "init", canvas, ...setup });
   return { send: host, close: () => host({ type: "dispose" }) };
 }
@@ -30,7 +42,8 @@ function openOnMainThread(canvas: HTMLCanvasElement, setup: PlayerSetup) {
 export const openPlayer = (
   canvas: HTMLCanvasElement,
   setup: PlayerSetup,
+  onLoadProgress: LoadProgressListener,
 ): PlayerChannel =>
   "transferControlToOffscreen" in canvas
-    ? openInWorker(canvas, setup)
-    : openOnMainThread(canvas, setup);
+    ? openInWorker(canvas, setup, onLoadProgress)
+    : openOnMainThread(canvas, setup, onLoadProgress);

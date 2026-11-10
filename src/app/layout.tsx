@@ -88,14 +88,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             {":root{overflow:visible!important}.intro{display:none!important}"}
           </style>
         </noscript>
-        <SmoothScroll>
-          <MotionProvider>
-            <div aria-hidden className="scroll-progress" />
-            {children}
-            <PointerSpotlight />
-            <RevealObserver />
-          </MotionProvider>
-        </SmoothScroll>
+        <MotionProvider>
+          <div aria-hidden className="scroll-progress" />
+          {children}
+          <PointerSpotlight />
+          <RevealObserver />
+        </MotionProvider>
+        <SmoothScroll />
       </body>
     </html>
   );

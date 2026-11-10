@@ -8,6 +8,7 @@ import {
   type Size,
   tierFor,
 } from "@/util/frame-sequence";
+import type { LoadProgressListener } from "./FramePlayer";
 import { openPlayer } from "./player-channel";
 
 const MAX_PIXEL_RATIO = 2;
@@ -18,8 +19,11 @@ type ScrollSequenceProps = {
   sequence: FrameSequence;
   progress: MotionValue<number>;
   label: string;
+  onLoadProgress?: LoadProgressListener;
   className?: string;
 };
+
+const ignoreLoadProgress: LoadProgressListener = () => undefined;
 
 function devicePixels({ width, height }: Size): Size {
   const ratio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO);
@@ -33,6 +37,7 @@ export function ScrollSequence({
   sequence,
   progress,
   label,
+  onLoadProgress = ignoreLoadProgress,
   className,
 }: ScrollSequenceProps) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -44,13 +49,17 @@ export function ScrollSequence({
     const canvas = stage.appendChild(document.createElement("canvas"));
     canvas.className = "block size-full";
     const tier = tierFor(sequence);
-    const player = openPlayer(canvas, {
-      sequence,
-      tier,
-      size: devicePixels(stage.getBoundingClientRect()),
-      progress: progress.get(),
-      preloaded: POSTER_FRAME,
-    });
+    const player = openPlayer(
+      canvas,
+      {
+        sequence,
+        tier,
+        size: devicePixels(stage.getBoundingClientRect()),
+        progress: progress.get(),
+        preloaded: POSTER_FRAME,
+      },
+      onLoadProgress,
+    );
     const posterRequest = new AbortController();
     fetch(frameUrl(sequence, tier, POSTER_FRAME), {
       signal: posterRequest.signal,
@@ -59,7 +68,9 @@ export function ScrollSequence({
       .then((frame) =>
         player.send({ type: "frame", index: POSTER_FRAME, frame }),
       )
-      .catch(() => undefined);
+      .catch(() => {
+        if (!posterRequest.signal.aborted) player.send({ type: "skip" });
+      });
 
     const resize = new ResizeObserver(([entry]) =>
       player.send({ type: "resize", size: devicePixels(entry.contentRect) }),
@@ -87,7 +98,7 @@ export function ScrollSequence({
       player.close();
       canvas.remove();
     };
-  }, [sequence, progress]);
+  }, [sequence, progress, onLoadProgress]);
 
   return (
     <>

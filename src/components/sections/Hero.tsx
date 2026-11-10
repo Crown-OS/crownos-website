@@ -11,6 +11,7 @@ import {
 import { hero } from "@/data/hero";
 import { horizonGlowShader } from "@/shaders/horizon-glow";
 import { SYNTHESIS_SHADER } from "@/shaders/synthesis";
+import { reportBootProgress } from "@/util/boot-progress";
 import { lineupSpan } from "@/util/device-still";
 import type { ScrollRange } from "@/util/scroll-range";
 import { useLineupFit } from "@/util/use-lineup-fit";
@@ -215,6 +216,7 @@ export function Hero() {
                 sequence={hero.laptop.sequence}
                 progress={frameProgress}
                 label={hero.laptop.label}
+                onLoadProgress={reportBootProgress}
                 className="absolute inset-0"
               />
               <HeroDevice

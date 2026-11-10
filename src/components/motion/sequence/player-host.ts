@@ -1,5 +1,5 @@
 import type { FrameSequence, FrameTier, Size } from "@/util/frame-sequence";
-import { FramePlayer } from "./FramePlayer";
+import { FramePlayer, type LoadProgressListener } from "./FramePlayer";
 
 export type PlayerSetup = {
   sequence: FrameSequence;
@@ -15,12 +15,13 @@ export type PlayerCommand =
       canvas: HTMLCanvasElement | OffscreenCanvas;
     })
   | { type: "frame"; index: number; frame: Blob }
+  | { type: "skip" }
   | { type: "seek"; progress: number }
   | { type: "resize"; size: Size }
   | { type: "release" }
   | { type: "dispose" };
 
-export function createPlayerHost() {
+export function createPlayerHost(onLoadProgress: LoadProgressListener) {
   let player: FramePlayer | undefined;
   return (command: PlayerCommand) => {
     switch (command.type) {
@@ -30,7 +31,12 @@ export function createPlayerHost() {
           | OffscreenCanvasRenderingContext2D
           | null;
         if (!context) return;
-        player = new FramePlayer(context, command.sequence, command.tier);
+        player = new FramePlayer(
+          context,
+          command.sequence,
+          command.tier,
+          onLoadProgress,
+        );
         player.resize(command.size);
         player.seek(command.progress);
         player.start(command.preloaded);
@@ -38,6 +44,8 @@ export function createPlayerHost() {
       }
       case "frame":
         return player?.receive(command.index, command.frame);
+      case "skip":
+        return player?.skip();
       case "seek":
         return player?.seek(command.progress);
       case "resize":

@@ -16,6 +16,7 @@ const PARALLEL_DECODES = 3;
 const LOOK_BEHIND = 1;
 
 type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+export type LoadProgressListener = (ratio: number) => void;
 
 export class FramePlayer {
   readonly #context: Context2D;
@@ -26,13 +27,21 @@ export class FramePlayer {
   readonly #decoding = new Set<number>();
   readonly #capacity: number;
   readonly #aborter = new AbortController();
+  readonly #onLoadProgress: LoadProgressListener;
+  #settledCount = 0;
   #decodedCount = 0;
   #target = 0;
   #direction = 1;
   #drawn = -1;
 
-  constructor(context: Context2D, sequence: FrameSequence, tier: FrameTier) {
+  constructor(
+    context: Context2D,
+    sequence: FrameSequence,
+    tier: FrameTier,
+    onLoadProgress: LoadProgressListener,
+  ) {
     this.#context = context;
+    this.#onLoadProgress = onLoadProgress;
     this.#sequence = sequence;
     this.#tier = tier;
     this.#encoded = new Array(sequence.frames);
@@ -51,7 +60,12 @@ export class FramePlayer {
 
   receive(index: number, frame: Blob) {
     this.#encoded[index] = frame;
+    this.#settle();
     this.#render();
+  }
+
+  skip() {
+    this.#settle();
   }
 
   seek(progress: number) {
@@ -100,11 +114,16 @@ export class FramePlayer {
         priority: "low",
         signal: this.#aborter.signal,
       });
-      if (!response.ok) return;
+      if (!response.ok) return this.skip();
       this.receive(index, await response.blob());
     } catch {
-      return;
+      if (!this.#aborter.signal.aborted) this.skip();
     }
+  }
+
+  #settle() {
+    this.#settledCount++;
+    this.#onLoadProgress(this.#settledCount / this.#sequence.frames);
   }
 
   *#decodeWindow() {

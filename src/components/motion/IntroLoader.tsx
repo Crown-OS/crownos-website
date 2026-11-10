@@ -3,6 +3,7 @@
 import { type CSSProperties, useEffect, useRef } from "react";
 import { CrownIcon } from "@/components/icons";
 import { intro } from "@/data/intro";
+import { bootProgress } from "@/util/boot-progress";
 import { easeOutCubic, releaseReveals, setIntroPhase } from "@/util/intro";
 import { prefersReducedMotion } from "@/util/reduced-motion";
 
@@ -71,11 +72,22 @@ export function IntroLoader() {
       later(drop, intro.vibrateMs + 100);
     };
 
-    const tick = (now: number) => {
-      const eased = easeOutCubic(
-        Math.min((now - startedAt) / intro.countMs, 1),
+    const loadedShare = (elapsedMs: number) => {
+      const loaded = bootProgress();
+      const overdue = (elapsedMs - intro.maxLoadWaitMs) / intro.loadFillMs;
+      return (
+        loaded + (1 - loaded) * easeOutCubic(Math.min(Math.max(overdue, 0), 1))
       );
-      const progress = fontsReady ? eased : Math.min(eased, PENDING_FONT_CAP);
+    };
+
+    const tick = (now: number) => {
+      const elapsedMs = now - startedAt;
+      const eased = easeOutCubic(Math.min(elapsedMs / intro.countMs, 1));
+      const progress = Math.min(
+        eased,
+        loadedShare(elapsedMs),
+        fontsReady ? 1 : PENDING_FONT_CAP,
+      );
       if (counterRef.current) {
         counterRef.current.textContent = String(
           Math.round(progress * 100),
