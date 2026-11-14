@@ -3,7 +3,7 @@ import type { Feature, SectionCopy } from "./feature";
 export const foundation = {
   heading: {
     title: "Redesigned the entire graphics stack",
-    lead: "We started with CachyOS and then rebuilt the entire layer that you interact with to perfect the user experience",
+    lead: "We started with CachyOS and rebuilt every layer you touch, from the compositor to the apps.",
   },
   pillars: [
     {

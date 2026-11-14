@@ -19,7 +19,11 @@ export function Comparison() {
 
   return (
     <Section labelledBy="comparison-title">
-      <SectionHeading id="comparison-title" {...comparison.heading} />
+      <SectionHeading
+        id="comparison-title"
+        {...comparison.heading}
+        pattern="tiles"
+      />
       <Tabs
         label="Comparison"
         options={comparison.tabs}
@@ -45,7 +49,7 @@ export function Comparison() {
         ) : (
           <ComparisonMatrix tab={active} />
         )}
-        <p className="mt-8 max-w-3xl font-normal text-faint text-sm">
+        <p className="mt-8 max-w-3xl text-pretty font-normal text-faint text-sm">
           {active.note}
         </p>
       </m.div>

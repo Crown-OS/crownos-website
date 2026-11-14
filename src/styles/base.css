@@ -532,19 +532,87 @@
     &::after {
       content: "";
       position: absolute;
-      background: var(--color-border);
     }
 
     &::before {
       inset: 50% 0 auto;
       height: 1px;
+      background: var(--guide-dashed);
     }
 
     &::after {
       inset: 0 auto 0 50%;
       width: 1px;
+      background: var(--color-guide);
     }
   }
+
+  .seam-frame {
+    display: none;
+    position: absolute;
+    inset: 0;
+    max-width: var(--container-frame);
+    margin-inline: auto;
+
+    @media (width >= 64rem) {
+      display: block;
+      border-inline: 1px solid var(--color-border);
+    }
+
+    [data-join="below"] > & {
+      top: 50%;
+    }
+  }
+
+  .seam-frame > .corner-mark {
+    --color-rule-mark: var(--color-guide-mark);
+    display: none;
+    width: 0.9375rem;
+    height: 0.9375rem;
+
+    @media (width >= 80rem) {
+      display: block;
+    }
+  }
+
+  .construction-guides {
+    position: relative;
+
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      inset-inline: 0;
+      height: 1px;
+      background: var(--guide-dashed);
+      pointer-events: none;
+    }
+
+    &::before {
+      top: 0;
+    }
+
+    &::after {
+      bottom: 0;
+    }
+  }
+
+  .construction-field {
+    mask:
+      linear-gradient(to right, transparent, #000 35%),
+      linear-gradient(to top, transparent, #000 30%);
+    mask-composite: intersect;
+  }
+}
+
+:root {
+  --color-guide: rgb(255 255 255 / 0.2);
+  --color-guide-mark: rgb(255 255 255 / 0.6);
+  --guide-dashed: repeating-linear-gradient(
+    90deg,
+    var(--color-guide) 0 6px,
+    transparent 6px 10px
+  );
 }
 
 @layer base {

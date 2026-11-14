@@ -55,6 +55,10 @@
     infinite;
 }
 
+.js [data-faded] .text-sweep {
+  animation-play-state: paused;
+}
+
 @keyframes text-sweep {
   0% {
     background-position: 100% 0;

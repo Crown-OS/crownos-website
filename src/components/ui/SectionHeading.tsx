@@ -1,5 +1,9 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { RevealText } from "@/components/motion";
+import {
+  ConstructionPattern,
+  type PatternKey,
+} from "@/components/visuals/construction";
 import type { SectionCopy } from "@/data/feature";
 
 type Alignment = "start" | "center";
@@ -9,15 +13,31 @@ const ALIGNMENT_CLASSES: Record<Alignment, string> = {
   center: "mx-auto justify-items-center text-center",
 };
 
+function PatternBand({
+  pattern,
+  children,
+}: {
+  pattern: PatternKey;
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative -mx-frame-x -mt-frame-y px-frame-x pt-frame-y">
+      <ConstructionPattern name={pattern} />
+      {children}
+    </div>
+  );
+}
+
 export function SectionHeading({
   id,
   title,
   lead,
   align = "start",
-}: SectionCopy & { id: string; align?: Alignment }) {
-  return (
+  pattern,
+}: SectionCopy & { id: string; align?: Alignment; pattern?: PatternKey }) {
+  const header = (
     <header
-      className={`grid max-w-3xl gap-6 md:gap-7 ${ALIGNMENT_CLASSES[align]}`}
+      className={`relative grid max-w-3xl gap-6 md:gap-7 ${ALIGNMENT_CLASSES[align]}`}
     >
       <RevealText
         id={id}
@@ -34,5 +54,10 @@ export function SectionHeading({
         </p>
       )}
     </header>
+  );
+  return pattern ? (
+    <PatternBand pattern={pattern}>{header}</PatternBand>
+  ) : (
+    header
   );
 }

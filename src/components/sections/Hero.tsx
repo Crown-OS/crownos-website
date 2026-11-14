@@ -14,6 +14,7 @@ import { SYNTHESIS_SHADER } from "@/shaders/synthesis";
 import { reportBootProgress } from "@/util/boot-progress";
 import { lineupSpan } from "@/util/device-still";
 import type { ScrollRange } from "@/util/scroll-range";
+import { useFlagWhile } from "@/util/use-flag-while";
 import { useLineupFit } from "@/util/use-lineup-fit";
 import { useRestingOffset } from "@/util/use-resting-offset";
 import { HeroDevice } from "./HeroDevice";
@@ -56,6 +57,8 @@ const SLOGAN_TIMING = {
   "--sweep-at": "1600ms",
   "--sweep-cycle": "6s",
 } as CSSProperties;
+const COPY_FADED = "data-faded";
+const isFadedOut = (opacity: number) => opacity <= 0;
 
 function HeroSlogan() {
   const { lead, emphasis, trail } = hero.slogan;
@@ -98,6 +101,7 @@ export function Hero() {
     "-45svh",
   ]);
   const copyOpacity = useTransform(scrollYProgress, TIMELINE.copyExit, [1, 0]);
+  useFlagWhile(copyRef, copyOpacity, COPY_FADED, isFadedOut);
   const copyScale = useTransform(
     scrollYProgress,
     [0, TIMELINE.copyExit[1]],

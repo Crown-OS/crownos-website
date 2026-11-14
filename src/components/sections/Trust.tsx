@@ -7,9 +7,9 @@ const STAGGER_MS = 80;
 export function Trust() {
   return (
     <Section labelledBy="trust-title">
-      <SectionHeading id="trust-title" {...trust.heading} />
+      <SectionHeading id="trust-title" {...trust.heading} pattern="poster" />
       <div className="-mx-frame-x mt-stack -mb-frame-y grid md:grid-cols-2">
-        {trust.points.map(({ icon, title, description }, index) => (
+        {trust.points.map(({ icon, label, title, description }, index) => (
           <article
             key={title}
             data-reveal
@@ -19,7 +19,12 @@ export function Trust() {
           >
             {icon && <IconTile icon={icon} />}
             <div className="grid gap-5">
-              <h3 className="text-balance text-title text-trim">{title}</h3>
+              <hgroup className="grid gap-3">
+                <p className="font-mono text-micro text-faint uppercase text-trim">
+                  {label}
+                </p>
+                <h3 className="text-balance text-title text-trim">{title}</h3>
+              </hgroup>
               <p className="max-w-xl text-pretty font-normal text-body text-muted text-trim">
                 {description}
               </p>

@@ -23,7 +23,11 @@ export async function Personalize() {
   const counts = await loadCounts();
   return (
     <Section labelledBy="personalize-title">
-      <SectionHeading id="personalize-title" {...personalize.heading} />
+      <SectionHeading
+        id="personalize-title"
+        {...personalize.heading}
+        pattern="cross"
+      />
       <div className="mt-stack grid grid-cols-1 gap-grid md:grid-cols-2 lg:grid-cols-3">
         {personalize.cards.map((card, index) => (
           <PocketCard

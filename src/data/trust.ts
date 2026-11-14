@@ -8,24 +8,28 @@ export const trust = {
   points: [
     {
       icon: "shield",
+      label: "Scoped permissions",
       title: "Plugins only touch what you allow",
       description:
         "Each plugin and agent declares the capabilities it needs: files, network, windows, devices. You approve them one by one and revoke any of them from Settings.",
     },
     {
       icon: "code",
+      label: "GPL",
       title: "Every line is open to read",
       description:
         "CrownOS is open source under the GPL. The compositor, CrownUI and every system app are public, so anyone can audit how they work.",
     },
     {
       icon: "link",
+      label: "CrownLink",
       title: "Your devices talk only to each other",
       description:
         "Crown Link pairs devices with keys that never leave them and encrypts every packet end to end. No account, no cloud relay.",
     },
     {
       icon: "rewind",
+      label: "Btrfs snapshots",
       title: "Any update can be undone",
       description:
         "A Btrfs snapshot is taken before every update and plugin install. If something breaks, roll back from the boot menu in seconds.",
