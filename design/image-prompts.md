@@ -12,7 +12,7 @@ into `public/images/`.
 
 > Ultra-smooth defocused gradient, extreme gaussian blur, no hard edges, no objects, no text, no
 > logos, no noise, no banding, subtle film grain only, photographic colour, 16-bit depth, the
-> top-left corner falls off into deep blue-black #16151c, overall dark and premium, Apple
+> top-left corner falls off into deep blue-black #16151c, overall dark and premium,
 > wallpaper quality.
 
 ---
@@ -56,7 +56,7 @@ Each one replaces the `aurora` utility on its card in `Showcase.tsx`.
 This one CSS can't reproduce (it is Sigma's "advantages" background). Replaces the
 `data-tone="tide"` aurora behind the four Interactions visuals.
 
-> Abstract macOS-style 3D wallpaper. Smooth translucent glass ribbons sweep in a large S-curve
+> Abstract 3D wallpaper. Smooth translucent glass ribbons sweep in a large S-curve
 > from the lower left to the upper right, like a frozen ocean wave made of tinted glass. Pale
 > sky blue (#8fd0ff) highlights run along the crests, saturated cobalt (#1f6fe0) fills the body
 > and deep navy (#0b2a8f) shadows sit in the folds. Soft caustic light passes through the glass,
@@ -72,7 +72,7 @@ Use a transparent PNG at 1200×900, exported to WebP with alpha.
 
 > Isometric-leaning front view, 3D render, soft studio lighting from the top, frosted
 > glass and satin plastic materials, gentle subsurface glow, soft contact shadow, transparent
-> background, centred with generous padding, no text, minimal, premium Apple keynote style.
+> background, centred with generous padding, no text, minimal, premium keynote style.
 
 ### 4a. `public/images/card-config.webp`: violet tone, "One folder runs the whole system"
 
@@ -107,7 +107,7 @@ PNG to `public/icons/<key>.webp`. Generate all 11 in one session so they stay co
 > darker bevel at the bottom and a faint outer rim. Centred on it is <GLYPH> as a puffy,
 > inflated, soft-white (#f2f2f4) 3D shape with rounded edges, a subtle top highlight and soft
 > ambient-occlusion shadow onto the tile. Minimal, no text, transparent background, 3D render,
-> Apple SF Symbols proportions, premium.
+> clean symbol-icon proportions, premium.
 
 | key      | `<GLYPH>`                                                   | `<TINT>` (card tone)       |
 | -------- | ----------------------------------------------------------- | -------------------------- |
@@ -131,7 +131,7 @@ Replaces the CSS gradient tile in `Beta.tsx` (Sigma's footer app icon).
 > (#a1d2ff) at the top left through vivid azure (#148eff) to deep royal blue (#0852e7) at the
 > bottom right, with a glassy specular highlight across the top third and a soft inner shadow.
 > Centred on it is a stylised three-point crown mark as a flat white cut-out with a very subtle
-> emboss. Soft blue glow beneath, transparent background, 3D render, Apple app icon quality.
+> emboss. Soft blue glow beneath, transparent background, 3D render, premium app icon quality.
 
 ## 7. Footer band: `public/images/aurora-dusk.webp` (2880×900)
 

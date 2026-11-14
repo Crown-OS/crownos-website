@@ -13,7 +13,7 @@ export const hero = {
   laptop: {
     label: "A CrownOS laptop opening to the desktop",
     sequence: {
-      path: "/sequences/crownbook/v7",
+      path: "/sequences/crownbook/v8",
       frames: 145,
       timeline: 240,
       digits: 4,
@@ -44,9 +44,9 @@ export const hero = {
     devices: {
       tablet: {
         label: "A CrownOS tablet beside the laptop",
-        path: "/devices/v1/tablet",
+        path: "/devices/v2/tablet",
         widths: [480, 960],
-        size: { width: 468, height: 650 },
+        size: { width: 447, height: 631 },
         centerX: 0.943,
         bottom: 0.607,
         depth: 0.73,
@@ -54,9 +54,9 @@ export const hero = {
       },
       phone: {
         label: "A CrownOS phone beside the laptop",
-        path: "/devices/v1/phone",
+        path: "/devices/v2/phone",
         widths: [320, 640],
-        size: { width: 182, height: 375 },
+        size: { width: 182, height: 370 },
         centerX: 0.141,
         bottom: 0.607,
         depth: 0.73,
