@@ -1,0 +1,145 @@
+---
+title: svg and icon
+description: "Draw SVG artwork at any size, tint it like currentColor, and use the kit's Lucide icons."
+sidebarTitle: svg
+api: FN svg
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+const LOGO: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6366f1"/><path d="M8 12h8" stroke="#ffffff" stroke-width="2"/></svg>"##;
+
+fn brand(active: Signal<bool>) -> impl View {
+    hstack((
+        svg(LOGO).size(32.0).label("CrownOS"),
+        icon(LOGO, bind(move |rt| if active.get(rt) { rgb(0x3b82f6) } else { rgb(0x9ca3af) }))
+            .size(16.0),
+    ))
+    .gap(8.0)
+    .items_center()
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn svg(source: impl Into<String>) -> Element<SvgKind>;
+
+pub fn icon(source: impl Into<String>, tint: impl IntoProp<Color>) -> Element<SvgKind>;
+```
+</ResponseExample>
+</ApiExamples>
+
+`svg` draws vector artwork from SVG source text. `icon` draws the same artwork with every color replaced by one tint, the way icons drawn with `currentColor` behave on the web. The kit adds `kit::icon` for its built-in Lucide set.
+
+## Parameters
+
+<ParamField name="source" type="impl Into<String>" required>
+  A complete SVG document as text, with its root `<svg>` element.
+</ParamField>
+
+<ParamField name="tint" type="impl IntoProp<Color>" required>
+  For `icon`: the color every fill and stroke becomes. A literal, a `Signal<Color>`, a `Memo<Color>` or a `bind`.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Element<SvgKind>" type="Element<SvgKind>">
+  An element with the `Image` role, sized to the SVG's natural size unless styled.
+</ResponseField>
+
+## Sizing
+
+The element starts at the SVG's own `width` and `height`. Any size you give it with `.size()`, `.w()` or `.h()` scales the picture to fit inside, keeping its aspect ratio, and centers it. The source is parsed once when the element mounts.
+
+```rust
+svg(LOGO)            // 24 x 24, from the SVG
+svg(LOGO).size(96.0) // scaled to 96 x 96
+svg(LOGO).w(200.0)   // 200 wide, 24 tall, the picture centered at 24 x 24
+```
+
+## Tinting
+
+`icon` replaces the color of every fill and stroke with `tint` and keeps each shape's own alpha. A half transparent shape stays half transparent in the new color. Because `tint` is a property, a signal or `bind` recolors the icon without rebuilding it.
+
+```rust
+let hovered = cx.signal(false);
+
+icon(source, bind(move |rt| if hovered.get(rt) { WHITE } else { rgb(0x9ca3af) }))
+    .size(20.0)
+    .on_pointer_enter(move |cx, _| hovered.set(cx, true))
+    .on_pointer_leave(move |cx, _| hovered.set(cx, false))
+```
+
+## Supported SVG
+
+| Content | Support |
+|---|---|
+| Paths and basic shapes (`rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`) | Drawn, after `usvg` turns them into paths. |
+| Groups and transforms | Drawn. Transforms are applied to the path points. |
+| Solid fill and stroke colors with opacity | Drawn. |
+| Stroke width, line caps and line joins | Drawn. Miter clip joins draw as miter. |
+| Gradients and patterns | Skipped. A shape painted only with them is not drawn. |
+| Embedded images | Skipped. |
+| Text | Skipped. |
+
+Invalid SVG logs `CUI0501` and the element draws nothing.
+
+## Kit icons
+
+The kit includes the Lucide icon set as constants in `kit::icons`, such as `icons::TRASH`, `icons::COPY` and `icons::SEARCH`. Each constant is an SVG body without the outer `<svg>` element, so it is not valid input for `svg` or `icon`. Draw them with the kit functions, which wrap the body in a 24 unit view box with round caps and joins and paint it in a theme color:
+
+```rust
+pub fn kit::icon(body: &'static str) -> Element<IconKind>;
+pub fn kit::icon_muted(body: &'static str) -> Element<IconKind>;
+pub fn kit::icon_colored(
+    body: &'static str,
+    stroke_width: f32,
+    color: impl Fn(&Theme) -> Color + 'static,
+) -> Element<IconKind>;
+```
+
+| Function | Color | Stroke |
+|---|---|---|
+| `kit::icon(body)` | `theme.text.icon` | 2 units |
+| `kit::icon_muted(body)` | `theme.text.icon_muted` | 2 units |
+| `kit::icon_colored(body, stroke_width, color)` | Whatever `color` picks from the theme | `stroke_width` units |
+
+Kit icons are 16 logical pixels by default. Resize them with `.size(..)`. They follow theme changes live.
+
+```rust
+use crownui::kit::{self, icons};
+
+hstack((
+    kit::icon(icons::TRASH),
+    kit::icon_muted(icons::COPY).size(20.0),
+    kit::icon_colored(icons::SEARCH, 1.5, |theme| theme.text.icon),
+))
+.gap(12.0)
+```
+
+<Note>
+  The prelude's `icon` and `kit::icon` share a name. Import the kit as a module, `use crownui::kit::{self, icons}`, and call `kit::icon` so the two never clash.
+</Note>
+
+## Accessibility
+
+Both elements get the `Image` role but no name. Label meaningful artwork with `.label("..")`. An icon inside a labelled button needs no label of its own.
+
+## Cost
+
+Each `svg` or `icon` element parses its source when it mounts and keeps the flattened paths. Each repaint, such as a tint change, copies those paths into a new draw list. Small paths such as icons get analytic edge coverage in Impeller, so they stay sharp at any size. For a toolbar this cost is negligible. For hundreds of icons that change every frame, draw them in one [canvas](/docs/crownui/api/canvas).
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Drawing guide" icon="image" href="/docs/crownui/drawing">
+    SVG next to canvases and images.
+  </Card>
+  <Card title="Kit" icon="book" href="/docs/crownui/kit">
+    The widgets that use these icons.
+  </Card>
+</CardGroup>

@@ -1,0 +1,410 @@
+---
+title: Drawing
+description: "Draw shapes, paths, gradients, images and SVG with canvas, image, cover_image, svg and icon."
+---
+
+When stacks and styles are not enough, draw. `canvas` gives you a `DrawList` to fill with shapes, paths, gradients, shadows and images. `image` and `cover_image` show pixels, and `svg` and `icon` show vector artwork. Everything here ends up as the same plain list of draw commands that the render thread hands to Impeller.
+
+## Your first canvas
+
+`canvas(painter)` takes a closure with three arguments: the runtime, the canvas size, and the list to record into. Coordinates are local to the canvas, with `(0, 0)` at its top-left corner.
+
+```rust
+use crownui::prelude::*;
+
+fn badge() -> impl View {
+    canvas(|_rt, size, list| {
+        let bounds = Rect::new(Point::ZERO, size);
+        list.fill(bounds, CornerRadii::uniform(size.height / 2.0), rgb(0x22c55e));
+    })
+    .w(48.0)
+    .h(20.0)
+}
+```
+
+A canvas has no natural size. Give it one with `.w()`, `.h()` or `.size()`, or let it grow inside a flex container with `.flex_1()` or `.w_full()`.
+
+The painter runs once when the canvas mounts, before layout, with a size of zero. It runs again whenever the size changes. Return early when the size is empty so you do not record garbage:
+
+```rust
+canvas(|_rt, size, list| {
+    if size.is_empty() {
+        return;
+    }
+    // draw
+})
+```
+
+## Signals in the painter
+
+The painter is an effect. Every signal it reads becomes a dependency, and a change to any of them re-runs the painter and replaces the list. You never call a redraw yourself.
+
+Here is a bar chart that redraws when its data changes:
+
+```rust
+fn bar_chart(values: Signal<Vec<f32>>) -> impl View {
+    canvas(move |rt, size, list| {
+        if size.is_empty() {
+            return;
+        }
+        values.with(rt, |values| {
+            let slot = size.width / values.len().max(1) as f32;
+            for (index, value) in values.iter().enumerate() {
+                let height = value.clamp(0.0, 1.0) * size.height;
+                let bar = Rect::from_xywh(
+                    index as f32 * slot + 1.0,
+                    size.height - height,
+                    slot - 2.0,
+                    height,
+                );
+                list.fill(bar, CornerRadii::uniform(2.0), rgb(0x3b82f6));
+            }
+        });
+    })
+    .w_full()
+    .h(120.0)
+}
+```
+
+Read signals with `rt`, the `&mut Runtime` argument. `values.with(rt, ..)` borrows the vector without cloning it.
+
+Theme colors work the same way. `kit::use_theme(cx)` returns a `Signal<Theme>`, so a painter that reads `theme.with(rt, |theme| theme.accent.end)` repaints when the user changes the accent color.
+
+## Shapes
+
+`DrawList` has helpers for the common shapes. Each one takes anything that converts into a `Paint`, and a `Color` does.
+
+```rust
+let card = Rect::from_xywh(8.0, 8.0, size.width - 16.0, size.height - 16.0);
+let corners = CornerRadii::uniform(12.0);
+
+list.shadow(card, corners, rgba(0x00000040), 16.0, Vector::new(0.0, 4.0));
+list.fill(card, corners, WHITE);
+list.stroke(card, corners, 1.0, rgb(0xe5e7eb));
+```
+
+| Method | Draws |
+|---|---|
+| `fill(rect, radii, paint)` | A rounded rectangle, or a plain one when the radii are zero. |
+| `stroke(rect, radii, width, paint)` | An outline centered on the rounded rectangle's edge. |
+| `shadow(rect, radii, color, blur, offset)` | A blurred drop shadow, cut away under the shape so it never shows through a translucent fill. |
+| `image(image, dest)` | A registered image scaled into `dest`. |
+
+`CornerRadii` has public `top_left`, `top_right`, `bottom_right` and `bottom_left` fields for corners that differ.
+
+## Paths
+
+For anything that is not a rounded rectangle, build a `Path` and push a `FillPath` or `StrokePath` command. `Path`, `Stroke`, `Paint` and `DrawCommand` come from `crownui::ext`.
+
+```rust
+use crownui::ext::{DrawCommand, Paint, Path, Stroke};
+
+fn line_chart(values: Signal<Vec<f32>>) -> impl View {
+    canvas(move |rt, size, list| {
+        if size.is_empty() {
+            return;
+        }
+        let line = values.with(rt, |values| {
+            let step = size.width / (values.len().max(2) - 1) as f32;
+            values
+                .iter()
+                .enumerate()
+                .fold(Path::new(), |path, (index, value)| {
+                    let point = Point::new(index as f32 * step, size.height * (1.0 - value));
+                    if index == 0 {
+                        path.move_to(point)
+                    } else {
+                        path.line_to(point)
+                    }
+                })
+        });
+        list.push(DrawCommand::StrokePath(
+            line,
+            Stroke::rounded(2.0),
+            Paint::solid(rgb(0x6366f1)),
+        ));
+    })
+    .w_full()
+    .h(160.0)
+}
+```
+
+A path is built with `move_to`, `line_to`, `quad_to`, `cubic_to` and `close`. Each returns the path, so calls chain. `Stroke::new(width)` gives butt caps and miter joins. `Stroke::rounded(width)` gives round caps and joins, which is how Lucide icons are drawn. Set the `cap` and `join` fields for anything else.
+
+## Gradients and blur
+
+`Paint` has two public fields, `brush` and `blur`. A linear gradient runs between two points in the shape's coordinates:
+
+```rust
+use crownui::ext::{Brush, GradientStop, Paint};
+
+let bounds = Rect::new(Point::ZERO, size);
+let sunset = Paint {
+    brush: Brush::LinearGradient {
+        start: Point::ZERO,
+        end: Point::new(size.width, size.height),
+        stops: [
+            GradientStop { offset: 0.0, color: rgb(0xf97316) },
+            GradientStop { offset: 1.0, color: rgb(0xdb2777) },
+        ]
+        .into_iter()
+        .collect(),
+    },
+    blur: None,
+};
+list.fill(bounds, CornerRadii::uniform(16.0), sunset);
+```
+
+`blur: Some(radius)` blurs the shape's edges, like CSS `filter: blur`. A soft glow is a blurred fill behind a sharp one.
+
+## Transforms and clipping
+
+`save` stores the current transform and clip, and `restore` brings them back. Between the two, `translate`, `transform` and `clip` apply to everything you record.
+
+```rust
+use crownui::ext::Transform;
+
+let center = Point::new(size.width / 2.0, size.height / 2.0);
+let angle = progress.get(rt) * std::f32::consts::TAU;
+
+list.save();
+list.clip(Rect::new(Point::ZERO, size), CornerRadii::uniform(8.0));
+list.transform(Transform::rotate(angle).about(center));
+list.fill(
+    Rect::from_xywh(center.x - 2.0, 4.0, 4.0, center.y - 4.0),
+    CornerRadii::uniform(2.0),
+    rgb(0xef4444),
+);
+list.restore();
+```
+
+Every `save` needs a matching `restore`. The full command set, including layers with backdrop blur, is on the [DrawList API page](/docs/crownui/api/draw-list).
+
+## Text and canvases
+
+A canvas records text by `TextLayoutId`, and app code has no way to shape text inside a painter. Put text views on top of the canvas instead:
+
+```rust
+zstack((
+    bar_chart(values),
+    text("Weekly sales").text_size(13.0).p(8.0),
+))
+```
+
+The text gets real layout and accessibility, and the canvas only draws.
+
+## Animating drawings cheaply
+
+Every painter run records a new list on the UI thread and the render thread records that boundary again. For motion, animate the element instead of the drawing. Rotation, scale, translation and opacity on an element run on the render thread and never re-run the painter.
+
+The kit spinner does exactly this. Its arc is drawn once, and the element spins. The same idea with a clock hand:
+
+```rust
+let theme = kit::use_theme(cx);
+
+canvas(move |rt, size, list| {
+    let center = Point::new(size.width / 2.0, size.height / 2.0);
+    let hand = Path::new().move_to(center).line_to(Point::new(center.x, 3.0));
+    let color = theme.with(rt, |theme| theme.accent.end);
+    list.push(DrawCommand::StrokePath(hand, Stroke::rounded(3.0), Paint::solid(color)));
+})
+.size(24.0)
+.rotate(360.0)
+.enter(|style| style.rotate(0.0))
+.transition(Curve::linear(1200).repeating())
+```
+
+Split a drawing into layers when only part of it changes. The spinner keeps its static track in one canvas and its moving head in another, stacked with `absolute()` and `inset(0.0)`.
+
+## Images
+
+`image(width, height, rgba)` shows pixels. The bytes are straight alpha RGBA8, four bytes per pixel, row by row. The element takes its pixel dimensions as its size unless you style it, and the pixels are freed from the GPU when it unmounts.
+
+```rust
+fn checkerboard(side: u32, cell: u32) -> Vec<u8> {
+    let mut pixels = Vec::with_capacity((side * side * 4) as usize);
+    for y in 0..side {
+        for x in 0..side {
+            let light = (x / cell + y / cell) % 2 == 0;
+            let value = if light { 0xee } else { 0x99 };
+            pixels.extend_from_slice(&[value, value, value, 0xff]);
+        }
+    }
+    pixels
+}
+
+image(64, 64, checkerboard(64, 8))
+```
+
+CrownUI does not decode files. Use a decoder crate and pass the result. With the `image` crate:
+
+```rust
+let decoded = ::image::load_from_memory(include_bytes!("../assets/photo.jpg"))?.to_rgba8();
+let (width, height) = decoded.dimensions();
+image(width, height, decoded.into_raw()).w(320.0).h(240.0)
+```
+
+<Note>
+  JPEG has no alpha, and PNG stores straight alpha, so decoded pixels already match. If your source gives premultiplied pixels, such as a tiny-skia `Pixmap`, divide the color channels by alpha first.
+</Note>
+
+### Registering an image yourself
+
+`image()` uploads its pixels every time it mounts. To show one picture in several places, or draw it inside a canvas, register it once and use its `ImageId`:
+
+```rust
+use crownui::ext::Paint;
+
+fn profile(cx: &mut Cx, width: u32, height: u32, rgba: Vec<u8>) -> impl View + use<> {
+    let avatar = cx.register_image(width, height, rgba);
+    cx.release_image_on_cleanup(avatar);
+    let natural = Size::new(width as f32, height as f32);
+
+    hstack((
+        cover_image(avatar, natural, 20.0).size(40.0),
+        canvas(move |_rt, size, list| {
+            let bounds = Rect::new(Point::ZERO, size);
+            list.fill(bounds, CornerRadii::uniform(12.0), Paint::image(avatar, bounds));
+        })
+        .w(160.0)
+        .h(160.0),
+    ))
+    .gap(12.0)
+}
+```
+
+| Method | What it does |
+|---|---|
+| `cx.register_image(width, height, rgba) -> ImageId` | Queues the pixels for upload and returns the id to draw them by. |
+| `cx.release_image(id)` | Frees the image once nothing on screen draws it, exiting nodes included. Drawing it afterwards draws nothing. |
+| `cx.release_image_on_cleanup(id)` | Releases it when the current scope ends, so the image lives exactly as long as the component that registered it. |
+
+`Paint::image(id, rect)` fills a shape with the image scaled into `rect`. The shape crops it, so a rounded rectangle filled this way is a rounded image with no clip. `list.image(id, dest)` draws it unclipped.
+
+### Cover images
+
+`cover_image(image, natural_size, radius)` scales a registered image to cover the box it is given, centers it, and crops it to a rounded rectangle. This is CSS `object-fit: cover`. It never sizes itself, so always give it a size. The caller owns the image and releases it.
+
+```rust
+cover_image(wallpaper, Size::new(3840.0, 2160.0), 12.0)
+    .w(240.0)
+    .h(135.0)
+```
+
+A wide image overflows sideways evenly and a tall image overflows top and bottom evenly. It draws as one image-filled shape, so the corners stay anti-aliased.
+
+## SVG
+
+`svg(source)` draws vector artwork from SVG text. It takes the SVG's own width and height as its natural size and scales to fit any other size you give it, keeping the aspect ratio and centering the picture.
+
+```rust
+const LOGO: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6366f1"/><path d="M8 12h8" stroke="#ffffff" stroke-width="2"/></svg>"##;
+
+hstack((svg(LOGO), svg(LOGO).size(64.0)))
+```
+
+`icon(source, tint)` is the same, but every fill and stroke color becomes `tint` while each shape keeps its own alpha. This matches icons drawn with `currentColor`. The tint takes any property, so it follows a signal:
+
+```rust
+let hovered = cx.signal(false);
+
+icon(LOGO, bind(move |rt| if hovered.get(rt) { WHITE } else { rgb(0x9ca3af) }))
+    .size(20.0)
+    .on_pointer_enter(move |cx, _| hovered.set(cx, true))
+    .on_pointer_leave(move |cx, _| hovered.set(cx, false))
+```
+
+Supported content is solid fills and solid strokes on paths and basic shapes, with their transforms. Gradients, embedded images and text inside the SVG are skipped. Invalid SVG logs `CUI0501` and draws nothing.
+
+Both get the `Image` role. Add `.label("..")` so screen readers and agents can name them.
+
+### Lucide icons from the kit
+
+The kit ships the Lucide set as constants in `kit::icons`. These are SVG bodies, not complete documents, so draw them with `kit::icon`, which wraps them in a 24 unit view box and paints them in the theme's icon color:
+
+```rust
+use crownui::kit::{self, icons};
+
+hstack((
+    kit::icon(icons::TRASH),
+    kit::icon_muted(icons::COPY).size(20.0),
+    kit::icon_colored(icons::SEARCH, 1.5, |theme| theme.text.icon),
+))
+```
+
+Kit icons are 16 pixels by default. Resize them with `.size(..)`.
+
+## Pixel art and the scale factor
+
+`cx.scale_factor()` is a `Signal<f32>` with the window's device pixels per logical pixel. Use it to make pixels at the size they show, so a sprite stays crisp instead of being resampled. `keyed` rebuilds the image when the window moves to a screen with a different scale, and the old image is freed as it unmounts.
+
+```rust
+fn sprite(cx: &mut Cx, art: &'static [u8], side: u32) -> impl View + use<> {
+    let scale = cx.scale_factor();
+    keyed(
+        move |rt| scale.get(rt),
+        move |_cx, scale| {
+            let device = (side as f32 * scale).round() as u32;
+            image(device, device, upscale(art, side, device))
+                .w(side as f32)
+                .h(side as f32)
+        },
+    )
+}
+
+fn upscale(art: &[u8], side: u32, device: u32) -> Vec<u8> {
+    let mut pixels = Vec::with_capacity((device * device * 4) as usize);
+    for y in 0..device {
+        for x in 0..device {
+            let source = ((y * side / device) * side + x * side / device) as usize * 4;
+            pixels.extend_from_slice(&art[source..source + 4]);
+        }
+    }
+    pixels
+}
+```
+
+The same signal sizes any render you do yourself, such as a thumbnail rasterized at device resolution.
+
+## Accessibility
+
+A canvas has no role. If it shows information, give it one and a name:
+
+```rust
+bar_chart(values)
+    .role(Role::Image)
+    .label(bind(move |rt| format!("Sales, {} days", values.with(rt, Vec::len))))
+```
+
+## Testing drawings
+
+A `DrawList` prints as stable text through `Display`, with one line per command. `crowntest` renders with the recording backend, so a snapshot shows exactly what a painter recorded and a diff shows what changed. See [testing](/docs/crownui/testing).
+
+## Why it works this way
+
+A `DrawList` is plain data: a vector of commands with no GPU handles. The painter records it on the UI thread, where the signals live, and the list travels to the render thread over a channel. The render thread keeps one display list per repaint boundary and records a boundary again only when its content changed. Changes that only move, fade or scale an element never re-record anything. That split is what keeps animations smooth while the UI thread is busy.
+
+Plain data also makes drawings inspectable. Tests snapshot them, devtools print them, and an agent reads the same text. A backend is free to translate the commands however it likes, which is how the recording backend runs tests with no GPU.
+
+The cost is that a painter is all or nothing. Any signal it reads re-runs the whole closure and replaces the whole list, and the list is copied on its way to the render thread. A painter that draws a thousand points because one label changed does a thousand points of work. Keep painters small, read only what they draw, and split static parts from moving parts into separate canvases.
+
+Images are uploaded once and referenced by id, so a large picture costs its upload once, not per frame. The price is ownership: GPU memory stays in use until the image is released. `image()` and `release_image_on_cleanup` tie that to a component's lifetime. A bare `register_image` without a release keeps the texture alive for as long as the window runs.
+
+SVG support is deliberately small. Flattening to solid paths at mount time keeps drawing simple, and small paths such as icons get analytic edge coverage from Impeller's shaders, so they stay sharp at any scale. Each `svg` or `icon` instance parses its source once when it mounts, and each repaint copies its paths into a new list. For a toolbar of icons that is nothing. For hundreds of animated icons, draw one canvas instead.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="DrawList API" icon="code" href="/docs/crownui/api/draw-list">
+    Every command, `Paint`, `Brush`, `Path` and `Stroke`.
+  </Card>
+  <Card title="canvas" icon="code" href="/docs/crownui/api/canvas">
+    The painter signature and sizing rules.
+  </Card>
+  <Card title="image and cover_image" icon="code" href="/docs/crownui/api/image">
+    Pixels, registration and release.
+  </Card>
+  <Card title="svg and icon" icon="code" href="/docs/crownui/api/svg">
+    Vector artwork and tinting.
+  </Card>
+</CardGroup>

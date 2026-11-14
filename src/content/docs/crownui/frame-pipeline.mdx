@@ -1,0 +1,255 @@
+---
+title: Frame pipeline
+description: How a change travels from an event on the UI thread to pixels presented by the render thread.
+sidebarTitle: Frame pipeline
+---
+
+Every CrownUI window runs on two threads. The UI thread owns all state: it handles events, flushes signals, lays out the tree and shapes text. The render thread owns the GPU: it applies changes to its own tree, runs animations on its own clock, records what changed and presents. The two threads share nothing. The UI thread sends messages over a channel, and the render thread sends frame reports back.
+
+```text
+ platform events
+       |
+       v
++------------------------- UI thread -------------------------+
+|  handle_event -> listeners -> signal writes                 |
+|  update: flush signals, apply queued commands               |
+|  layout: taffy, text shaping, up to 3 passes                |
+|  take_frame: RenderOps + SurfaceState + cursor + images     |
++-------------------------------------------------------------+
+       |  RenderBatch over a channel
+       v
++----------------------- render thread -----------------------+
+|  RenderTree.apply(ops)                                      |
+|  wait for the display's frame callback                      |
+|  prepare: tick animations, re-record changed boundaries     |
+|  compose -> Composition -> renderer.render -> present       |
+|  commit SurfaceState with the same frame                    |
++-------------------------------------------------------------+
+```
+
+The code lives in `runtime/src/window_runner.rs` (UI side), `runtime/src/render_thread.rs` (render side), `runtime/src/render/` (the render tree) and `view/src/ui.rs` (the `Ui` pipeline).
+
+## The UI thread
+
+The platform's event loop calls the runner. Events go to `Ui::handle_event`, which routes pointer, key, wheel, text, clipboard and drag events into the element tree. Listeners run and write signals. Nothing is laid out yet.
+
+When the loop is about to sleep, the runner does one pass per window:
+
+1. It polls the bridges: finished `cx.spawn` tasks, MCP requests and screen reader requests.
+2. It takes in the render thread's frame reports.
+3. It runs due `request_animation_frame` callbacks.
+4. It builds and sends a frame, but only when `Ui::needs_frame()` is true.
+
+`needs_frame` is a few flag reads. It checks for layout work, pending reactive work, a focus request, a keyboard change and queued render changes. An idle window does no work at all.
+
+Building a frame is `runtime::frame::build_batch`:
+
+```rust title="runtime/src/frame.rs"
+ui.update(now);
+ui.layout(layout, text);
+let frame = ui.take_frame();
+text.finish_frame();
+```
+
+- `update` advances time-based work such as long presses and cancels tasks whose scope died. It then flushes the reactive runtime and applies every command the flush queued, in a loop, until nothing is left.
+- `layout` syncs dirty styles into the layout engine and runs it. Text is measured during layout through `TextCache`, which shapes on the UI thread. Content that reacts to its own size, such as a lazy list that mounts the rows that fit, is laid out again in the same frame, up to three passes.
+- `take_frame` turns the queued changes into `RenderOp`s and returns a `UiFrame` with the ops, a `SurfaceState` when it changed, the cursor when it changed, and images to upload or release.
+
+The runner packs that into a `RenderBatch` with the text layouts shaped this frame and the ones no node uses anymore, and sends it.
+
+## Render ops
+
+A `RenderOp` is one change to the render thread's tree. There are six:
+
+```rust title="view/src/render_op.rs"
+pub enum RenderOp {
+    SetRoot(NodeKey),
+    SetChildren(NodeKey, Vec<NodeKey>),
+    Remove(NodeKey, Option<(Visual, Transaction)>),
+    Frame(NodeKey, Rect, Option<Transaction>),
+    Visual(NodeKey, Visual, Option<Transaction>),
+    Content(NodeKey, RenderContent),
+}
+```
+
+- `SetRoot` names the root node.
+- `SetChildren` replaces a node's children in paint order. Children that are still animating out stay in the list until their exit ends.
+- `Remove` deletes a subtree. With an exit visual and a transaction, the subtree stays drawn and animates to that visual first.
+- `Frame` moves or resizes a node. The rect is relative to the parent.
+- `Visual` sets everything about how the node's box looks and where it sits: background, border, ring, radii, shadow, opacity, translate, scale, rotate, backdrop blur, clip, z-index, top layer and scroll offset.
+- `Content` sets what the node draws inside its box: nothing, shaped text by `TextLayoutId`, a canvas `DrawList`, or an image.
+
+`Frame`, `Visual` and `Remove` carry an optional `Transaction`. When a node or an ancestor has `.transition(..)`, the op carries the curve, and the render thread animates from the current value to the new one. The UI thread sends the target once and never sends the in-between values.
+
+Only queued nodes produce ops. A signal write marks the nodes that read it, and `take_frame` visits only those. An unchanged frame sends nothing.
+
+## The render thread
+
+Each window gets its own `crownui-render` thread. It receives five kinds of message:
+
+| Message | Effect |
+|---|---|
+| `Batch` | Uploads text and images, applies the ops to the `RenderTree`, queues the `SurfaceState`. |
+| `Viewport` | Sets the drawable size and scale, and queues the new geometry for the next frame. |
+| `Paused` | Stops or resumes drawing. The UI thread sends it when the platform reports the window obscured. |
+| `AnimationFrames` | Tells the render thread to wake the UI thread after each frame. |
+| `Shutdown` | Ends the thread. |
+
+The loop sleeps on the channel while there is nothing to draw. When a batch arrives or an animation runs, it waits for the display, drains any messages that came in meanwhile, samples the time, prepares the frame and presents it:
+
+```rust title="runtime/src/render_thread.rs"
+let now = clock.next(epoch.elapsed() + Duration::from_millis(1), timing);
+let (composition, stats) = tree.prepare(now, &mut renderer);
+if let Some(state) = inbox.pending_surface.take() {
+    surface.apply(&state);
+}
+surface.pre_present_notify();
+renderer.render(&composition)
+```
+
+After presenting, it sends a report with the frame number, the recording and rendering time, the time the frame was sampled at and the display's refresh interval. Devtools read those reports through the MCP bridge.
+
+## Repaint boundaries
+
+Every render node that draws something is its own repaint boundary. There is no modifier to opt in. When a node is recorded, its box and content become one `DrawList` in the node's own coordinates: the shadow, the background fill, the border, the ring, and then the text, canvas or image. The renderer caches that list under the node's `BoundaryId`. Impeller keeps it as one display list.
+
+`RenderTree::prepare` keeps a list of active nodes, the ones that changed or are animating. It ticks and re-records only those. A node is recorded again when:
+
+- its content changed,
+- its size changed,
+- a paint field of its visual changed: background, border, ring, radii or shadow,
+- it was hidden or shown, or its body edge changed.
+
+Everything else is composite-only.
+
+## Composition and composite-only changes
+
+After recording, `compose` walks the tree in paint order and builds a `Composition`: a flat list of `CompositeOp`s.
+
+```rust title="graphics/src/composition.rs"
+pub enum CompositeOp {
+    PushLayer(LayerProps),
+    PopLayer,
+    Draw(BoundaryId),
+}
+
+pub struct LayerProps {
+    pub transform: Transform,
+    pub opacity: f32,
+    pub clip: Option<(Rect, CornerRadii)>,
+    pub backdrop_blur: Option<f32>,
+    pub node: Option<BoundaryId>,
+}
+```
+
+For each visible node, compose pushes a layer placed by the node's frame origin, translate, scale and rotate (about its transform origin) and by its opacity. It draws the node's cached boundary, then its children inside a clip layer and a scroll layer when the node clips or scrolls. Children are sorted by z-index only when one of them has a non-zero z-index. Top-layer subtrees paint last, in window space, so no ancestor clips them.
+
+Translate, scale, rotate, opacity, backdrop blur and scroll offset only change `LayerProps`. Changing them never re-records a list. A hover scale with a spring is a good example:
+
+```rust
+button("Open")
+    .hover(|style| style.scale(1.04))
+    .transition(Spring::snappy())
+```
+
+Each frame of that spring changes one layer transform. The button's text and background are not recorded again.
+
+Compose also skips work it knows is invisible. A subtree that has not changed since the last frame and painted outside the visible part of its clipping ancestor, such as a row scrolled out of view, is left out of the composition. A rounded clip costs Impeller an offscreen layer, so compose drops it when the children stay clear of the corners, and uses a plain rectangle when they only overflow the edges.
+
+## Surface state
+
+Some window state has to change in the same frame as the pixels. A `SurfaceState` carries it:
+
+| Field | Meaning |
+|---|---|
+| `geometry` | The buffer's logical size and scale. It goes out with the first buffer drawn for it, so a resize never shows the old buffer stretched. |
+| `damage` | Areas that changed. Empty means the whole surface. |
+| `material` | The platform material, such as compositor blur. |
+| `material_shapes` | The rounded rectangles the material covers. |
+| `input_region` | Areas that accept input, from `pointer_events_none` on the root. |
+| `opaque_region` | Areas drawn fully opaque. |
+| `keyboard` | A layer surface's keyboard interactivity. |
+
+The UI thread only sends fields that changed. The render thread merges states that arrive between two frames and commits the result together with the next frame it presents. A glass panel that moves therefore moves its blur shape in the same frame, never one frame later.
+
+## Frame pacing
+
+`AppConfig::frame_pacing` picks when the render thread draws:
+
+- `FramePacing::Display`, the default, waits for the platform's frame callback before each frame. On Wayland that is `wl_surface.frame`. The window draws at most once per refresh, and a hidden or throttled window draws less.
+- `FramePacing::Unpaced` draws as soon as the previous frame is submitted and never waits. Frames the display cannot show are drawn and dropped. Use it to measure throughput, never to ship.
+
+```rust
+AppConfig::new("Bench").frame_pacing(FramePacing::Unpaced)
+```
+
+The wait goes through `PlatformSurface::wait_for_frame`, which returns a `FrameTiming`. It carries the presentation time and refresh interval when the platform reports them, and `waited`, which is true only when the call blocked until the callback fired.
+
+Animations are sampled by `FrameClock`. While callbacks come back to back, each frame is sampled exactly one refresh after the previous one, as long as that is within half a refresh of the actual wake time. Motion then advances by the same step every frame, even when the thread wakes a little early or late. A frame that did not wait, such as the first after a pause, uses its own wake time and does not set the pace. Sampled times never go backwards.
+
+On Vulkan, the swapchain presents in mailbox mode where the surface supports it. The frame callback does the pacing, so a FIFO queue would only add a second barrier that can hold back an idle window's next commit.
+
+## Animation frames on the UI thread
+
+Most motion runs on the render thread through `.transition(..)` and `.enter(..)`. Some motion has to run on the UI thread, because it drives layout or comes from a simulation. `cx.request_animation_frame` is for that:
+
+```rust
+use std::time::Duration;
+use crownui::prelude::*;
+
+fn spin(cx: &mut Cx, angle: Signal<f32>) {
+    cx.request_animation_frame(move |cx, now: Duration| {
+        angle.set(cx, now.as_secs_f32() * 90.0);
+        spin(cx, angle);
+    });
+}
+
+fn spinner() -> impl View {
+    component(|cx| {
+        let angle = cx.signal(0.0_f32);
+        spin(cx, angle);
+        vstack(()).size(24.0).bg(rgb(0x3b82f6)).rotate(angle)
+    })
+}
+```
+
+The callback runs once, just before the next frame is laid out. Asking again from inside it animates every frame. The callback is dropped if its component unmounts first.
+
+The timing is tied to the render thread. While callbacks are waiting, the UI thread sends `AnimationFrames(true)`, and the render thread wakes it after each frame it presents. The UI thread then runs the callbacks with the time the next frame will be sampled at: the reported sample time plus one refresh. The callback's changes land in the frame sampled at exactly the time it was given, in step with render-thread animations. From idle, no frames are being presented, so a timer at the refresh interval starts the first callback. The frame it produces brings the render thread's pacing back.
+
+## Headless frames
+
+`runtime::InlineApp` runs the same steps on one thread with a manual clock. `frame()` runs animation frames, builds the batch, applies it to a `RenderTree`, prepares and renders. `advance(elapsed)` steps the clock in 16.667 ms frames. `settle()` advances until nothing animates, for at most ten simulated seconds. `crowntest`, previews and the frame benchmarks use it.
+
+## Why it works this way
+
+A separate render thread keeps animations smooth when the UI thread is busy. A slow event handler, a long layout or a big list mount delays the next batch, but the render thread keeps ticking springs and presenting frames on its own clock. Transitions only need the target value, so they survive a stalled UI thread.
+
+The split also keeps GPU work off the thread that runs app code. Recording display lists, composing and presenting all happen on the render thread. The UI thread never blocks on vsync.
+
+Ops instead of a shared tree follow from the workspace rule against locks. The render thread has its own `RenderTree` and gets changes as messages, so neither thread waits on the other and no data is borrowed across threads.
+
+Per-node boundaries make re-recording fine-grained. A text change re-records one node, not its parent card. Composite-only changes re-record nothing, so scrolling, hover scales and fades cost one layer property each.
+
+Text is shaped on the UI thread because layout needs its size. Taffy asks a text leaf for its size during layout, and only a shaped paragraph can answer. The shaped layout is then handed to the renderer by id, so it is shaped once and drawn many times.
+
+## What it costs
+
+- Two copies of the tree. The UI thread keeps the element tree and its layout tree. The render thread keeps a `RenderTree` with frames, visuals and content for every node. That is memory a single-threaded immediate-mode toolkit does not spend.
+- Thread handoffs. One animated frame moves from the UI thread to the render thread and back. The performance plan measured about 13 context switches per frame against GPUI's 2, and splitting work over two cores lets the `powersave` governor clock them lower. See [Performance](/docs/crownui/performance).
+- Whole visuals for small changes. A transform change still ships and compares the whole `Visual` for that node. A smaller composite-only op is planned and does not exist yet.
+- A layer per node. Compose pushes one layer for every visible node, even when the layer is a plain translation. Impeller then sees many save and restore pairs.
+- Full-surface damage. The runtime leaves `SurfaceState::damage` empty and sets no opaque region, so the compositor repaints the whole window on every frame.
+- UI-thread text cost. Shaping happens on the UI thread, so a screen full of new text costs UI time before the frame can be sent.
+- One frame of latency for UI-thread motion. A change made in an animation-frame callback appears in the next frame the render thread presents, not the one already in flight.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Reactivity" icon="refresh" href="/docs/crownui/reactivity">
+    How signal writes become the queued changes this pipeline sends.
+  </Card>
+  <Card title="Rendering" icon="image" href="/docs/crownui/rendering">
+    How Impeller draws the boundaries and compositions.
+  </Card>
+</CardGroup>

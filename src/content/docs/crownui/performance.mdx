@@ -1,0 +1,204 @@
+---
+title: Performance
+description: Why CrownUI keeps a retained tree, which parts of a frame cost only what changed, how to benchmark it, and how it compares with GPUI, Qt, Electron and Tauri.
+sidebarTitle: Performance
+---
+
+CrownUI keeps a retained element tree and updates it in place. The goal is that a frame costs work in proportion to what changed, not to the size of the window. Some parts of a frame already meet that goal and some do not yet. Every figure on this page comes from `benchmarks/results/` or `docs/performance-plan.md` in the repository.
+
+## Retained tree, not immediate mode
+
+Immediate-mode toolkits such as GPUI rebuild the element tree from a `render()` call every frame. They make that cheap with arenas, cached layouts and scene replay. CrownUI builds the tree once and changes it when signals change.
+
+| | GPUI | CrownUI |
+|---|---|---|
+| Element tree | Rebuilt every frame in a bump arena | Built once, kept in a slot map |
+| Invalidation | A view and its ancestors are marked dirty, and unchanged views replay last frame's output | Each node is queued when a signal it reads changes |
+| Layout | Taffy tree cleared and rebuilt every frame | One persistent taffy tree, dirty nodes restyled |
+| Scene | Primitive arrays rebuilt and uploaded every frame | One display list per node, recorded again only when the node changes |
+| Threads | One thread draws and presents | A UI thread and a render thread per window |
+
+Because CrownUI does not rebuild, GPUI's tricks for cheap rebuilds do not apply. What does apply is keeping every hot path proportional to the change. The performance plan in `docs/performance-plan.md` tracks that work item by item.
+
+## What costs only what changed
+
+These paths are proportional to the change today:
+
+- Deciding whether to draw. `Ui::needs_frame` reads flags. Signals and commands push dirty nodes into queues, and an unchanged frame visits nothing.
+- Layout. Only queued nodes are restyled, and reading results back skips subtrees whose rect did not change.
+- Render ops. `take_frame` visits only queued nodes, and only their changes go to the render thread.
+- Scrolling. A wheel tick moves the scrolled subtree without running layout, sends the new offset as a composite-only change, and records nothing again.
+- Hit testing. A pointer move runs one hit test, which skips subtrees whose bounds do not contain the point.
+- Shortcuts and materials. Indexes replace scans of every node.
+- Semantics. The semantic tree is rebuilt only when something reads it, and an event that changes nothing visible leaves it as it is.
+- Render thread. Only nodes that changed or are animating are ticked and recorded again.
+- Off-screen content. Compose skips unchanged subtrees that painted outside the visible part of their clip, such as rows scrolled out of view.
+- Clips. Compose drops a rounded clip when nothing reaches into its corners, because each rounded clip costs Impeller an offscreen layer.
+- Text. Each unwrapped text is shaped once, a shaped layout stays alive two frames after its last node lets go, and width-only measurements reuse the unbounded metrics.
+
+The first round of this work, finished on 2026-11-05, added the dirty queues, the pruned layout read-back, queue-driven render ops, semantics on demand, the shortcut and material indexes, scrolling without layout and one hit test per pointer move. Against the saved `before` baseline, that round cut retired instructions per frame by 38 to 72% in every interactive benchmark scenario, and by 94 to 99.8% for an unchanged frame. The text, render-thread and compose items came after it.
+
+## What is not yet proportional
+
+These still cost something per node, per frame or per surface:
+
+- Compose walks the visible tree every frame the render thread draws, and pushes one layer per node, even for a plain translation.
+- A transform change ships and compares the node's whole `Visual`. A smaller composite-only op is planned.
+- Damage is the whole surface. The runtime leaves `SurfaceState::damage` empty and sets no opaque region, so the compositor recomposites the whole window for a hover.
+- A semantic tree rebuild visits every element. With the accessibility bridge running, any frame that sent render ops triggers one, because the bridge asks for the diff after every frame.
+- The Tab order is rebuilt from every element after nodes move, appear or go away.
+- Freeing text and images scans every render node while releases are pending.
+- Blurred shadows use Impeller's mask blur, which costs an offscreen texture and two blur passes per shadow. An analytic shadow shader is planned.
+- Each icon parses its SVG when it mounts. A shared parse cache is planned.
+- Index-based lazy lists (`lazy_index` and the lists built on it) give every item the same height. Variable-height virtualization with measured rows is planned.
+
+## Counters
+
+The UI thread counts its work in `view::UiCounters`, taken with `Ui::take_counters()`:
+
+| Counter | Meaning |
+|---|---|
+| `layout_passes` | Layout passes that ran the engine. |
+| `layout_visits` | Nodes visited while syncing styles and reading layouts back. |
+| `op_visits` | Nodes visited while collecting render ops. |
+| `ops` | Render ops sent. |
+| `hit_tests` and `hit_visits` | Hit tests run and the nodes they visited. |
+| `semantics_rebuilds` | Semantic tree rebuilds. |
+
+The render thread reports `runtime::RenderStats` per frame: `recorded` boundaries, `nodes`, `animating` and `composite_ops`. Every one of these numbers should grow with what changed, not with the tree.
+
+## Frame benchmarks
+
+```sh
+cargo xtask bench
+cargo xtask bench --save-baseline before
+cargo xtask bench --baseline before
+cargo xtask bench --filter hover --sizes 1000 --iterations 50
+```
+
+`cargo xtask bench` runs `cargo bench -p runtime --bench frame`. It mounts seeded trees inside a scroll view through `InlineApp` with the `RecordingBackend`, so it measures CrownUI's own work and no GPU.
+
+- Families: `wide` (one column of rows), `deep` (rows nested 48 levels deep) and `mixed` (seeded random branching and depth). Pick with `--families`.
+- Sizes: 256, 1,000 and 10,000 nodes by default. Pick with `--sizes`.
+- Scenarios: `unchanged`, `hover`, `scroll_tick`, `text_change`, `insert_remove_rows` and `root_resize`. Pick with `--filter`.
+- Iterations: 200 per scenario by default, after a warm-up.
+
+Each record has the median and minimum wall time, the retired instruction count when the kernel allows it, and every counter above. `--save-baseline NAME` stores the results in `target/bench/NAME.json`, and `--baseline NAME` prints how each scenario moved. Instruction counts are the stable figure. Wall time moves with the CPU governor and other load.
+
+## Comparing with other toolkits
+
+```sh
+cargo xtask compare
+cargo xtask compare --frameworks crownui,gpui --scenarios list --runs 3 --duration 5
+cargo xtask compare --uncapped
+cargo xtask compare --placement desktop
+```
+
+`cargo xtask compare` builds the same four apps in CrownUI, GPUI, Qt Quick, Electron and Tauri, and measures each one from the outside with the harness in `benchmarks/`:
+
+- `hello`: a title and a button. Startup, memory and idle cost.
+- `list`: 10,000 rows scrolled by the app at 2,400 px/s.
+- `animation`: 1,000 boxes translated and rotated, plus 200 labels whose text changes every frame.
+- `settings`: a window like crownos-settings, with a sidebar of 8 pages and pages of cards with switches, sliders and icons, scrolled at 1,200 px/s with a page switch every 2 s.
+
+Frames are counted from the Wayland protocol trace, memory from `/proc`, GPU memory from DRM fdinfo, and work per frame from `perf stat`. The CrownUI app is built the way CrownOS ships apps: `default-features = false` with `wayland`, `impeller`, `static` and `tokio`, so without the MCP server and the AT-SPI bridge. See `benchmarks/README.md` for the method and its fairness rules.
+
+<Warning>
+  Unlock the screen and stop other builds before a run. A locked screen hides every window, and another build moves wall time and CPU percentages by 20 to 30%. Instructions per frame stay stable.
+</Warning>
+
+### Results from 2026-11-07
+
+Machine: AMD Ryzen 7 7840HS with Radeon 780M, kernel 7.2.9, `powersave` governor, windows on the hidden headless output, compositor pace 62 Hz, 5 runs of 10 s, medians. Source: `benchmarks/results/2026-11-07T07-43Z.md`.
+
+Startup, memory and idle cost:
+
+| Framework | Startup ms (p50) | PSS MiB | VRAM MiB | Idle CPU ms/s | Idle wakeups/s |
+|---|--:|--:|--:|--:|--:|
+| CrownUI | 204 | 31.2 | 48.8 | 0.0 | 0.0 |
+| GPUI | 92 | 31.6 | 93.4 | 9.0 | 62.6 |
+| Qt | 111 | 100.5 | 44.0 | 0.0 | 0.0 |
+| Electron | 348 | 277.3 | 37.0 | 2.0 | 13.2 |
+| Tauri | 159 | 255.7 | 116.9 | 1.0 | 0.0 |
+
+Work per frame, paced by the display (millions of user-space instructions, CPU ms):
+
+| Framework | list M instr | list CPU ms | animation M instr | animation CPU ms | settings M instr | settings CPU ms |
+|---|--:|--:|--:|--:|--:|--:|
+| CrownUI | 2.35 | 2.36 | 29.45 | 6.01 | 3.68 | 2.23 |
+| GPUI | 5.23 | 1.95 | 29.95 | 4.78 | 19.73 | 3.70 |
+| Qt | 0.74 | 2.07 | 40.87 | 8.44 | 1.79 | 1.97 |
+| Electron | 10.45 | 4.57 | 99.93 | 11.74 | 5.72 | 4.13 |
+| Tauri | 3.38 | 3.91 | 81.17 | 11.88 | 2.08 | 3.72 |
+
+Peak memory during the scenarios:
+
+| Framework | list PSS MiB | list VRAM MiB | settings PSS MiB | settings VRAM MiB |
+|---|--:|--:|--:|--:|
+| CrownUI | 49.1 | 48.8 | 50.1 | 56.3 |
+| GPUI | 32.3 | 93.4 | 35.0 | 93.4 |
+| Qt | 96.0 | 48.0 | 113.2 | 69.7 |
+| Electron | 397.7 | 66.3 | 307.3 | 77.3 |
+| Tauri | 422.8 | 117.7 | 270.8 | 125.6 |
+
+With frame pacing off (`--uncapped`, 3 runs of 8 s, `benchmarks/results/2026-11-07T08-08Z.md`), FPS shows how many frames each toolkit can draw. CrownUI turns pacing off with `FramePacing::Unpaced`. GPUI has no switch, so the harness builds it with a patch that draws the next frame as soon as the last one is submitted. Qt, Electron and Tauri stay at the compositor's pace on Wayland, so they are left out here:
+
+| Scenario | CrownUI FPS | GPUI FPS | CrownUI CPU ms/frame | GPUI CPU ms/frame |
+|---|--:|--:|--:|--:|
+| list | 2303.4 | 2355.6 | 0.31 | 0.42 |
+| animation | 328.6 | 422.6 | 3.14 | 2.37 |
+| settings | 1092.4 | 580.9 | 0.54 | 1.72 |
+
+What the numbers say:
+
+- CrownUI executes fewer instructions per frame than GPUI in every paced scenario, and far fewer in `settings`, where GPUI re-renders a page of cards each frame.
+- Paced, CrownUI spends more CPU time per frame than GPUI in `list` and `animation`, and Qt does less work than CrownUI in `list` and `settings`.
+- Uncapped, CrownUI draws `settings` almost twice as fast as GPUI and `list` at about the same rate, and it draws `animation` slower.
+- An idle CrownUI window costs nothing: no CPU time and no wakeups.
+- CrownUI starts slower than GPUI, Qt and Tauri.
+- CrownUI uses about half of GPUI's VRAM. Its PSS matches GPUI at idle and is higher while the scenarios run.
+
+### Where the time goes
+
+The performance plan traced the remaining render-thread time to Impeller's text path, glyph atlas lookups and vertex generation, and to per-op dispatch. The handoff from the UI thread to the render thread and the wait on the GPU fence cost about 13 context switches per frame, against GPUI's 2. Splitting the work over two cores also lets the `powersave` governor run both at a lower clock, which is why CPU ms per frame can rise while instructions per frame fall. A composite-only render op and fewer handoffs per frame are the next steps.
+
+## Frame pacing
+
+By default the render thread draws only when the display asks for a frame, and sleeps on its channel when nothing changed. The UI thread sleeps until an event, a timer or a wake from the render thread. That is why the idle `hello` window shows zero CPU time and zero wakeups. A window the platform reports as obscured pauses its render thread. The compositor also throttles hidden windows to 1 Hz, and CrownUI then stops drawing them.
+
+`AppConfig::frame_pacing(FramePacing::Unpaced)` draws as fast as possible for measurements. Never ship it: frames the display cannot show are drawn and dropped. See [Frame pipeline](/docs/crownui/frame-pipeline) for the frame clock and animation-frame timing.
+
+## Memory choices
+
+- Swapchain images. Impeller asks the driver for its minimum image count plus one. The Vulkan shim asks for the minimum, but never fewer than three, which saves one full window-sized image per window.
+- One Vulkan driver. `select_vulkan_driver` limits the Vulkan loader to the compositor's GPU, so other GPUs' drivers are never loaded. The impeller README puts that at about 50 MiB of RSS on hybrid laptops, and the other GPU stays asleep.
+- Text. The text cache has an 8 MiB budget. Shaped paragraphs that no node draws are dropped two frames later, including text that was only measured. In the settings app that took anonymous memory from 29 to 21.5 MiB after a full page cycle.
+- Animations. In-flight animations are boxed, so a render node at rest does not carry three copies of its visual values.
+- Layer surfaces. `cx.set_layer_height` lets a panel grow only while a popup needs the room, because every pixel of surface costs GPU memory.
+
+## Why it works this way
+
+A desktop app spends most of its life showing almost the same frame. A retained tree with fine-grained signals makes that cheap: a hover changes one node, a scroll moves one subtree, and an idle window does nothing at all. The idle numbers above are the direct result. An immediate-mode toolkit pays for the whole view every frame it draws, and it has to work hard to make that small.
+
+Two threads keep animation independent of app code. A render thread on its own clock keeps springs moving through a slow handler. That costs handoffs, and the numbers show them, but the design keeps the UI thread free for app work.
+
+Measuring from outside the process keeps comparisons fair. Every toolkit is counted the same way, from the Wayland trace, `/proc` and `perf`, so no toolkit reports its own numbers.
+
+## What it costs
+
+- More memory per node. CrownUI keeps an element tree, a layout tree, a render tree and a semantic tree, so its peak PSS is higher than GPUI's in the list and settings scenarios.
+- Slower startup. 204 ms to the first frame against 92 ms for GPUI. Creating Impeller's typography context alone took about 160 ms in the spike.
+- Thread handoffs. Two threads per window cost context switches and let the CPU governor clock down, so paced CPU ms per frame trails GPUI in `list` and `animation`.
+- Invalidation code. Dirty queues, indexes and caches are more code to keep correct than a rebuild, and each new feature has to mark exactly the nodes it changes.
+- Open items. Full-surface damage, a layer per node in compose and full semantic rebuilds still scale with the window, as listed above.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Frame pipeline" icon="layers" href="/docs/crownui/frame-pipeline">
+    The path a change takes from the UI thread to the screen.
+  </Card>
+  <Card title="Rendering" icon="image" href="/docs/crownui/rendering">
+    Impeller, the swapchain shim and driver selection.
+  </Card>
+</CardGroup>

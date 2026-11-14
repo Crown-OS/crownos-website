@@ -1,0 +1,203 @@
+---
+title: Stacks
+description: Lay out children in a column, a row or in layers, with spacers and dividers.
+sidebarTitle: Stacks
+api: FN vstack
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Header"
+use crownui::prelude::*;
+
+fn header() -> impl View {
+    vstack((
+        hstack((
+            text("Inbox").text_size(20.0).font_bold(),
+            spacer(),
+            button("Compose"),
+        ))
+        .items_center()
+        .gap(8.0),
+        divider(),
+        text("3 unread messages").text_color(rgb(0x64748b)),
+    ))
+    .gap(12.0)
+    .p(16.0)
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signatures"
+pub fn vstack<C: ViewSeq>(children: C) -> Element<StackKind<C>>
+pub fn hstack<C: ViewSeq>(children: C) -> Element<StackKind<C>>
+pub fn zstack<C: ViewSeq>(children: C) -> Element<StackKind<C>>
+pub fn spacer() -> Element<SpacerKind>
+pub fn divider() -> Element<DividerKind>
+```
+</ResponseExample>
+</ApiExamples>
+
+`vstack`, `hstack` and `zstack` lay out their children in a column, a row or in layers. `spacer` fills free space and `divider` draws a separator line.
+
+## vstack
+
+Lays its children out top to bottom, like CSS `flex flex-col`.
+
+<ParamField name="children" type="C: ViewSeq" required>
+  A single view, a tuple of up to 16, a `Vec`, an `Option` or `()`.
+</ParamField>
+
+```rust
+vstack((
+    text("Wi-Fi").font_semibold(),
+    text("Connected to Home").text_size(12.0),
+))
+.gap(2.0)
+```
+
+`vstack(())` is an empty box. Use it as a plain colored rectangle or as an empty branch.
+
+```rust
+vstack(()).size(24.0).rounded(6.0).bg(rgb(0x3b82f6))
+```
+
+## hstack
+
+Lays its children out from start to end, like CSS `flex flex-row`. In a right-to-left layout, start
+is on the right, so the row mirrors.
+
+<ParamField name="children" type="C: ViewSeq" required>
+  Any `ViewSeq`.
+</ParamField>
+
+```rust
+use crownui::kit::{self, icons};
+
+hstack((kit::icon(icons::TRASH), text("Delete")))
+    .gap(6.0)
+    .items_center()
+```
+
+## zstack
+
+Layers its children on top of each other. The first child stays in the flow and sizes the stack.
+Every later child is an overlay: CrownUI makes it `absolute` with an inset of 0, so it covers the
+first child.
+
+<ParamField name="children" type="C: ViewSeq" required>
+  Any `ViewSeq`. The first child is the base, the rest are overlays.
+</ParamField>
+
+```rust
+zstack((
+    cover_image(photo, Size::new(1600.0, 1000.0), 12.0).w(320.0).h(200.0),
+    vstack(text("Sunset").text_color(WHITE).font_semibold())
+        .justify_end()
+        .p(12.0),
+))
+```
+
+Here `photo` is an `ImageId` you registered with `cx.register_image`, and `1600 x 1000` is its
+natural size. `cover_image` never sizes itself, so the first child gets an explicit size, and the
+stack takes it.
+
+An overlay that you made `absolute` yourself keeps its own insets. Use that to pin a badge to a
+corner.
+
+```rust
+zstack((
+    kit::icon(icons::BELL).size(24.0),
+    text("3")
+        .text_size(10.0)
+        .text_color(WHITE)
+        .bg(rgb(0xdc2626))
+        .rounded(8.0)
+        .px(4.0)
+        .absolute()
+        .top(-4.0)
+        .right(-4.0),
+))
+```
+
+## spacer
+
+Empty space with `grow(1.0)`. In a stack, it takes all the room the other children leave and pushes
+them apart.
+
+<CodeGroup>
+```rust title="Push apart"
+hstack((text("Volume"), spacer(), text("80%")))
+```
+
+```rust title="Center"
+hstack((spacer(), text("Centered"), spacer()))
+```
+</CodeGroup>
+
+Two spacers share the room equally, so they center what sits between them.
+
+## divider
+
+A one-pixel separator. It has the `Separator` role, a height of 1, does not shrink, and a neutral
+gray at 25 percent alpha. In a `vstack` that stretches its children, it spans the full width.
+
+```rust
+vstack((text("General"), divider(), text("Privacy"))).gap(8.0)
+```
+
+For a vertical divider in an `hstack`, set the width and height yourself.
+
+```rust
+hstack((text("Bold"), divider().w(1.0).h(16.0), text("Italic")))
+    .gap(8.0)
+    .items_center()
+```
+
+<Note>
+  If the stack centers its items, the divider has no width of its own. Give it `.w_full()`.
+</Note>
+
+The kit has a themed `kit::divider()` that reads its color from the CrownOS theme. See
+[Kit layout](/docs/crownui/kit-layout).
+
+## Common modifiers
+
+Stacks are flex containers, so every Tailwind-named layout method applies.
+
+- `.gap(px)`, `.gap_x(px)`, `.gap_y(px)` set the space between children.
+- `.p(px)`, `.px(px)`, `.py(px)`, `.pt(px)`, `.pr(px)`, `.pb(px)`, `.pl(px)` set the padding.
+- `.items_start()`, `.items_center()`, `.items_end()`, `.items_stretch()`, `.items_baseline()` align children across the axis.
+- `.justify_start()`, `.justify_center()`, `.justify_end()`, `.justify_between()`, `.justify_around()`, `.justify_evenly()` distribute children along the axis.
+- `.flex_wrap()` wraps children onto new lines.
+- `.flex_row()`, `.flex_col()`, `.flex_row_reverse()`, `.flex_col_reverse()` change the direction after the fact.
+- `.grow(n)`, `.shrink(n)`, `.basis(px)`, `.flex_1()` size the stack inside its own parent.
+
+See [Layout](/docs/crownui/layout) for the full list.
+
+## Why stacks work this way
+
+A stack is a flex container whose direction is set for you. There is no separate layout model to
+learn. Every rule that taffy applies to CSS flexbox applies here, including min sizes and shrinking.
+The cost is CSS behavior where it surprises. A flex item does not shrink below its content by
+default, so a scroll area inside a column needs `.min_h(0.0)` or a fixed height to scroll instead of
+growing.
+
+`zstack` makes overlays absolute instead of running a separate pass. Overlays never affect the
+stack's size, which keeps layout to one pass. The cost is that only the first child sizes the stack.
+An overlay larger than the first child overflows it.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Layout" icon="layers" href="/docs/crownui/layout">
+    Flexbox, grid, sizing and alignment.
+  </Card>
+  <Card title="Views" icon="book" href="/docs/crownui/views">
+    Children as tuples, `Vec` and `Option`.
+  </Card>
+  <Card title="Styling" icon="pencil" href="/docs/crownui/styling">
+    Tailwind-named style methods.
+  </Card>
+</CardGroup>

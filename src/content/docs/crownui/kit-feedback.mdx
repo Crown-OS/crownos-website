@@ -1,0 +1,242 @@
+---
+title: Feedback
+description: Status lines, badges, callouts, progress bars, spinners, step bars, tag chips and the audio meters and waveforms from the kit.
+sidebarTitle: Feedback
+---
+
+Feedback widgets show state. None of them take input except a seekable `waveform`. Most take a value that is a literal, a signal, a memo or a `bind`, so they follow your state without any wiring. The examples on this page assume these imports:
+
+```rust
+use crownui::{
+    kit::{
+        badge, callout, icons, level_meter, live_waveform, progress, segmented_bar, spinner,
+        status, step_bar, tag_chip, use_theme, waveform, BadgeOptions, CalloutOptions,
+        LevelHistory, LevelMeterOptions, Segment, SegmentedBarOptions, StatusOptions, Tone,
+        WaveformOptions, WaveformPeaks,
+    },
+    prelude::*,
+};
+```
+
+Toasts are notifications, but they live with the other floating surfaces on the [overlays page](/docs/crownui/kit-overlays).
+
+## Tone
+
+`Tone` is what a status line or callout is saying. It has four values, one per register of the palette's `status` group:
+
+| Tone | Meaning | Example |
+|---|---|---|
+| `Tone::Success` | It worked. | "Connected", "Saved" |
+| `Tone::Warning` | It works, but. | "Weak Security" |
+| `Tone::Danger` | It failed. | "Couldn't join network" |
+| `Tone::Neutral` | Nothing in particular. The quiet default. | "Not connected" |
+
+`tone.color(&theme)` returns the tone's own color: a status dot's fill, a callout's wash, rule and glyph. `tone.text_color(&theme)` returns its label color. Neutral recedes to muted text, and every other tone letters in its own color.
+
+## Status
+
+`status(label)` is a colored dot followed by a label. It is quiet until you give it a tone.
+
+```rust
+status("Connected").tone(Tone::Success)
+status("Weak Security").tone(Tone::Warning)
+status("Not connected")
+```
+
+The label takes a signal or a `bind`, so one status line follows a connection:
+
+```rust
+let online = cx.signal(false);
+status(bind(move |runtime| {
+    String::from(if online.get(runtime) { "Online" } else { "Offline" })
+}))
+```
+
+`.tone(..)` takes a plain `Tone`, fixed when the view is built. To change the tone with state, build the line inside `keyed`, which rebuilds it when the derived value changes.
+
+## Badge
+
+`badge(label, color)` is a small pill that names what something is, tinted from one color. `.leading_icon(body)` adds a Lucide icon in the label's color.
+
+```rust
+let theme = use_theme(cx);
+badge("Weak Security", bind(move |runtime| theme.with(runtime, |theme| theme.status.warning)))
+
+badge("Bluetooth", bind(move |runtime| theme.with(runtime, |theme| theme.accent.end)))
+    .leading_icon(icons::BLUETOOTH)
+```
+
+Read the color from the theme with `bind`, as above, so the badge follows light and dark mode. A literal `rgb(..)` works too, but it stays the same in both modes.
+
+## Callout
+
+`callout(tone, title)` is a tinted notice block headed by a title. `.body(text)` adds a paragraph under the title that wraps. `.icon(body)` replaces the glyph the tone would choose.
+
+```rust
+callout(Tone::Warning, "BitLocker is on")
+    .body("Suspend BitLocker before resizing this volume, or Windows will ask for your recovery key on the next boot.")
+    .max_w(360.0)
+
+callout(Tone::Success, "Backup finished").body("Everything was copied.")
+
+callout(Tone::Neutral, "Tip").icon(icons::LIGHTBULB).body("Drag files here to upload them.")
+```
+
+Give a callout with a long body a `max_w`, so the body wraps at a readable width.
+
+## Progress
+
+`progress(fraction)` is a determinate bar filled `fraction` of the way along. The fraction is clamped to `0..=1`. Resize it with `.w(..)`.
+
+```rust
+let copied = cx.signal(0.0_f32);
+progress(copied).w(240.0)
+```
+
+Write the signal from your work's completion handler. The bar follows it on the next frame.
+
+## Spinner
+
+`spinner()` is an indeterminate activity indicator: a ring with a rotating accent arc, 15px across. Resize it with `.size(..)` and the stroke scales with it.
+
+```rust
+hstack((spinner(), text("Looking for networks…"))).gap(8.0).items_center()
+```
+
+Mount a spinner only while work is in flight. A mounted spinner keeps asking for frames, so hiding it with opacity still costs a frame every refresh. Use `show` to take it out of the tree:
+
+```rust
+let busy = cx.signal(true);
+show(busy, || spinner(), || vstack(()))
+```
+
+## Step bar
+
+`step_bar(total, current)` draws `total` equal tracks and fills the first `current + 1` with the accent. `current` is zero-based. It fills its column's width.
+
+```rust
+let step = cx.signal(0_usize);
+step_bar(4, step).w(360.0)
+```
+
+`current` takes anything that implements `IntoStep`: a `usize`, a `Signal<usize>`, a `Memo<usize>` or a `bind` closure that returns a `usize`. The step being shown counts as reached, and an index past the end fills the whole bar.
+
+## Segmented bar
+
+`segmented_bar(segments)` is one pill shared by proportional runs, such as disk usage by category. It fills its column's width. Resize its thickness with `.h(..)`.
+
+```rust
+segmented_bar([
+    Segment::new(120.0, rgb(0x8f6dfb)),
+    Segment::new(80.0, rgb(0x5aa2ff)),
+    Segment::new(300.0, rgb(0x3a3a44)),
+])
+.w(360.0)
+```
+
+`Segment::new(weight, color)` is one run. The bar divides by the total weight, so raw quantities such as gigabytes work. A negative or NaN weight contributes nothing.
+
+For runs that follow state or the theme, start with an empty list and compute the runs with `.segments_from(..)`. The closure runs again whenever a signal it reads changes:
+
+```rust
+let theme = use_theme(cx);
+let used = cx.signal(120.0_f32);
+segmented_bar([])
+    .segments_from(move |runtime| {
+        let used = used.get(runtime);
+        let (fill, free) = theme.with(runtime, |theme| (theme.accent.end, theme.control.track));
+        vec![Segment::new(used, fill), Segment::new(500.0 - used, free)]
+    })
+    .w(360.0)
+```
+
+## Tag chip
+
+`tag_chip(label, dot)` is a 22px pill that names a tag: a 6px dot in the tag's color before the label, on the field background with a hairline border.
+
+```rust
+hstack((
+    tag_chip("Red", rgb(0xe5484d)),
+    tag_chip("Work", rgb(0x3b82f6)),
+    tag_chip("Done", rgb(0x4ade80)),
+))
+.gap(6.0)
+```
+
+The dot color is the tag's own color, so a literal is right here. It is the user's label, not part of the theme.
+
+## Level meter
+
+`level_meter(peak)` is a live input meter for a linear peak in `0..=1`, fed once per audio update, which is about 60 times a second. It reads on a 60 dB scale. It turns the warning color from -6 dBFS and the danger color from -1 dBFS, so clipping is seen before it is heard. It holds the loudest peak for 60 updates before letting it fall.
+
+```rust
+let level = cx.signal(0.0_f32);
+let rms = cx.signal(0.0_f32);
+level_meter(level).rms(rms).w(320.0).label("Input level")
+```
+
+- `.rms(level)` draws the RMS of the same input solid over a dimmed peak.
+- `.vertical()` makes the meter rise from the bottom. A vertical meter is 8 wide and 120 tall by default. A horizontal one is 240 by 8.
+
+The hold is clocked by the updates you feed, not by wall time. Feed the meter at a steady rate and stop feeding it when the input stops.
+
+## Live waveform
+
+`live_waveform(history)` draws the input while recording. The newest level sits at the right edge and older ones scroll left, one bar per push. It repaints only when the history changes.
+
+```rust
+let history = cx.signal(LevelHistory::new());
+live_waveform(history).w_full().h(120.0).label("Live waveform")
+```
+
+Push each new level into the history from your audio update:
+
+```rust
+history.update(cx, |history| history.push(peak));
+```
+
+`LevelHistory` is a fixed ring of `LevelHistory::CAPACITY` bytes that never reallocates. Each pushed level is smoothed with a fast attack and a slow release, so peaks pop without flicker.
+
+| Method | What it does |
+|---|---|
+| `LevelHistory::new()` | An empty history. It is a `const fn`. |
+| `.push(level)` | Appends a `0..=1` level. |
+| `.clear()` | Forgets every level, for example when a new take starts. |
+| `.len()` and `.is_empty()` | How many levels are held. |
+| `.newest_first()` | The smoothed levels, newest first. |
+
+## Waveform
+
+`waveform(peaks, progress)` draws a saved recording as rounded bars mirrored around the center line, fitted to the width, with a playhead at `progress` in `0..=1`. Bars behind the playhead wear the accent and the rest wear the muted text color, each brighter the louder it is.
+
+```rust
+let peaks = WaveformPeaks::from_levels(&levels);
+let position = cx.signal(0.0_f32);
+waveform(peaks, position)
+    .on_seeking(move |cx, fraction| seek_to(cx, fraction))
+```
+
+`.on_seeking(|cx, position| ..)` makes it a seek bar, named after the DOM media `seeking` event. The handler gets the `0..=1` position under a click or drag, or one moved by the arrow keys (5%), Home or End. Seek your playback there, and the `progress` signal brings the playhead along.
+
+`WaveformPeaks` holds one byte per bucket, `255` being full scale:
+
+| Item | What it does |
+|---|---|
+| `WaveformPeaks::from_levels(&[f32])` | Packs `0..=1` peaks into bytes. Out-of-range values clamp. |
+| `WaveformPeaks::new(bytes)` | Wraps peaks already packed into bytes. |
+| `.as_bytes()` | The packed peaks. |
+| `.len()` and `.is_empty()` | How many buckets there are. An empty recording has none. |
+
+Both waveforms fill their column's width at a fixed height unless you restyle them.
+
+## Why the meters work this way
+
+The audio widgets are fed at the audio rate, about 60 updates a second. At that rate any allocation or full rebuild per update adds up, so each one is built to do the least work per push.
+
+`LevelHistory` is a fixed array of bytes inside the signal. A push writes one byte and moves an index, so a long recording never grows memory and never allocates. Storing bytes instead of floats keeps the ring small enough to copy. The cost is precision: a level is one of 256 steps, which is finer than a bar on screen shows.
+
+`WaveformPeaks` is shared behind an `Arc`, so putting it in a signal or cloning it copies a pointer, not the recording. Build it once, off the UI thread for a long take, and the waveform fits it to whatever width it gets. With fewer buckets than bars, neighbouring bars share a bucket. With more, each bar shows the loudest bucket under it, so short peaks stay visible when the waveform is narrow.
+
+The level meter's hold counts updates instead of reading a clock. That keeps the meter a pure function of what you fed it, which makes it testable frame by frame. It also means a meter you stop feeding freezes, so stop showing it when the input closes.
+
+The status colors follow the same rule as the rest of the kit: the warning and danger zones come from the theme's `status` group, which does not follow the accent. A red accent never hides a clipping warning.

@@ -1,0 +1,259 @@
+---
+title: Audio
+description: "Capture the microphone with PipeWire and crown-voiced enhancement, and show it with the kit level meter and waveforms."
+---
+
+CrownUI apps capture the microphone through PipeWire, with optional AI noise suppression from the CrownOS voice daemon, `crown-voiced`. A component opens the microphone with one call and gets its level and state as signals. The kit draws them with a level meter and a live waveform.
+
+```rust
+use crownui::audio::{Enhancement, MicrophoneOptions};
+use crownui::kit::{LevelHistory, LevelMeterOptions, level_meter, live_waveform, use_microphone};
+use crownui::prelude::*;
+
+fn input_monitor() -> impl View {
+    component(|cx| {
+        let options = MicrophoneOptions::default().enhancement(Enhancement::NoiseSuppression);
+        let microphone = use_microphone(cx, options);
+        let level = microphone.level;
+        let history = cx.signal(LevelHistory::new());
+        cx.effect(move |rt| {
+            let peak = level.get(rt).peak;
+            history.update(rt, |history| history.push(peak));
+        });
+        vstack((
+            live_waveform(history).w_full().h(120.0).label("Live waveform"),
+            level_meter(bind(move |rt| level.get(rt).peak))
+                .rms(bind(move |rt| level.get(rt).rms))
+                .w(320.0)
+                .label("Input level"),
+        ))
+        .gap(24.0)
+        .p(32.0)
+    })
+}
+```
+
+## Turn on the feature
+
+Audio is off by default, so apps without a microphone link no PipeWire. Turn on the `audio` feature.
+
+```toml
+crownui = { path = "../crownui/crownui", features = ["audio"] }
+```
+
+The feature adds the audio crate as `crownui::audio` in the published crate, and `kit::use_microphone` with `kit::MicrophoneSignals`. Inside the CrownUI workspace, depend on the `audio` crate by path, as the CrownOS sound recorder does, and import from `audio::` instead of `crownui::audio::`.
+
+The level meter and the waveforms do not need the feature. They draw any `0..=1` level you give them.
+
+## Open a microphone in a component
+
+```rust
+pub fn use_microphone(cx: &mut Cx, options: MicrophoneOptions) -> MicrophoneSignals
+
+pub struct MicrophoneSignals {
+    pub level: Signal<Level>,
+    pub state: Signal<StreamState>,
+    /* private */
+}
+
+impl MicrophoneSignals {
+    pub fn take_frames(self, cx: &mut Cx) -> Option<FrameConsumer>;
+    pub fn set_enhancement(self, cx: &mut Cx, enhancement: Enhancement);
+}
+```
+
+`use_microphone` opens a stream owned by the calling component. It mirrors the stream's level and state into signals, and it stops the stream when the component unmounts. Signals update through `cx.spawn`, so the app needs the default `tokio` feature.
+
+- `level` holds the `Level` of the latest frame, with linear `peak` and `rms` amplitudes from 0 to 1.
+- `state` holds the `StreamState`.
+- `take_frames(cx)` hands over the ring of raw audio frames, once. Move it to the thread that records or analyzes the audio. A second call returns `None`.
+- `set_enhancement(cx, enhancement)` switches enhancement without stopping the stream. `state` follows.
+
+A microphone that fails to open does not panic or return an error. Its `state` is `StreamState::Failed(message)` with the `CUI07xx` message, so show it in the UI.
+
+```rust
+fn status_line(state: Signal<StreamState>) -> impl View {
+    text(bind(move |rt| {
+        state.with(rt, |state| match state {
+            StreamState::Starting => "Starting the microphone".to_owned(),
+            StreamState::Live { enhanced_by: Some(backend) } => format!("Live, enhanced by {backend}"),
+            StreamState::Live { enhanced_by: None } => "Live".to_owned(),
+            StreamState::Unenhanced(_) => "Live, without enhancement".to_owned(),
+            StreamState::Failed(message) => message.clone(),
+        })
+    }))
+}
+```
+
+To open the microphone again with new options, such as another input, wrap the component in `keyed(..)` on the input. The old component unmounts and stops its stream, and the new one opens a fresh stream.
+
+```rust
+keyed(
+    move |rt| selected_source.get(rt),
+    move |cx, source: Option<SourceId>| {
+        let options = match source {
+            Some(source) => MicrophoneOptions::default().source(source),
+            None => MicrophoneOptions::default(),
+        };
+        let microphone = use_microphone(cx, options);
+        level_meter(bind(move |rt| microphone.level.get(rt).peak))
+    },
+)
+```
+
+## Options
+
+```rust
+impl MicrophoneOptions {
+    pub fn source(self, source: SourceId) -> Self;
+    pub fn enhancement(self, enhancement: Enhancement) -> Self;
+}
+```
+
+`MicrophoneOptions::default()` captures the default source with `Enhancement::NoiseSuppression`.
+
+| `Enhancement` | What it does |
+|---|---|
+| `Off` | Raw microphone. `crown-voiced` is not involved. |
+| `Light` | RNNoise-class suppression. The lowest cost, and it removes steady noise only. |
+| `NoiseSuppression` | DeepFilterNet3-class AI noise suppression. The default. |
+| `StudioVoice` | Noise suppression plus dereverberation and level control. |
+
+With enhancement on, the stream asks `crown-voiced` for an enhanced node and captures it. If the daemon is absent, fails or does not answer within 3 seconds, the stream captures the raw source instead and reports `StreamState::Unenhanced(reason)`. The recording keeps going either way.
+
+## Stream state
+
+| `StreamState` | Meaning |
+|---|---|
+| `Starting` | PipeWire accepted the stream and it is starting. |
+| `Live { enhanced_by }` | Audio flows. `enhanced_by` names the enhancement backend, or is `None` without enhancement. |
+| `Unenhanced(reason)` | Audio flows, but enhancement was asked for and is not available. |
+| `Failed(message)` | The stream stopped or never started. |
+
+`UnenhancedReason` is `Disconnected`, `Refused(message)`, `TimedOut` or `Unavailable(message)`.
+
+## Sources
+
+`audio::sources()` lists the capture devices and follows hotplug.
+
+```rust
+pub fn sources() -> tokio::sync::watch::Receiver<Vec<SourceInfo>>
+
+pub struct SourceInfo {
+    pub id: SourceId,
+    pub description: String,
+    pub is_default: bool,
+}
+```
+
+`id` is the PipeWire node name, and `SourceId::new(name)` builds one from a saved setting. The `crown-voiced` virtual nodes are left out of the list. Read the current list with `borrow()`. To keep a signal in step with hotplug, wait for `changed()` in `cx.spawn` and arm it again after each change.
+
+```rust
+use tokio::sync::watch;
+
+fn follow_sources(cx: &mut Cx, list: Signal<Vec<SourceInfo>>, mut sources: watch::Receiver<Vec<SourceInfo>>) {
+    let next = async move {
+        let open = sources.changed().await.is_ok();
+        (sources, open)
+    };
+    cx.spawn(next, move |cx, (sources, open)| {
+        if open {
+            list.set(cx, sources.borrow().clone());
+            follow_sources(cx, list, sources);
+        }
+    });
+}
+
+let sources = crownui::audio::sources();
+let list = cx.signal(sources.borrow().clone());
+follow_sources(cx, list, sources);
+```
+
+<Note>
+  This needs `tokio` as a direct dependency of the app, for the `watch` type.
+</Note>
+
+## Raw frames and streams outside components
+
+`audio::Microphone::open` opens a stream without a component, for a recorder engine or a test.
+
+```rust
+use std::{thread, time::Duration};
+use crownui::audio::{AudioError, Microphone, MicrophoneOptions, MicrophoneStream};
+
+fn start_recording() -> Result<MicrophoneStream, AudioError> {
+    let mut stream = Microphone::open(MicrophoneOptions::default())?;
+    if let Some(mut frames) = stream.take_frames() {
+        thread::spawn(move || loop {
+            while let Ok(frame) = frames.pop() {
+                encode(frame.pts, &frame.samples);
+            }
+            thread::sleep(Duration::from_millis(10));
+        });
+    }
+    Ok(stream)
+}
+```
+
+Keep the returned stream alive for as long as you record. Dropping it stops the capture. `pop` returns an error when the ring is empty, so the worker drains what is there and then waits for the next 10 ms frame.
+
+| Item | What it is |
+|---|---|
+| `Microphone::open(options) -> Result<MicrophoneStream, AudioError>` | Returns once PipeWire accepts the stream. |
+| `MicrophoneStream` | `Send`. Stops when dropped. |
+| `stream.take_frames() -> Option<FrameConsumer>` | The frame ring, handed over once. |
+| `stream.level()`, `stream.state()` | `watch::Receiver<Level>` and `watch::Receiver<StreamState>`. |
+| `stream.set_enhancement(enhancement)` | Switches enhancement without stopping. |
+| `AudioFrame { pts, samples }` | `FRAME_SAMPLES` (480) mono `f32` samples at `SAMPLE_RATE` (48 kHz), which is 10 ms. |
+| `ClockNanos(u64)` | The PipeWire graph clock in nanoseconds (`CLOCK_MONOTONIC`). `pts` is the time of the first sample. |
+| `Level { peak, rms }` | Linear amplitudes. `Level::measure(&samples)` computes one. |
+
+Video frames from the camera stack carry the same `ClockNanos`, so a recorder muxes audio and video without converting clocks.
+
+## Meters and waveforms
+
+These kit widgets work with or without the `audio` feature.
+
+```rust
+pub fn level_meter(peak: impl IntoProp<f32>) -> Element<LevelMeterKind>
+pub fn live_waveform(history: Signal<LevelHistory>) -> Element<LiveWaveformKind>
+pub fn waveform(peaks: impl IntoProp<WaveformPeaks>, progress: impl IntoProp<f32>) -> Element<WaveformKind>
+```
+
+`level_meter(peak)` shows a `0..=1` linear peak on a 60 dB scale. It turns the warning color from -6 dBFS and the danger color from -1 dBFS, and it holds the loudest peak for 60 updates before letting it fall. It is horizontal, 240 by 8, by default. Options from `LevelMeterOptions`:
+
+- `.rms(level)` draws the RMS solid over a dimmed peak.
+- `.vertical()` rises from the bottom, 8 wide and 120 tall by default.
+
+`live_waveform(history)` scrolls the recent levels in a `LevelHistory`, the newest at the right edge. `LevelHistory` is a fixed ring that never reallocates. Push one level per update with `push`, reset it with `clear` when a new take starts, and read it with `len`, `is_empty` and `newest_first`. Each pushed level is smoothed with a fast attack and a slow release.
+
+`waveform(peaks, progress)` draws a saved recording's peaks as bars mirrored around the center line, fitted to the width, with a playhead at `progress` from 0 to 1. Build the peaks once with `WaveformPeaks::from_levels(&levels)` or `WaveformPeaks::new(bytes)`. Cloning `WaveformPeaks` copies a pointer, so storing it in a signal is cheap. `.on_seeking(|cx, position| ..)` turns the waveform into a seek bar that reports the position a click, drag or arrow key seeks to.
+
+```rust
+waveform(peaks, bind(move |rt| position.get(rt)))
+    .on_seeking(move |cx, position| player.seek(cx, position))
+    .w_full()
+    .h(120.0)
+    .label("Playback position")
+```
+
+## Errors
+
+| Code | Meaning |
+|---|---|
+| `CUI0701` | PipeWire is unreachable or refused the capture stream. Check `pw-cli info 0`. |
+| `CUI0702` | The capture thread failed to spawn. |
+| `CUI0703` | The capture format failed to serialize. This is a library bug. |
+| `CUI0704` | The capture thread stopped before the stream was set up. |
+
+`Microphone::open` returns these as `AudioError`. `use_microphone` puts the message in `StreamState::Failed`. See [Errors](/docs/crownui/errors).
+
+## Why it works this way, and what it costs
+
+Audio runs on its own clock, and the UI must never slow it down. Each stream owns a PipeWire thread. The real-time callback packs PipeWire buffers into fixed 10 ms frames, pushes them into a lock-free ring and publishes the level. It never allocates and never takes a lock, because a real-time thread that waits on a lock drops audio. The app reads the level and state through `tokio::sync::watch` channels and the frames through the ring. The audio crate does not depend on `Cx` at all, so the same stream works in a component, a background engine or a test.
+
+The design has three costs.
+
+- When the ring is full because the consumer fell behind, the callback drops the frame instead of waiting. A recorder that stalls loses audio rather than freezing the capture thread. Drain the ring on a dedicated thread.
+- Enhancement depends on a separate daemon. When `crown-voiced` is missing or slow, the stream waits up to 3 seconds and then falls back to raw capture. The app keeps recording, and `StreamState::Unenhanced` tells the user why the audio sounds different.
+- The scope is narrow. There is no playback, no encoding, no multichannel capture and no device permission prompt yet. Encoding lives in a separate CrownOS crate, and device permission will come through a compositor protocol.

@@ -1,0 +1,222 @@
+---
+title: Rendering
+description: How the impeller crate draws CrownUI frames with Flutter's Impeller on Vulkan or GLES, with analytic edges, squircles, blur and offscreen output.
+sidebarTitle: Rendering
+---
+
+CrownUI renders with Impeller, the engine behind Flutter, through the `impeller` crate. That crate implements the `graphics` contract: it shapes text into Impeller paragraphs on the UI thread, records each repaint boundary into an Impeller display list on the render thread, and composes them into frames. Nothing above the `graphics` contract sees an Impeller type.
+
+The crate binds Impeller's C API through `impellers =0.4.3`. Its README lists the invariants and its non-goals, and `docs/impeller.md` has the notes from the integration spike.
+
+## Vulkan first, GLES as fallback
+
+Each window's renderer picks a GPU API when it starts:
+
+1. With `CROWNUI_RENDERER=gles` in the environment, it uses OpenGL ES through EGL.
+2. Otherwise it tries Vulkan.
+3. When Vulkan fails, it logs a warning and falls back to GLES. When both fail, renderer creation fails with `CUI0402`.
+
+```sh
+CROWNUI_RENDERER=gles cargo run -p crownui --example glass_card
+```
+
+`ImpellerRenderer::api()` reports the choice as a `RenderApi`: `Vulkan`, `Gles`, or for offscreen renderers `GlesSurfaceless` or `GlesPbuffer`.
+
+On Wayland, Impeller creates Vulkan swapchains 1x1, because Wayland reports no surface extent. The crate fixes this with a loader shim. It intercepts three Vulkan calls through the proc-address callback passed to Impeller's context, reports the window's real size, and returns `VK_ERROR_OUT_OF_DATE_KHR` when the size changes so Impeller recreates the swapchain. The same shim changes two more things:
+
+- The swapchain gets the driver's minimum image count, never fewer than three, instead of Impeller's minimum plus one. That saves one full surface of memory per window.
+- The swapchain presents in mailbox mode where the surface supports it. The render thread paces itself by frame callbacks, so FIFO would only add a second barrier.
+
+Those shimmed calls are plain `extern "system"` functions without user data, so the wanted extent per surface lives in a fixed table of atomics with room for 32 surfaces. No locks are taken.
+
+## The renderer
+
+`ImpellerRenderer` implements `graphics::Renderer`. It caches:
+
+- one Impeller `DisplayList` per repaint boundary, re-recorded only when the render thread asks,
+- one `Paragraph` per uploaded text layout,
+- one texture per uploaded image,
+- the segment textures of small paths, described below.
+
+`render(&composition)` walks the `CompositeOp`s, pushes and pops layers with their transform, opacity, clip and backdrop blur, and draws the cached lists into the frame. See [Frame pipeline](/docs/crownui/frame-pipeline) for where boundaries and compositions come from.
+
+The renderer is not `Send`. It is created, used and dropped on the render thread, because GLES contexts are bound to one thread. Each window has its own GPU context.
+
+## Analytic edges
+
+Impeller's default antialiasing is MSAA. CrownUI draws its most common shapes with two fragment shaders instead, so edges stay exactly one device pixel wide at any scale or transform.
+
+`shaders/rounded_box.frag` covers rounded rectangles, strokes, unblurred shadows and the rounded clips of layers. It shades a slightly larger quad and computes coverage from the shape's signed distance divided by its screen-space gradient. A card rotated by 3 degrees or scaled by 1.04 on hover keeps a crisp one-pixel edge.
+
+`shaders/flattened_path.frag` covers unblurred paths at most 128 device pixels across, which is every icon. It flattens the path to within 0.1 device pixel at the current scale and shades its quad from the segments:
+
+- Fills use the non-zero rule.
+- Strokes keep butt, round and square caps, and join every segment round. At icon sizes a miter or bevel differs by under a pixel.
+- Strokes thinner than a device pixel fade with their width instead of breaking up.
+- The segments go to the GPU once as a one-row RGBA8 texture of 15-bit fixed-point points, at most 2048 segments, cached by a hash of the path and its flattening. The cache starts over past 256 paths.
+
+Brushes the shaders cannot paint, such as images or gradients with more than 8 stops, fill a layer that the shader then masks.
+
+The shaders are compiled ahead of time with `impellerc`, the compiler shipped with the linked Impeller SDK, and committed as `shaders/*.iplr`. Regenerate them after editing a `.frag`:
+
+```sh
+cargo xtask shaders
+cargo xtask shaders --check
+```
+
+Runtime stages take no uniform arrays, so `util/shape_uniforms.rs` and `util/path_uniforms.rs` pack uniforms as `vec4`s in declaration order.
+
+## MSAA fallback
+
+Some drawing still relies on multisampling: blurred paints, paths larger than 128 device pixels, and rounded clips inside a canvas `DrawList`, which use the stencil buffer. Vulkan windows get 4x MSAA, fixed by Impeller. GLES windows and offscreen framebuffers ask for 8x and take what the driver offers, down to single sampling. When Impeller rejects one of the custom shaders, what it would have drawn falls back to MSAA too, so a driver bug degrades edges instead of dropping shapes.
+
+## Corner shapes and squircles
+
+Rounded rectangles, clips and shadows follow the renderer's `CornerShape`. `CornerShape::Round` draws circular corners and is the default. `CornerShape::Squircle` draws the same curve as the CrownOS compositor: a quarter of `x⁴ + y⁴ = 1` over 1.5 times the radius, capped at half the shorter side.
+
+```rust
+crownui::run(
+    root,
+    AppConfig::new("Settings").corner_shape(CornerShape::Squircle),
+)
+```
+
+The setting applies to the whole window, kit widgets included. The analytic shader evaluates the squircle exactly. MSAA fallbacks draw one cubic per corner. Pills and circles stay circular under either shape, and radii larger than the box shrink the way CSS shrinks them. `InlineApp::set_corner_shape` switches shapes in tests and re-records every boundary.
+
+## Blur
+
+Blur radii follow CSS. `Paint::blur` and backdrop blur use a sigma equal to the radius. A `Shadow` uses a sigma of half its blur radius, like `box-shadow`.
+
+`.backdrop_blur(radius)` blurs what is behind a node, inside its own rounded shape, before the node draws. Compose turns it into a layer with a clip and a backdrop blur:
+
+```rust
+vstack((
+    text("Glass").text_size(28.0).text_color(WHITE),
+    text("Backdrop blur rendered by Impeller.").text_color(rgba(0xffffffcc)),
+))
+.p(24.0)
+.rounded(24.0)
+.bg(rgba(0xffffff26))
+.border(1.0)
+.border_color(rgba(0xffffff4d))
+.backdrop_blur(24.0)
+.shadow(Shadow::xl())
+```
+
+In-app backdrop blur only sees what the app itself drew. It cannot blur the desktop behind a translucent window.
+
+## Compositor materials
+
+`.material(Material::thin())` asks the platform to draw the blur instead. On CrownOS the compositor implements the `crownos_background_effects` protocol and blurs whatever is behind the window, other windows and the wallpaper included.
+
+```rust
+vstack((text("Now playing"), text("Track title")))
+    .p(16.0)
+    .rounded(16.0)
+    .material(Material::thin())
+```
+
+The app sends the material and the rounded rectangles it covers in the frame's `SurfaceState`, so the compositor's blur moves in the same frame as the pixels. The runtime picks the path from the platform's `Capabilities`:
+
+- With `materials`, the compositor draws the blur behind the window.
+- Without it, the node falls back to in-app backdrop blur, so the UI still reads as glass on other compositors.
+- With `composited_materials`, which CrownOS offers to a layer surface whose material is one blurring shape, the compositor lays the surface over its glass and cuts both with one edge. The body under the material is then painted with square corners, and the compositor's edge is the only rounded edge. Border, ring, shadow and the children's clip stay rounded.
+
+Nodes with a material snap their window-space edges to the device pixel grid, so the body CrownUI paints and the shape the compositor cuts cover the same pixels.
+
+## Text
+
+`ImpellerTextSystem` shapes text on the UI thread with one Impeller `TypographyContext`. Creating it scans the system fonts and took about 160 ms in the spike, so each window keeps one for its whole life. `AppConfig::font(bytes, alias)` registers extra fonts with it.
+
+Shaping produces an `ImpellerTextLayout`: a `Paragraph` plus its metrics, read once. Paragraphs are `Send`, so the layout moves to the render thread by `TextLayoutId` and is drawn there without shaping again. The UI thread's `TextCache` keys layouts by content, style and wrap width in steps of 0.5 px, so a remounted row or a repeated string reuses its paragraph.
+
+A few rules come from Impeller:
+
+- Text width is the widest line. For centered, trailing, justified or right-to-left text it is the paragraph width, and unconstrained text of that kind is laid out again at its intrinsic width first.
+- Text indices are UTF-16, and glyph cluster bounds come back with x and y swapped, an upstream Impeller bug.
+- Letter spacing is ignored, because Impeller's C API has no setter for it.
+
+## Offscreen rendering
+
+`impeller::Offscreen` renders without a window or a display. The renderer draws into a multisampled RGBA8 and stencil8 framebuffer on the EGL surfaceless platform, with a pbuffer as fallback. `read_pixels()` resolves it into `Pixels` with straight alpha and the top row first, and `encode_png` turns them into a PNG. This is how `cargo xtask preview <name> --png <path>` works, condensed from `xtask/src/command/preview.rs`:
+
+```rust
+let surface = Offscreen {
+    width: (PREVIEW_SIZE.width * PREVIEW_SCALE) as u32,
+    height: (PREVIEW_SIZE.height * PREVIEW_SCALE) as u32,
+    scale: PREVIEW_SCALE,
+};
+let mut app = InlineApp::<ImpellerBackend, TaffyEngine>::with_surface(
+    preview.view(),
+    TaffyEngine::new(),
+    PREVIEW_SIZE,
+    PREVIEW_SCALE,
+    &surface,
+)?;
+app.settle()?;
+let pixels = app.renderer_mut().read_pixels()?;
+let png = impeller::encode_png(&pixels)?;
+```
+
+Offscreen output is deterministic for one GPU driver, not across drivers: NVIDIA and Mesa antialias differently. NVIDIA's EGL also crashes when freeing a context that drew an offscreen layer, so golden tests pin the Mesa EGL vendor:
+
+```sh
+__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json cargo test -p impeller -- --ignored
+```
+
+Offscreen rendering uses GLES only. Vulkan offscreen rendering is a non-goal.
+
+## Picking the Vulkan driver
+
+On a laptop with two GPUs, the Vulkan loader loads every installed driver by default. That wakes the second GPU and maps its driver into the process. `impeller::select_vulkan_driver(main_device)` sets `VK_LOADER_DRIVERS_SELECT` to the driver of the compositor's GPU, given as a Linux `dev_t`, so other drivers are never loaded and other GPUs stay asleep. The impeller README puts the saving at about 50 MiB of RSS on hybrid laptops.
+
+`crownui::run` calls it for you with the device the Wayland compositor reports. It does nothing when you already chose a driver or GPU through `VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`, `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `VK_ADD_DRIVER_FILES`, `DRI_PRIME`, `MESA_VK_DEVICE_SELECT` or `__NV_PRIME_RENDER_OFFLOAD`.
+
+<Warning>
+  `select_vulkan_driver` is `unsafe` because it writes the process environment. Call `crownui::run` from `main` before you start any thread, so nothing else reads or writes the environment at the same time.
+</Warning>
+
+## Linking
+
+The `prebuilt_libs` and `cache_libs` features of `impellers` download a 22.7 MB Impeller SDK into `.impeller_cache/` on the first build. Set `IMPELLER_CACHE_DIR` to a vendored copy for offline builds. The `static` feature of `crownui` links `libimpeller.a` into the binary, so no rpath is needed, at a cost of about 9 MiB. CrownOS builds its own apps with `default-features = false` and the features `wayland`, `impeller`, `static` and `tokio`.
+
+## Measured cost
+
+The integration spike on 2026-10-02 measured one scene with a gradient, a shadow, a blur, a paragraph and a backdrop blur on an AMD Radeon 780M (RADV, Mesa 26.2.3) under crownpositor at 144 Hz:
+
+| Path | Frame time (acquire, draw, present) |
+|---|--:|
+| Vulkan FIFO | 6.85 ms average, mostly the vsync wait. Draw took 0.19 ms and present 0.05 ms. |
+| Vulkan mailbox | 1.25 ms |
+| GLES | 0.54 ms of CPU, unthrottled |
+
+A second swapchain on a desynchronized subsurface drew in 0.23 ms without blocking. Those are spike numbers for one machine. For whole-app numbers see [Performance](/docs/crownui/performance).
+
+## Why it works this way
+
+Impeller gives CrownUI a mature GPU renderer with Vulkan and GLES backends, text layout, blur filters and backdrop filters, without writing and maintaining a renderer from scratch. Display lists match CrownUI's model directly: each repaint boundary is recorded once and replayed until it changes.
+
+The custom shaders exist because MSAA alone is not sharp enough at small sizes. With 4x MSAA, which is what Impeller uses on Vulkan, an edge pixel has at most five coverage levels, and that shows on rounded corners and icons on a 1x display. Analytic coverage computes the exact fraction per pixel and stays one pixel wide under any transform, which matters because hover and press springs scale and rotate widgets constantly.
+
+Compositor materials exist because only the compositor sees what is behind a window. In-app blur stays as the fallback so the same code runs on any Wayland compositor.
+
+## What it costs
+
+- Startup. The first `TypographyContext` scans the system fonts. In the comparison benchmark, the CrownUI hello window takes 204 ms to its first frame against 92 ms for GPUI.
+- Less control over text. Impeller owns shaping, the glyph atlas and rasterization. The performance plan found the render thread's time is mostly Impeller's text path and per-op dispatch, and CrownUI cannot tune that path without leaving Impeller. Letter spacing is missing.
+- Process-global state. The swapchain shim needs a table of atomics shared by the whole process, with room for 32 surfaces, and one Vulkan context per window.
+- A downloaded binary. Builds need the prebuilt Impeller SDK or a vendored copy, and a static build is about 9 MiB larger.
+- Driver variance. Offscreen goldens hold for one driver only, and NVIDIA's EGL needs a workaround.
+- Two edge techniques. Shapes the shaders cover and shapes that fall back to MSAA antialias differently, so a large path next to an icon has a slightly softer edge.
+- Platform reach. X11, Windows and macOS surfaces are non-goals.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Frame pipeline" icon="layers" href="/docs/crownui/frame-pipeline">
+    Where boundaries and compositions come from.
+  </Card>
+  <Card title="Performance" icon="zap" href="/docs/crownui/performance">
+    Whole-app numbers against GPUI, Qt, Electron and Tauri.
+  </Card>
+</CardGroup>

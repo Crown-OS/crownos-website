@@ -1,0 +1,204 @@
+---
+title: Overlays
+description: Dialogs, tooltips, toasts and context menus from the kit, and how they float above the window.
+sidebarTitle: Overlays
+---
+
+Overlays float above the rest of the window: a modal dialog, a tooltip, a toast or a context menu. You mount them anywhere in the tree, and they cover the whole window from there. Most are driven by a signal you own, so opening one is a `set` and closing one is a `set`. The examples on this page assume these imports:
+
+```rust
+use crownui::{
+    kit::{
+        button, context_menu, context_menu_at, dialog, icon_button, icons, menu_header, menu_item,
+        menu_item_disabled, menu_item_selected, menu_separator, menu_submenu,
+        provide_configured_theme, provide_toasts, toast, toast_host, tooltip, ButtonOptions,
+        ButtonVariant, DialogOptions, MenuRowOptions, Toast, ToastOptions,
+    },
+    prelude::*,
+};
+```
+
+## Dialog
+
+`dialog(open, content)` is a modal sheet inside the window. While `open` is true, the views that `content()` returns sit in a centered frosted-glass card over a scrim that covers the whole window.
+
+```rust
+let confirm = cx.signal(false);
+vstack((
+    button("Delete…")
+        .variant(ButtonVariant::Destructive)
+        .on_click(move |cx, _| confirm.set(cx, true)),
+    dialog(confirm, move || {
+        (
+            text("Delete 3 items permanently?").font_semibold(),
+            text("This cannot be undone."),
+            hstack((
+                spacer(),
+                button("Cancel").on_click(move |cx, _| confirm.set(cx, false)),
+                button("Delete")
+                    .variant(ButtonVariant::Destructive)
+                    .on_click(move |cx, _| {
+                        delete_selection(cx);
+                        confirm.set(cx, false);
+                    }),
+            ))
+            .gap(8.0),
+        )
+    }),
+))
+```
+
+While the dialog is open:
+
+- Focus moves into the card, and Tab and Shift+Tab cycle through the focusable views inside it.
+- Escape sets `open` to false.
+- A press on the scrim sets `open` to false. Turn that off with `.dismiss_on_scrim(false)` for a dialog the user must answer.
+
+The content closure builds the card's views when the dialog opens. Your buttons close it by setting the same signal to false.
+
+```rust
+dialog(confirm, move || (text("Install the update now?"), update_buttons(confirm)))
+    .dismiss_on_scrim(false)
+```
+
+## Tooltip
+
+`tooltip(label, content)` wraps a view so a small frosted-glass label appears under it once the pointer has rested on it for half a second. Near the bottom of the window the label goes above it instead. Moving away or pressing hides it.
+
+```rust
+tooltip("Copy to the clipboard", icon_button(icons::COPY, "Copy"))
+```
+
+The label is centered under the view and kept at least 4px inside the window's left and right edges. It wraps once it reaches 320px. The label takes a literal, a signal or a `bind`.
+
+Give icon-only buttons a tooltip with the same text as their accessible label, so sighted pointer users get the name that a screen reader already speaks.
+
+## Toasts
+
+A toast is a short notification pill that appears at the bottom center of the window and leaves on its own. Three pieces work together:
+
+- `toast_host(content)` wraps the window's content and shows the raised toasts above everything else. Make it the root, or a view that fills the window.
+- `provide_toasts(cx)` creates the window's `Toasts` handle and provides it to everything built inside the current component. The host provides one itself when none is in scope, so call `provide_toasts` only when you want to hold the handle above the host, as below.
+- `Toasts` is a small `Copy` handle. Copy it into handlers and call `show`.
+
+```rust
+component(|cx| {
+    provide_configured_theme(cx);
+    let toasts = provide_toasts(cx);
+    toast_host(
+        vstack((
+            button("Copy").on_click(move |cx, _| toasts.show(cx, "Copied 3 items")),
+            button("Mount").on_click(move |cx, _| {
+                let notice = Toast::new("Mounted USB Drive")
+                    .icon(icons::HARD_DRIVE)
+                    .duration(std::time::Duration::from_secs(6));
+                toasts.show_with(cx, notice);
+            }),
+        ))
+        .p(24.0),
+    )
+})
+```
+
+Components inside the host get the same handle with `use_toasts(cx)`. It returns the nearest provided `Toasts`, which is the root's handle or the one the host provided. Only call `use_toasts` from inside the host's content. Outside it, with no handle provided above, it creates a fresh handle that no host shows.
+
+| Item | What it does |
+|---|---|
+| `toasts.show(cx, message)` | Shows `message` for three seconds. |
+| `toasts.show_with(cx, toast)` | Shows a `Toast` until its duration has passed. |
+| `toasts.dismiss_all(cx)` | Takes every toast off the screen at once. |
+| `Toast::new(message)` | A toast saying `message` for three seconds. |
+| `Toast::icon(body)` | The same toast with a leading Lucide icon. |
+| `Toast::duration(duration)` | The same toast staying for `duration`. |
+
+`Toast` also has the public fields `message`, `icon` and `duration`.
+
+The host stacks several toasts upward, springs each one in and out, and keeps the stack 24px above the window's bottom edge. The layer around the pills ignores the pointer, so the host never blocks clicks on the content beside a toast.
+
+`toast(message)` is the pill alone, with `.leading_icon(body)`. The host builds these for you. Use `toast` directly only to show the pill in a preview or a custom layout.
+
+```rust
+toast("Copied 3 items").leading_icon(icons::COPY)
+```
+
+## Context menus
+
+`context_menu(items)` stacks menu rows in a frosted-glass panel. The panel blurs what lies behind it and grows to fit its widest row. The row under the pointer lights up in an accent capsule.
+
+```rust
+context_menu((
+    menu_item("Undo").leading_icon(icons::UNDO).shortcut_hint("Ctrl Z"),
+    menu_item("Redo").leading_icon(icons::REDO).shortcut_hint("Shift Ctrl Z"),
+    menu_separator(),
+    menu_header("Clipboard"),
+    menu_item("Paste").leading_icon(icons::CLIPBOARD).shortcut_hint("Ctrl V"),
+    menu_item_disabled("Paste as Quotation"),
+    menu_separator(),
+    menu_submenu("Share"),
+))
+```
+
+### Rows
+
+| Builder | What it is |
+|---|---|
+| `menu_item(label)` | A standard row: icon slot, label and a trailing shortcut hint. Listen with `.on_click`. |
+| `menu_item_selected(label)` | A row held in the highlighted state: an accent capsule lettered in the menu's selected text color. |
+| `menu_item_disabled(label)` | A dimmed row that does nothing. |
+| `menu_submenu(label)` | A row with a trailing chevron in place of a shortcut. |
+| `menu_header(label)` | A section header in small medium-weight text, aligned with the row labels. |
+| `menu_separator()` | A one-pixel line between sections, inset to the row labels. |
+
+Rows take two options from `MenuRowOptions`:
+
+- `.leading_icon(body)` puts a Lucide icon in the row's leading slot.
+- `.shortcut_hint(text)` shows a keyboard shortcut hint at the trailing edge. It is only a label. Bind the shortcut itself with a key listener.
+
+`menu_submenu` draws the chevron only. The kit has no nested menu panel, so open whatever the row leads to from its `.on_click`.
+
+### Open a menu at the pointer
+
+`context_menu_at(position, items)` opens a `context_menu` where `position` says, above everything in the window. `position` is a `Signal<Option<Point>>` in window coordinates. `Some(point)` opens the menu there and `None` closes it.
+
+The menu sets `position` back to `None` on a press outside it, on Escape and on a click on any of its rows. It flips to the left of or above the point rather than cross the window's edge, and stays inside the window when it fits neither way.
+
+`on_context_menu` reports the click relative to the view it fired on, not the window. Track the pointer in window coordinates with `on_pointer_down` on the root, and open the menu at that point:
+
+```rust
+component(|cx| {
+    let pointer = cx.signal(Point::ZERO);
+    let menu = cx.signal(None::<Point>);
+    vstack((
+        text("Report.pdf")
+            .p(12.0)
+            .on_context_menu(move |cx, event| {
+                event.stop_propagation();
+                let at = pointer.get(cx);
+                menu.set(cx, Some(at));
+            }),
+        context_menu_at(menu, move || {
+            (
+                menu_item("Open").on_click(move |cx, _| open_file(cx)),
+                menu_item("Copy").leading_icon(icons::COPY),
+                menu_separator(),
+                menu_item("Move to Trash").leading_icon(icons::TRASH),
+            )
+        }),
+    ))
+    .w_full()
+    .h_full()
+    .on_pointer_down(move |cx, event| pointer.set(cx, event.position))
+})
+```
+
+The items closure runs each time the menu opens, so it builds rows for the current state. To vary the rows by what was clicked, store the target in a signal before you set `position`, and read it inside the closure or in a `keyed` view.
+
+## Why overlays live inside the window
+
+Every overlay on this page is part of the window's own surface. A dialog, tooltip, toast host or context menu measures where its host sits, covers the window from there, and draws in the window's top layer. None of them create a separate Wayland surface.
+
+An overlay is an ordinary view, so it uses the same theme, the same springs, the same focus rules and the same semantic tree as the rest of the window. Tests find a dialog's buttons with the same `role(..)` queries as any other button, and agents see a menu's rows in `ui_tree`. Mounting an overlay costs a few nodes, and an overlay never waits for the compositor to map a new surface, so it opens on the next frame.
+
+The cost is that an overlay cannot leave the window. A context menu opened near the edge flips inward instead of hanging over the desktop, and a tooltip near the bottom goes above its anchor. In a very small window, a large menu gets clamped. For a surface that has to float outside the window, such as a panel opened from a status bar, use a [layer surface](/docs/crownui/windows) with its own window instead.
+
+Driving overlays with signals has a smaller cost too. You own one signal per overlay, and you close a dialog yourself from its buttons. In return, the open state is visible to everything: a test checks `confirm.get(..)`, and a keyboard shortcut elsewhere in the app opens the same dialog by setting the same signal.

@@ -1,0 +1,264 @@
+---
+title: Controls
+description: Buttons, switches, sliders, radio groups, choice lists, toggle groups, selects and popup menus from the kit.
+sidebarTitle: Controls
+---
+
+Kit controls take a signal and write the user's choice back into it. You own the signal, the control keeps it current, and anything that reads the signal updates on its own. The examples on this page assume these imports:
+
+```rust
+use crownui::{
+    kit::{
+        button, choice_list, icon_button, icons, popup_menu, popup_menu_item, popup_menu_separator,
+        radio_group, select, slider, toggle, toggle_group, ButtonOptions, ButtonShape, ButtonSize,
+        ButtonVariant, Choice, PopupMenuOptions, SelectOptions, SliderOptions, ToggleGroupOptions,
+        ToggleItem, ToggleOptions,
+    },
+    prelude::*,
+};
+```
+
+The kit names are imported by name, so `button` and `toggle` mean the kit widgets and not the prelude primitives. Do not glob import both `kit::*` and `prelude::*`, because the shared names then become ambiguous. The [kit overview](/docs/crownui/kit) explains the rule.
+
+## Button
+
+`button(label)` draws a pill with a label. Attach behavior with `.on_click`.
+
+```rust
+let saved = cx.signal(false);
+button("Save")
+    .variant(ButtonVariant::Primary)
+    .on_click(move |cx, _| saved.set(cx, true))
+```
+
+Enter and Space click a focused button. Hover and press are washes of the palette's hover color.
+
+### Variants
+
+`.variant(ButtonVariant)` picks which palette slot fills the button. The default is `Secondary`.
+
+| Variant | Look | Use it for |
+|---|---|---|
+| `Primary` | The accent gradient, lettered in `text.on_accent`. | The one main action of a surface. Use one per surface. |
+| `Secondary` | A bordered chip. | Everyday actions. |
+| `Tinted` | A wash of the accent, lettered in the accent. | A highlighted action that is not the main one. |
+| `Ghost` | No fill until hovered. | Toolbars and tertiary actions. |
+| `Destructive` | A red fill. | Actions that destroy something. |
+
+```rust
+hstack((
+    button("Cancel"),
+    button("Forget This Network…").variant(ButtonVariant::Destructive),
+    button("Join").variant(ButtonVariant::Primary),
+))
+.gap(8.0)
+```
+
+### Sizes
+
+`.control_size(ButtonSize)` sets height, padding, corner and text size as one choice. The default is `Medium`.
+
+| Size | Height | Notes |
+|---|---|---|
+| `Small` | 28px | Dense toolbars and table rows. |
+| `Medium` | 34px | The height of a text field, so a button lines up with an input beside it. |
+| `Icon` | 28px | A rounded square that shows only its icon. `icon_button` uses it. |
+
+`ButtonSize::height()` returns the height in logical pixels, for laying out something next to a button.
+
+### Shape, icon and width
+
+- `.shape(ButtonShape::Pill)` gives fully rounded ends at whatever height the button is laid out at, and a circle when it is square. The default `ButtonShape::Sized` takes the corner from the size: a pill for text, a rounded square for an icon.
+- `.leading_icon(icons::PLUS)` draws a Lucide icon before the label, in the label's color.
+- `.min_width(120.0)` keeps the button from getting narrower than a width.
+- `.stretch()` makes the button take the whole width its parent offers.
+
+```rust
+button("Add")
+    .variant(ButtonVariant::Primary)
+    .control_size(ButtonSize::Small)
+    .leading_icon(icons::PLUS)
+
+button("Next step").variant(ButtonVariant::Primary).stretch()
+```
+
+Disable a button with the semantic modifier `.disabled(true)`. It takes a literal, a signal or a `bind`, so a button follows a condition:
+
+```rust
+let name = cx.signal(String::new());
+button("Create")
+    .variant(ButtonVariant::Primary)
+    .disabled(bind(move |runtime| name.with(runtime, String::is_empty)))
+```
+
+### Icon buttons
+
+`icon_button(body, label)` is a square button that shows only an icon. The `label` is not drawn. It names the button for screen readers, tests and agents, so always give a real name.
+
+```rust
+icon_button(icons::SETTINGS, "Settings")
+    .variant(ButtonVariant::Ghost)
+    .on_click(move |cx, _| page.set(cx, Page::Settings))
+```
+
+It returns the same `Element<ButtonKind>` as `button`, so every button option works on it.
+
+## Toggle
+
+`toggle(on)` is a pill switch bound to a `Signal<bool>`. The track fades from the off gradient to the accent while the knob glides across on the snappy spring. Click, Space and Enter flip it.
+
+```rust
+let wifi = cx.signal(true);
+toggle(wifi).caption("Wi-Fi")
+```
+
+`.caption(text)` draws text beside the track in the body color and also names the switch. Without a caption, name it with `.label("Wi-Fi")` so assistive technology and tests can find it. In a `setting_row`, the row's label is visible, so add `.label(..)` with the same text.
+
+The toggle has no change event. React to it by reading the signal:
+
+```rust
+cx.effect(move |runtime| {
+    let enabled = wifi.get(runtime);
+    println!("Wi-Fi is now {}", if enabled { "on" } else { "off" });
+});
+```
+
+## Slider
+
+`slider(value)` is a horizontal slider bound to a `Signal<f32>`. The accent fill and the raised thumb glide together on the snappy spring. Drag, click, the arrow keys, Page Up and Page Down, Home, End and the wheel all move it. Shift with an arrow moves ten steps.
+
+```rust
+let volume = cx.signal(0.4);
+slider(volume).w(180.0).label("Volume")
+```
+
+The default range is `0.0..=1.0`. Change it with `.range(min, max)`. `.step(step)` snaps every pointer and keyboard value to multiples of `step` from the start of the range.
+
+```rust
+let brightness = cx.signal(3.0);
+slider(brightness).range(0.0, 10.0).step(1.0)
+```
+
+Without a step, one arrow press moves the slider by a hundredth of its range, Page Up and Page Down move ten of those, and the pointer sets any value in between. With a step, one arrow press moves one step.
+
+## Radio group
+
+`radio_group(labels, selected)` stacks radio rows bound to the index in a `Signal<Option<usize>>`. `None` means nothing is chosen yet. The whole row is the click target, and the ring thickens on the crisp spring when it is selected. Arrow keys move the choice and wrap at the ends while the group has focus.
+
+```rust
+let filesystem = cx.signal(None::<usize>);
+radio_group(["ext4", "btrfs", "xfs"], filesystem)
+```
+
+Labels are anything that converts into a `String`, so an array of `&str` or a `Vec<String>` both work.
+
+## Choice list
+
+`choice_list(choices, selected)` is a stack of large selectable rows. Each row has an optional icon tile, a title, a line of detail and a radio at the trailing edge. It binds to a `Signal<Option<usize>>` like `radio_group` and takes the width its parent offers.
+
+```rust
+let disk = cx.signal(Some(0));
+choice_list(
+    [
+        Choice::new("/dev/nvme0n1", "476 GB, Windows 11, 94 GiB free").icon(icons::HARD_DRIVE),
+        Choice::new("/dev/sdb", "No free space").icon(icons::HARD_DRIVE).disabled(),
+        Choice::new("Erase disk", ""),
+    ],
+    disk,
+)
+```
+
+- `Choice::new(title, subtitle)` makes a row. An empty subtitle centers the title vertically.
+- `.icon(body)` adds a leading tile with a Lucide icon.
+- `.disabled()` keeps the row listed but unpickable and draws it faded. Put the reason in the subtitle.
+
+Hover washes on the snappy spring and selection on the crisp one. The arrow keys move between rows that are not disabled.
+
+## Toggle group
+
+`toggle_group(items, selected)` is a segmented control: a row of equal segments with a raised pill that springs to the chosen one. It binds to a `Signal<usize>`, not an `Option`, because a segmented control always has a choice.
+
+```rust
+let layout = cx.signal(0);
+toggle_group([ToggleItem::text("Grid"), ToggleItem::text("List")], layout)
+```
+
+- `ToggleItem::text(label)` shows a text label.
+- `ToggleItem::icon(body, label)` shows a Lucide icon. The label is only spoken.
+- `.stretch()` shares the parent's whole width between the segments.
+
+```rust
+let scheme = cx.signal(0);
+toggle_group(
+    [ToggleItem::icon(icons::SUN, "Light"), ToggleItem::icon(icons::MOON, "Dark")],
+    scheme,
+)
+.stretch()
+```
+
+The group is as tall as a text field, so it lines up with a search bar beside it. Arrows, Home and End move the choice while it has focus.
+
+## Select
+
+`select(options, selected)` is a dropdown. It takes the options as a `Signal<Vec<String>>` and the chosen index as a `Signal<Option<usize>>`, and it writes the index back when the user picks.
+
+```rust
+let frameworks = cx.signal(vec![
+    String::from("Next.js"),
+    String::from("SvelteKit"),
+    String::from("Astro"),
+]);
+let picked = cx.signal(None::<usize>);
+select(frameworks, picked)
+    .placeholder("Select a framework")
+    .label("Framework")
+    .on_change(|_, event| println!("picked {}", event.value))
+```
+
+Picking fires the DOM `change` event with the option's text in `event.value`. The trigger shows the selected option, or the placeholder while `selected` is `None`. When the value changes, the old text fades out and the new one fades in.
+
+The panel is frosted glass. The option under the pointer lights up in an accent capsule. Arrow keys, Home and End move the highlight, Enter picks, and Escape closes. Typing jumps to the option that starts with the typed text, and repeating one letter cycles through the options that start with it.
+
+| Option | Effect |
+|---|---|
+| `.placeholder(text)` | The muted text shown while nothing is selected. |
+| `.start_open()` | Mounts the select with its panel already open. Use it for previews and docs. |
+| `.disabled(true)` | Dims the shown value to the muted text color and ignores presses. |
+
+## Popup menu
+
+`popup_menu(icon, label, entries)` is a small icon pill that opens an anchored menu. The `label` names the pill for assistive technology. Each entry runs a callback when it is picked.
+
+```rust
+let auto_join = cx.signal(true);
+popup_menu(
+    icons::ELLIPSIS,
+    "Network options",
+    vec![
+        popup_menu_item("Auto-Join", move |cx| auto_join.update(cx, |on| *on = !*on))
+            .checked(auto_join),
+        popup_menu_item("Network Settings…", |cx| open_settings(cx)),
+        popup_menu_separator(),
+        popup_menu_item("Share Password…", |_| {}).disabled(true),
+        popup_menu_item("Forget This Network…", move |cx| forget(cx)).destructive(),
+    ],
+)
+```
+
+- `popup_menu_item(label, on_select)` returns a `MenuEntry` that runs `on_select(cx)` when it is picked.
+- `popup_menu_separator()` returns a hairline between two groups of rows.
+- `.checked(flag)` draws a leading checkmark while the flag holds. Use it for a row that toggles something.
+- `.disabled(flag)` dims the row and ignores presses on it while the flag holds.
+- `.destructive()` letters the row in the danger color. Use it for the one row that destroys something.
+
+`checked` and `disabled` take a `MenuFlag`, which converts from a `bool` (decided when the menu is built) or a `Signal<bool>` (followed while the menu is open). Arrow keys, Home and End move the highlight, Enter picks, and Escape closes. `.start_open()` mounts it open for previews, and `.disabled(true)` on the menu itself disables the trigger.
+
+The kit exports these two functions as `popup_menu_item` and `popup_menu_separator` because `menu_item` and `menu_separator` already name the rows of a [context menu](/docs/crownui/kit-overlays). Context menu rows are views you attach listeners to. Popup menu entries are plain values with a callback, because the popup menu builds its rows itself each time it opens.
+
+## Why controls bind to signals
+
+Every control on this page takes a signal and writes into it. There is no `value` plus `on_change` pair to wire up, and no copy of the state inside the widget.
+
+The value lives in one place, the reactive runtime, where your other views, effects, tests and agents read the same signal. A test sets the signal and checks the widget, or clicks the widget and checks the signal. An agent that drives the app through MCP sees the same value a user does.
+
+The cost is that you create and own a signal per control, even for a value you only read once. Controls that hold an index, like `select`, `radio_group`, `choice_list` and `toggle_group`, store a position and not the option itself. If you reorder or replace the options list, update the index in the same handler, or the selection points at a different option. A toggle or slider also has no change event of its own. Use `cx.effect` or a `bind` that reads the signal to react to it, and keep side effects such as saving settings in that one place.

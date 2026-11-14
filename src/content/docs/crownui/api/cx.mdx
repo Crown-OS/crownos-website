@@ -1,0 +1,467 @@
+---
+title: Cx
+description: The context every build closure, event handler and task completion receives, with every method grouped by purpose.
+api: FN Cx
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Where a Cx shows up"
+component(|cx| {
+    let count = cx.signal(0);
+    cx.spawn(load_count(), move |cx, saved| count.set(cx, saved));
+    cx.on_close_requested(move |cx, event| {
+        if count.get(cx) > 0 {
+            event.prevent_default();
+        }
+    });
+    button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1))
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub struct Cx { /* private */ }
+
+impl Deref for Cx {
+    type Target = Runtime;
+}
+
+impl DerefMut for Cx {}
+```
+</ResponseExample>
+</ApiExamples>
+
+`Cx` owns the window's reactive runtime and its element tree. It derefs to `Runtime`, so `cx.signal(..)`, `count.get(cx)` and `count.set(cx, ..)` all work on it directly. Every other method talks to the view or to the platform.
+
+You receive `&mut Cx` in these places:
+
+- the closure of `component(|cx| ..)`, once, while the view is built,
+- every event handler, such as `.on_click(|cx, event| ..)`,
+- the completion of `cx.spawn`, `cx.request_animation_frame`, `cx.read_clipboard` and `cx.start_drag`,
+- listeners such as `cx.on_close_requested` and `cx.on_app_windows`,
+- `Kind::mount` and app tool handlers.
+
+`bind`, `memo`, `effect` and `canvas` painters receive `&mut Runtime` instead. They read and write signals but cannot call the methods on this page that are not part of the runtime.
+
+## Scope rules
+
+Many methods tie what they create to the current scope: signals, effects, tasks, animation frames, close listeners, app icon listeners and app tools. When that scope is disposed, they go away with it.
+
+In a component body the current scope is the component's own. In an event handler it is the window's root scope, because handlers do not switch scopes. So a task spawned from `on_click` is not cancelled when the component unmounts. Write its result with `try_set`, or spawn from the body.
+
+## Reactive state
+
+These come from `Runtime` through `Deref`. Each has its own page.
+
+<ResponseField name="signal" type="fn<T: 'static>(&mut self, T) -> Signal<T>">
+  Creates a reactive value in the current scope. See [signal](/docs/crownui/api/signal).
+</ResponseField>
+
+<ResponseField name="memo" type="fn<T: PartialEq + 'static>(&mut self, impl FnMut(&mut Runtime) -> T + 'static) -> Memo<T>">
+  Creates a derived value that stops propagation when unchanged. See [memo](/docs/crownui/api/memo).
+</ResponseField>
+
+<ResponseField name="effect" type="fn(&mut self, impl FnMut(&mut Runtime) + 'static) -> EffectId">
+  Runs a side effect now and after every change to what it read. See [effect](/docs/crownui/api/effect).
+</ResponseField>
+
+<ResponseField name="store" type="fn<T: 'static>(&mut self, T) -> Store<T>">
+  Creates untracked storage in the current scope. See [store](/docs/crownui/api/store).
+</ResponseField>
+
+<ResponseField name="provide" type="fn<T: 'static>(&mut self, T) -> Signal<T>">
+  Shares a value with every scope below the current one. See [provide](/docs/crownui/api/provide).
+</ResponseField>
+
+<ResponseField name="environment" type="fn<T: 'static>(&self) -> Option<Signal<T>>">
+  Finds the nearest provided value of type `T`.
+</ResponseField>
+
+<ResponseField name="with2" type="fn<A: 'static, B: 'static, R>(&mut self, Signal<A>, Signal<B>, impl FnOnce(&A, &B) -> R) -> R">
+  Lends two signals at once and subscribes the running observer to both. Panics when either was disposed.
+</ResponseField>
+
+<ResponseField name="untrack" type="fn<R>(&mut self, impl FnOnce(&mut Runtime) -> R) -> R">
+  Runs a closure whose reads subscribe nothing.
+</ResponseField>
+
+<ResponseField name="on_cleanup" type="fn(&mut self, impl FnOnce(&mut Runtime) + 'static)">
+  Runs a closure when the current scope is disposed.
+</ResponseField>
+
+<ResponseField name="dispose_effect" type="fn(&mut self, EffectId)">
+  Stops one effect before its scope ends.
+</ResponseField>
+
+## Scopes and diagnostics
+
+Also from `Runtime`. App code rarely calls these. Components and tests do.
+
+<ResponseField name="current_scope" type="fn(&self) -> ScopeId">
+  The scope new signals, effects and tasks are created in.
+</ResponseField>
+
+<ResponseField name="root_scope" type="fn(&self) -> ScopeId">
+  The scope that lives as long as the runtime. It is never disposed.
+</ResponseField>
+
+<ResponseField name="create_scope" type="fn(&mut self) -> ScopeId">
+  Creates a child of the current scope.
+</ResponseField>
+
+<ResponseField name="create_child_scope" type="fn(&mut self, ScopeId) -> ScopeId">
+  Creates a child of the given scope.
+</ResponseField>
+
+<ResponseField name="set_current_scope" type="fn(&mut self, ScopeId) -> ScopeId">
+  Makes a scope current and returns the previous one. Restore it with a second call.
+</ResponseField>
+
+<ResponseField name="with_scope" type="fn<R>(&mut self, ScopeId, impl FnOnce(&mut Runtime) -> R) -> R">
+  Runs a closure with a scope current, then restores the previous one.
+</ResponseField>
+
+<ResponseField name="dispose_scope" type="fn(&mut self, ScopeId)">
+  Frees a scope, its children and everything created in them, and runs their cleanups. Disposing the root scope does nothing.
+</ResponseField>
+
+<ResponseField name="is_scope_alive" type="fn(&self, ScopeId) -> bool">
+  Whether a scope has not been disposed.
+</ResponseField>
+
+<ResponseField name="parent_scope" type="fn(&self, ScopeId) -> Option<ScopeId>">
+  The parent of a scope.
+</ResponseField>
+
+<ResponseField name="set_error_boundary" type="fn(&mut self, ScopeId, impl FnMut(&mut Runtime, &ObserverPanic) + 'static)">
+  Makes a scope receive panics from observers inside it. `error_boundary(..)` is built on this.
+</ResponseField>
+
+<ResponseField name="take_panics" type="fn(&mut self) -> Vec<ObserverPanic>">
+  Returns the observer panics no error boundary handled since the last call.
+</ResponseField>
+
+<ResponseField name="flush" type="fn(&mut self) -> Result<FlushStats, FlushError>">
+  Runs dirty observers until everything is consistent. The view calls it for you after each event.
+</ResponseField>
+
+<ResponseField name="has_pending" type="fn(&self) -> bool">
+  Whether any observer waits to run.
+</ResponseField>
+
+<ResponseField name="signal_count" type="fn(&self) -> usize">
+  Number of live signals, memos and stores. Useful in leak tests.
+</ResponseField>
+
+<ResponseField name="observer_count" type="fn(&self) -> usize">
+  Number of live effects and memos.
+</ResponseField>
+
+<ResponseField name="scope_count" type="fn(&self) -> usize">
+  Number of live scopes, including the root.
+</ResponseField>
+
+## Async work and timing
+
+<ResponseField name="spawn" type="fn<T: Send + 'static>(&mut self, impl Future<Output = T> + Send + 'static, impl FnOnce(&mut Cx, T) + 'static) -> TaskId">
+  Runs a future off the UI thread and calls the second closure with its output on the UI thread. The task is cancelled when the current scope is disposed first. See [Async](/docs/crownui/async).
+</ResponseField>
+
+<ResponseField name="request_animation_frame" type="fn(&mut self, impl FnOnce(&mut Cx, Duration) + 'static)">
+  Calls the closure with the frame time just before the next frame is laid out, like the DOM's `requestAnimationFrame`. Ask again from inside it to run every frame. Dropped when the current scope ends first. Use it for simulations and values that drive layout. Use `.transition(..)` for everything else.
+</ResponseField>
+
+<ResponseField name="with_animation" type="fn(&mut self, impl Into<Curve>, impl FnOnce(&mut Cx))">
+  Runs the closure so every property change it causes animates with the curve, like SwiftUI's `withAnimation`.
+</ResponseField>
+
+```rust
+button("Expand").on_click(move |cx, _| {
+    cx.with_animation(Spring::snappy(), |cx| expanded.set(cx, true))
+})
+```
+
+## Window and display signals
+
+Each returns a signal the view keeps up to date. Read it inside `bind` to react to changes.
+
+<ResponseField name="color_scheme" type="fn(&self) -> Signal<ColorScheme>">
+  The window's light or dark scheme. It drives `.dark(..)` variants and is also provided in the root scope's environment.
+</ResponseField>
+
+<ResponseField name="scale_factor" type="fn(&self) -> Signal<f32>">
+  Device pixels per logical pixel, so pixel art can be made at the size it shows.
+</ResponseField>
+
+<ResponseField name="output_size" type="fn(&self) -> Signal<Option<Size>>">
+  Logical size of the output the window is on, once the platform reports it. Layer surfaces use it to place themselves against the whole screen.
+</ResponseField>
+
+<ResponseField name="platform_capabilities" type="fn(&self) -> Signal<Capabilities>">
+  What the platform supports, such as `materials`, `popups` or `text_input`, so a component picks a fallback instead of relying on something absent.
+</ResponseField>
+
+```rust
+let scheme = cx.color_scheme();
+text(bind(move |rt| match scheme.get(rt) {
+    ColorScheme::Dark => "Dark".to_owned(),
+    ColorScheme::Light => "Light".to_owned(),
+}))
+```
+
+## Observing nodes
+
+These take a `NodeId`, which you get inside `Kind::mount` or from `cx.build(..)`. Calling one twice for the same node returns the same signal.
+
+<ResponseField name="observe_size" type="fn(&mut self, NodeId) -> Signal<Size>">
+  Follows the node's laid-out size, updated after every layout pass.
+</ResponseField>
+
+<ResponseField name="observe_rect" type="fn(&mut self, NodeId) -> Signal<Rect>">
+  Follows where the node is laid out in the window.
+</ResponseField>
+
+<ResponseField name="observe_disabled" type="fn(&mut self, NodeId) -> Signal<bool>">
+  Follows whether the node is disabled by its `.disabled(..)` modifier.
+</ResponseField>
+
+## Focus and synthetic input
+
+<ResponseField name="request_focus" type="fn(&mut self, NodeId)">
+  Moves keyboard focus to the node after the current event, or by the end of the frame when no event is being handled, as when a component mounts.
+</ResponseField>
+
+<ResponseField name="emit_input" type="fn(&mut self, NodeId, impl Into<String>)">
+  Fires a DOM `input` event on the node after the current handler. Text fields use it.
+</ResponseField>
+
+<ResponseField name="emit_change" type="fn(&mut self, NodeId, impl Into<String>)">
+  Fires a DOM `change` event on the node after the current handler.
+</ResponseField>
+
+<ResponseField name="emit_submit" type="fn(&mut self, NodeId, impl Into<String>)">
+  Fires a DOM `submit` event on the node after the current handler.
+</ResponseField>
+
+## Clipboard
+
+<ResponseField name="copy_to_clipboard" type="fn(&mut self, impl Into<String>)">
+  Puts text on the system clipboard.
+</ResponseField>
+
+<ResponseField name="paste_from_clipboard" type="fn(&mut self)">
+  Requests the clipboard's text. It arrives as a paste into the focused element.
+</ResponseField>
+
+<ResponseField name="set_clipboard" type="fn(&mut self, Vec<(String, Vec<u8>)>)">
+  Offers the same content in several MIME types. An item in a text type is also offered under the other text types.
+</ResponseField>
+
+<ResponseField name="read_clipboard" type="fn(&mut self, &[&str], impl FnOnce(&mut Cx, Option<ClipboardData>) + 'static)">
+  Reads the clipboard in the first of the MIME types it holds, best first. The closure gets `None` when it holds none of them.
+</ResponseField>
+
+```rust
+button("Paste image").on_click(move |cx, _| {
+    cx.read_clipboard(&["image/png", "text/uri-list"], move |cx, data| {
+        if let Some(data) = data {
+            pasted_type.set(cx, data.mime_type);
+        }
+    })
+})
+```
+
+See [Clipboard and drag](/docs/crownui/clipboard-and-drag).
+
+## Drag out of the window
+
+<ResponseField name="start_drag" type="fn(&mut self, DragSource, impl FnOnce(&mut Cx, DragOutcome) + 'static) -> bool">
+  Hands a drag source to the platform while the pointer button is held. Call it from a `dragstart` or pointer-down handler. The closure learns whether a target took the drag. Returns `false`, dropping both, while an earlier drag is still in flight.
+</ResponseField>
+
+## Window control
+
+<ResponseField name="begin_window_move" type="fn(&mut self)">
+  Lets the user drag the window by the element being pressed. Call it from a pointer-down handler, as a client-drawn title bar does.
+</ResponseField>
+
+<ResponseField name="minimize_window" type="fn(&mut self)">
+  Minimizes the window.
+</ResponseField>
+
+<ResponseField name="toggle_maximize_window" type="fn(&mut self)">
+  Maximizes the window, or restores it when it already is.
+</ResponseField>
+
+<ResponseField name="request_close" type="fn(&mut self)">
+  Asks to close the window the way its close button does. `on_close_requested` listeners can still keep it open.
+</ResponseField>
+
+<ResponseField name="close_window" type="fn(&mut self)">
+  Closes the window without asking the `on_close_requested` listeners.
+</ResponseField>
+
+<ResponseField name="on_close_requested" type="fn(&mut self, impl FnMut(&mut Cx, &mut Event<()>) + 'static)">
+  Calls the listener when the user or the compositor asks to close the window, until the current scope ends. `event.prevent_default()` keeps the window open. Without listeners the window closes right away.
+</ResponseField>
+
+<ResponseField name="set_idle_inhibited" type="fn(&mut self, bool)">
+  Keeps the system from idling, such as screen blanking or sleep, while the window is visible. It is released with the window, so a crash cannot keep the machine awake.
+</ResponseField>
+
+```rust
+cx.on_close_requested(move |cx, event| {
+    if unsaved.get(cx) {
+        event.prevent_default();
+        confirm_open.set(cx, true);
+    }
+});
+
+button("Discard and close").on_click(|cx, _| cx.close_window())
+```
+
+## Layer surfaces
+
+Panels, docks and overlays run as layer surfaces. Toplevel windows ignore these two methods. See [Windows](/docs/crownui/windows).
+
+<ResponseField name="set_keyboard_interactivity" type="fn(&mut self, KeyboardInteractivity)">
+  Changes when the layer surface takes keyboard focus, for example `KeyboardInteractivity::OnDemand` only while a text field is open. Applied with the next frame.
+</ResponseField>
+
+<ResponseField name="set_layer_height" type="fn(&mut self, LayerExtent)">
+  Resizes the layer surface along its height, for example to give a panel room only while it is open. Every pixel of surface costs GPU memory whether or not anything is drawn there. The new size arrives as a resize.
+</ResponseField>
+
+## App icons
+
+A dock or launcher tells the compositor where it draws each app's icon, so windows open out of it and minimize into it.
+
+<ResponseField name="set_app_icon" type="fn(&mut self, &str, Rect, f32)">
+  Shows the icon of `app_id` at a rect with a corner radius, where it rests when the window is fully shown. Calling it again moves the icon. An unchanged placement sends nothing.
+</ResponseField>
+
+<ResponseField name="remove_app_icon" type="fn(&mut self, &str)">
+  Stops showing the icon of an app.
+</ResponseField>
+
+<ResponseField name="activate_app_icon" type="fn(&mut self, &str) -> bool">
+  Hands a click on an icon to the compositor, which restores and focuses the app's windows or asks `on_launch_app` listeners to start it. Returns `false` when the platform has no app icons or the window does not show this one, so the caller starts the app itself. The result is `#[must_use]`.
+</ResponseField>
+
+<ResponseField name="on_launch_app" type="fn(&mut self, impl FnMut(&mut Cx, &str) + 'static)">
+  Calls the listener with the app id when the compositor asks to start an app whose icon was activated, until the current scope ends.
+</ResponseField>
+
+<ResponseField name="on_app_windows" type="fn(&mut self, impl FnMut(&mut Cx, &AppWindows) + 'static)">
+  Calls the listener whenever an app's windows change, starting with every app already running. `AppWindows` has `app_id`, `count` and `focused`. A count of 0 means the app has no window left.
+</ResponseField>
+
+<ResponseField name="on_app_icon_lifted" type="fn(&mut self, impl FnMut(&mut Cx, &str, bool) + 'static)">
+  Calls the listener with `true` when the compositor starts drawing an app's icon as part of a window's motion, and `false` when it stops. In between, the icon keeps its place but should not be drawn.
+</ResponseField>
+
+## Images
+
+<ResponseField name="register_image" type="fn(&mut self, u32, u32, Vec<u8>) -> ImageId">
+  Queues straight-alpha RGBA8 pixels of the given width and height for the renderer and returns the id to draw them by. The byte length must be `width * height * 4`, or the upload is rejected with `CUI0401`.
+</ResponseField>
+
+<ResponseField name="release_image" type="fn(&mut self, ImageId)">
+  Frees an image once nothing on screen draws it. Drawing it afterwards draws nothing.
+</ResponseField>
+
+<ResponseField name="release_image_on_cleanup" type="fn(&mut self, ImageId)">
+  Releases the image when the current scope ends, so an image lives exactly as long as the component that registered it. `image(..)` does this for you.
+</ResponseField>
+
+## Agents
+
+<ResponseField name="register_tool" type="fn(&mut self, AppTool)">
+  Exposes an action to AI agents over MCP while the current component stays mounted. `AppTool::new(name, description, input_schema, handler)` takes a handler of type `FnMut(&mut Cx, &str) -> Result<String, String>`, with JSON text in and out. Call `.destructive()` to make agents confirm first.
+</ResponseField>
+
+```rust
+use crownui::ext::AppTool;
+
+cx.register_tool(AppTool::new(
+    "clear_todos",
+    "Removes every finished todo",
+    r#"{"type":"object","properties":{}}"#,
+    move |cx, _arguments| {
+        todos.update(cx, |list| list.retain(|todo| !todo.done));
+        Ok("{}".to_owned())
+    },
+).destructive());
+```
+
+See [Agents](/docs/crownui/agents).
+
+## Building nodes
+
+These are for `Kind` implementations, the low-level way to write a widget. App code builds views with functions such as `vstack` and `text` instead. See [Custom components](/docs/crownui/custom-components).
+
+<ResponseField name="build" type="fn(&mut self, impl View) -> NodeId">
+  Mounts a view as a child of nothing. The caller attaches the returned root.
+</ResponseField>
+
+<ResponseField name="set_children" type="fn(&mut self, NodeId, impl ViewSeq)">
+  Mounts views and makes them the node's children, replacing previous ones.
+</ResponseField>
+
+<ResponseField name="adopt_children" type="fn(&mut self, NodeId, Vec<NodeId>)">
+  Makes already-built nodes the node's children.
+</ResponseField>
+
+<ResponseField name="set_role" type="fn(&mut self, NodeId, Role)">
+  Sets the ARIA role the kind implies.
+</ResponseField>
+
+<ResponseField name="set_default_style" type="fn(&mut self, NodeId, StyleProp)">
+  Applies a default style that the element's own modifiers override.
+</ResponseField>
+
+<ResponseField name="bind_style" type="fn(&mut self, NodeId, impl FnMut(&mut Runtime) -> StyleProp + 'static)">
+  Binds a default style property to signals.
+</ResponseField>
+
+<ResponseField name="add_listener" type="fn(&mut self, NodeId, Listener)">
+  Adds a listener on behalf of the kind, such as a toggle flipping its signal on click.
+</ResponseField>
+
+<ResponseField name="set_text" type="fn(&mut self, NodeId, impl IntoProp<String>)">
+  Makes the node display text, recomputed when the signals it reads change. Sets the role to text.
+</ResponseField>
+
+<ResponseField name="set_canvas" type="fn(&mut self, NodeId, impl FnMut(&mut Runtime, Size, &mut DrawList) + 'static)">
+  Makes the node draw with a painter. The painter re-runs when the node's size or a signal it read changes.
+</ResponseField>
+
+<ResponseField name="set_image" type="fn(&mut self, NodeId, ImageId, Size)">
+  Makes the node draw a registered image at its natural size unless styled otherwise. Sets the role to image.
+</ResponseField>
+
+<ResponseField name="set_checked" type="fn(&mut self, NodeId, Option<bool>)">
+  Sets the checked state reported to assistive technology.
+</ResponseField>
+
+<ResponseField name="bind_checked" type="fn(&mut self, NodeId, impl FnMut(&mut Runtime) -> bool + 'static)">
+  Binds the checked state to signals.
+</ResponseField>
+
+<ResponseField name="bind_value" type="fn(&mut self, NodeId, impl FnMut(&mut Runtime) -> String + 'static)">
+  Binds the accessible value, such as a text field's contents, to signals.
+</ResponseField>
+
+<ResponseField name="tree" type="fn(&self) -> &ElementTree">
+  Read-only access to the element tree.
+</ResponseField>
+
+## Why one context
+
+CrownUI has no globals and no interior mutability. Everything a handler can touch, from signals to the clipboard queue, lives in one value the UI thread owns, and you get it as `&mut Cx`. The borrow checker can then prove that nothing else is reading the tree while you change it, without a lock.
+
+Most platform methods do not act right away. `copy_to_clipboard`, `request_focus`, `minimize_window` and the rest record a request, and the runtime carries it out after the handler returns. That keeps a handler free of I/O and lets tests run the same code against a headless platform.
+
+The cost is that `Cx` is a wide type. It mixes reactive state, view building and platform requests in one place. Closures that only need state get `&mut Runtime` instead, which is why `bind` and `effect` cannot open a clipboard or move focus.

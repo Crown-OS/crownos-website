@@ -1,0 +1,196 @@
+---
+title: text
+description: Show a run of text from a literal or a reactive value, styled with Tailwind-named methods.
+api: FN text
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Greeting"
+use crownui::prelude::*;
+
+fn greeting() -> impl View {
+    component(|cx| {
+        let name = cx.signal(String::from("Ada"));
+        vstack((
+            text("Welcome back").text_size(28.0).font_bold(),
+            text(bind(move |rt| format!("Signed in as {}", name.get(rt))))
+                .text_color(rgb(0x64748b)),
+        ))
+        .gap(4.0)
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn text(content: impl IntoProp<String>) -> Element<TextKind>
+```
+</ResponseExample>
+</ApiExamples>
+
+`text` shows a run of text. Its content is a literal or a reactive value, and it wraps to the width
+its parent gives it.
+
+## Parameters
+
+<ParamField name="content" type="impl IntoProp<String>" required>
+  One of:
+
+  - a literal: `&str`, `String` or `&String`
+  - a `Signal<String>` or `Memo<String>`
+  - a `bind(move |rt| ..)` closure that returns a `String`
+</ParamField>
+
+<Note>
+  A `bind` closure must return `String`, not `&str`. Call `.to_string()` or use `format!`.
+</Note>
+
+## Returns
+
+<ResponseField name="Element<TextKind>" type="Element">
+  It has the `Text` role. Its accessible name is the text itself, so tests and agents find it with
+  `role(Role::Text).name("Welcome back")`.
+</ResponseField>
+
+## Reactive content
+
+When the content is a `Signal`, a `Memo` or a `bind`, only this node's text changes when the inputs
+change. The rest of the tree is untouched.
+
+<CodeGroup>
+```rust title="bind"
+let seconds = cx.signal(0_u32);
+text(bind(move |rt| {
+    let total = seconds.get(rt);
+    format!("{:02}:{:02}", total / 60, total % 60)
+}))
+.font_medium()
+```
+
+```rust title="Signal"
+let status = cx.signal(String::from("Idle"));
+text(status)
+```
+</CodeGroup>
+
+## Text style methods
+
+Every method takes a literal. The ones marked bindable also take a `Signal`, a `Memo` or a `bind`.
+
+<ParamField name=".text_size" type="impl IntoProp<f32>">
+  The font size in logical pixels. Bindable. The default is 14.
+</ParamField>
+
+<ParamField name=".text_color" type="impl IntoProp<Color>">
+  The color. Bindable. The default is black.
+</ParamField>
+
+<ParamField name=".font_weight" type="u16">
+  A weight on the 100 to 900 scale.
+</ParamField>
+
+<ParamField name=".font_medium / .font_semibold / .font_bold" type="()">
+  Common weights.
+</ParamField>
+
+<ParamField name=".font_family" type="impl Into<String>">
+  Picks a family by name. Register custom fonts with `AppConfig::font`.
+</ParamField>
+
+<ParamField name=".italic" type="()">
+  Uses the italic style.
+</ParamField>
+
+<ParamField name=".leading" type="impl IntoProp<f32>">
+  The line height as a multiple of the font size. Bindable.
+</ParamField>
+
+<ParamField name=".tracking" type="impl IntoProp<f32>">
+  The letter spacing in logical pixels. Bindable.
+</ParamField>
+
+<ParamField name=".text_left / .text_center / .text_right / .text_justify" type="()">
+  Align the lines. Left and right mean start and end, so they flip in a right-to-left layout.
+</ParamField>
+
+<ParamField name=".line_clamp" type="u32">
+  Limits the text to a number of lines.
+</ParamField>
+
+<ParamField name=".truncate" type="()">
+  Keeps the text on one line and ends it with an ellipsis.
+</ParamField>
+
+<ParamField name=".text_blur" type="impl IntoProp<f32>">
+  Blurs the glyphs alone by a radius in logical pixels. Bindable.
+</ParamField>
+
+```rust
+text("A very long file name that does not fit.pdf")
+    .truncate()
+    .w(180.0)
+
+text(description)
+    .text_size(13.0)
+    .leading(1.4)
+    .line_clamp(2)
+```
+
+## Inheritance
+
+Text properties cascade like CSS. A `text` node without a size, color, weight, family, italic, line
+height, letter spacing or alignment takes the value from the nearest ancestor that sets it. Set them
+once on a container.
+
+```rust
+vstack((
+    text("Title").font_bold(),
+    text("Body copy in the same color and size."),
+))
+.text_size(15.0)
+.text_color(rgb(0x0f172a))
+```
+
+<Warning>
+  `.line_clamp`, `.truncate` and `.text_blur` do not cascade. Set them on the `text` node itself.
+</Warning>
+
+## Layout
+
+A `text` node measures itself. Its natural width is its longest line, and it wraps when its parent
+offers less. In an `hstack`, give the text `.grow(1.0)` so it takes the free width, and let it wrap
+or truncate there.
+
+```rust
+hstack((
+    text(title).grow(1.0).truncate(),
+    text("2 MB").text_color(rgb(0x64748b)),
+))
+.gap(8.0)
+```
+
+## Why it works this way
+
+Impeller shapes text into a paragraph, and CrownUI caches the shaped layout by text, style and
+width. Unchanged text costs nothing per frame. Styles cascade so a page sets its typography once
+instead of on every label.
+
+The cost is that every change of content shapes the text again. A label bound to a value that
+changes on every frame shapes on every frame. Keep fast-changing numbers short, and keep them in
+their own `text` node so the long text around them stays cached.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Styling" icon="pencil" href="/docs/crownui/styling">
+    All style methods and variants.
+  </Card>
+  <Card title="AppConfig" icon="settings" href="/docs/crownui/api/app-config">
+    Register fonts.
+  </Card>
+  <Card title="Accessibility" icon="info" href="/docs/crownui/accessibility">
+    Roles, names and the semantic tree.
+  </Card>
+</CardGroup>

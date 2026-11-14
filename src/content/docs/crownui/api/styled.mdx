@@ -1,0 +1,322 @@
+---
+title: Styled
+description: Every Tailwind-named style method on the Styled trait, grouped by category with its signature.
+api: FN Styled
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn card(title: &'static str, body: &'static str) -> impl View {
+    vstack((text(title).text_size(17.0).font_semibold(), text(body).text_color(rgb(0x64748b))))
+        .gap(6.0)
+        .p(16.0)
+        .w_full()
+        .rounded(14.0)
+        .bg(WHITE)
+        .border(1.0)
+        .border_color(rgba(0x0f172a14))
+        .shadow(Shadow::sm())
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub trait Styled: Sized {
+    fn modifier(self, modifier: Modifier) -> Self;
+    // every other method is built on modifier and listed below
+}
+
+impl<K: Kind> Styled for Element<K> { .. }
+impl Styled for VariantStyle { .. }
+```
+</ResponseExample>
+</ApiExamples>
+
+`Styled` is the trait behind every style method. Its methods are Tailwind class names that take literal values in logical pixels, or signals and `bind` closures for values that change.
+
+Every widget returns an `Element<K>`, so every widget has these methods. `VariantStyle` implements `Styled` too, which is why the closure in `.hover(|style| style.bg(..))` uses the same names. The `Listeners` and `Semantic` traits are implemented for every `Styled` type, so event and accessibility methods chain the same way.
+
+Each call appends a modifier. Modifiers apply in order after the widget's own defaults, so the last call for a property wins. Read the [styling guide](/docs/crownui/styling) for a walkthrough and the [layout guide](/docs/crownui/layout) for how the layout methods combine.
+
+## Value types
+
+Methods that take `impl IntoProp<T>` accept a literal or a reactive source.
+
+<ParamField name="f32" type="impl IntoProp<f32>">
+  An `f32`, `f64`, `i32` or `u32` literal, a `Signal<f32>`, a `Memo<f32>` or `bind(move |rt| ..)` returning `f32`.
+</ParamField>
+
+<ParamField name="Color" type="impl IntoProp<Color>">
+  A `Color` such as `rgb(0x3b82f6)`, `rgba(0x3b82f680)` or `WHITE`, or a signal, memo or `bind` returning one.
+</ParamField>
+
+<ParamField name="bool" type="impl IntoProp<bool>">
+  A `bool`, or a signal, memo or `bind` returning one.
+</ParamField>
+
+<ParamField name="Vector" type="impl IntoProp<Vector>">
+  A `Vector::new(x, y)`, or a signal, memo or `bind` returning one.
+</ParamField>
+
+<ParamField name="Material" type="impl IntoProp<Material>">
+  A `Material` such as `Material::thin()`, or a reactive source of one.
+</ParamField>
+
+A bound value updates that single property when its inputs change. The component does not run again. Methods that take a plain `f32`, `u16`, `Shadow`, `CursorIcon` or `Vec<GridTrack>` take literals only.
+
+## The modifier method
+
+<ParamField name="modifier" type="fn modifier(self, modifier: Modifier) -> Self" required>
+  Appends a raw `Modifier`. Implementors provide this one method and get every other method for free. Component libraries use it with `Modifier::Style(StyleProp::..)` for properties that have no named method.
+</ParamField>
+
+## Padding
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `p` | `fn p(self, impl IntoProp<f32>) -> Self` | `p-*`, every edge |
+| `px` | `fn px(self, impl IntoProp<f32>) -> Self` | `px-*`, left and right |
+| `py` | `fn py(self, impl IntoProp<f32>) -> Self` | `py-*`, top and bottom |
+| `pt` | `fn pt(self, impl IntoProp<f32>) -> Self` | `pt-*` |
+| `pr` | `fn pr(self, impl IntoProp<f32>) -> Self` | `pr-*` |
+| `pb` | `fn pb(self, impl IntoProp<f32>) -> Self` | `pb-*` |
+| `pl` | `fn pl(self, impl IntoProp<f32>) -> Self` | `pl-*` |
+
+```rust
+text("Padded").p(16.0).px(24.0) // 16 top and bottom, 24 left and right
+```
+
+## Margin
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `m` | `fn m(self, impl IntoProp<f32>) -> Self` | `m-*`, every edge |
+| `mx` | `fn mx(self, impl IntoProp<f32>) -> Self` | `mx-*` |
+| `my` | `fn my(self, impl IntoProp<f32>) -> Self` | `my-*` |
+| `mt` | `fn mt(self, impl IntoProp<f32>) -> Self` | `mt-*` |
+| `mr` | `fn mr(self, impl IntoProp<f32>) -> Self` | `mr-*` |
+| `mb` | `fn mb(self, impl IntoProp<f32>) -> Self` | `mb-*` |
+| `ml` | `fn ml(self, impl IntoProp<f32>) -> Self` | `ml-*` |
+
+Margins accept negative values, which pull a box over its neighbor.
+
+## Size
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `w` | `fn w(self, impl IntoProp<f32>) -> Self` | `w-*` |
+| `h` | `fn h(self, impl IntoProp<f32>) -> Self` | `h-*` |
+| `size` | `fn size(self, f32) -> Self` | `size-*`, width and height |
+| `min_w` | `fn min_w(self, impl IntoProp<f32>) -> Self` | `min-w-*` |
+| `min_h` | `fn min_h(self, impl IntoProp<f32>) -> Self` | `min-h-*` |
+| `max_w` | `fn max_w(self, impl IntoProp<f32>) -> Self` | `max-w-*` |
+| `max_h` | `fn max_h(self, impl IntoProp<f32>) -> Self` | `max-h-*` |
+| `w_full` | `fn w_full(self) -> Self` | `w-full` |
+| `h_full` | `fn h_full(self) -> Self` | `h-full` |
+| `w_frac` | `fn w_frac(self, f32) -> Self` | `w-1/2` and friends, as a fraction |
+| `h_frac` | `fn h_frac(self, f32) -> Self` | `h-1/2` and friends, as a fraction |
+| `aspect` | `fn aspect(self, impl IntoProp<f32>) -> Self` | `aspect-*`, width divided by height |
+
+```rust
+vstack(()).w_frac(0.5).aspect(16.0 / 9.0).bg(rgb(0x0f172a))
+```
+
+## Flex
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `flex_row` | `fn flex_row(self) -> Self` | `flex-row` |
+| `flex_col` | `fn flex_col(self) -> Self` | `flex-col`, the default |
+| `flex_row_reverse` | `fn flex_row_reverse(self) -> Self` | `flex-row-reverse` |
+| `flex_col_reverse` | `fn flex_col_reverse(self) -> Self` | `flex-col-reverse` |
+| `flex_wrap` | `fn flex_wrap(self) -> Self` | `flex-wrap` |
+| `grow` | `fn grow(self, impl IntoProp<f32>) -> Self` | `grow`, `grow-*` |
+| `shrink` | `fn shrink(self, impl IntoProp<f32>) -> Self` | `shrink`, `shrink-*` (default 1) |
+| `basis` | `fn basis(self, impl IntoProp<f32>) -> Self` | `basis-*` |
+| `flex_1` | `fn flex_1(self) -> Self` | `flex-1`: `grow(1.0).shrink(1.0).basis(0.0)` |
+
+```rust
+hstack((text("Label").shrink(0.0), text_field(value, "Value").flex_1()))
+```
+
+## Gap
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `gap` | `fn gap(self, impl IntoProp<f32>) -> Self` | `gap-*`, rows and columns |
+| `gap_x` | `fn gap_x(self, impl IntoProp<f32>) -> Self` | `gap-x-*`, between columns |
+| `gap_y` | `fn gap_y(self, impl IntoProp<f32>) -> Self` | `gap-y-*`, between rows |
+
+## Alignment
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `items_start` | `fn items_start(self) -> Self` | `items-start` |
+| `items_center` | `fn items_center(self) -> Self` | `items-center` |
+| `items_end` | `fn items_end(self) -> Self` | `items-end` |
+| `items_stretch` | `fn items_stretch(self) -> Self` | `items-stretch` |
+| `items_baseline` | `fn items_baseline(self) -> Self` | `items-baseline` |
+| `self_start` | `fn self_start(self) -> Self` | `self-start` |
+| `self_center` | `fn self_center(self) -> Self` | `self-center` |
+| `self_end` | `fn self_end(self) -> Self` | `self-end` |
+| `self_stretch` | `fn self_stretch(self) -> Self` | `self-stretch` |
+| `justify_start` | `fn justify_start(self) -> Self` | `justify-start` |
+| `justify_center` | `fn justify_center(self) -> Self` | `justify-center` |
+| `justify_end` | `fn justify_end(self) -> Self` | `justify-end` |
+| `justify_between` | `fn justify_between(self) -> Self` | `justify-between` |
+| `justify_around` | `fn justify_around(self) -> Self` | `justify-around` |
+| `justify_evenly` | `fn justify_evenly(self) -> Self` | `justify-evenly` |
+
+Without `items_*`, children stretch across the cross axis.
+
+## Grid
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `grid` | `fn grid(self) -> Self` | `grid` |
+| `grid_cols` | `fn grid_cols(self, u16) -> Self` | `grid-cols-*`, equal columns |
+| `grid_template_cols` | `fn grid_template_cols(self, Vec<GridTrack>) -> Self` | `grid-template-columns` |
+| `col_span` | `fn col_span(self, u16) -> Self` | `col-span-*` |
+| `row_span` | `fn row_span(self, u16) -> Self` | `row-span-*` |
+
+`grid_cols` and `grid_template_cols` also switch the box to grid layout, so `.grid()` is only needed for a grid with no explicit columns. `GridTrack` has three variants: `Length(f32)` in logical pixels, `Fraction(f32)` for a share of the free space like `1fr`, and `Auto` to fit the content.
+
+```rust
+vstack((text("A"), text("B"), text("C")))
+    .grid_template_cols(vec![GridTrack::Length(120.0), GridTrack::Fraction(1.0), GridTrack::Auto])
+    .gap(8.0)
+```
+
+## Position
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `absolute` | `fn absolute(self) -> Self` | `absolute` |
+| `relative` | `fn relative(self) -> Self` | `relative`, the default |
+| `inset` | `fn inset(self, impl IntoProp<f32>) -> Self` | `inset-*`, every edge |
+| `top` | `fn top(self, impl IntoProp<f32>) -> Self` | `top-*` |
+| `right` | `fn right(self, impl IntoProp<f32>) -> Self` | `right-*` |
+| `bottom` | `fn bottom(self, impl IntoProp<f32>) -> Self` | `bottom-*` |
+| `left` | `fn left(self, impl IntoProp<f32>) -> Self` | `left-*` |
+| `z` | `fn z(self, i16) -> Self` | `z-*`, paint order among siblings |
+| `top_layer` | `fn top_layer(self) -> Self` | CSS top layer |
+
+`top_layer` paints the node above every other node in the window and lets it escape the clips of its ancestors. Popovers and menus use it.
+
+## Display and overflow
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `display_none` | `fn display_none(self) -> Self` | `hidden` (`display: none`), takes no space |
+| `hidden` | `fn hidden(self, impl IntoProp<bool>) -> Self` | `invisible`, keeps its space |
+| `overflow_hidden` | `fn overflow_hidden(self) -> Self` | `overflow-hidden`, clips children |
+| `overflow_scroll` | `fn overflow_scroll(self) -> Self` | `overflow-scroll`, makes a scroll container |
+
+```rust
+text("Unsaved changes").hidden(bind(move |rt| !dirty.get(rt)))
+```
+
+## Background, border and corners
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `bg` | `fn bg(self, impl IntoProp<Color>) -> Self` | `bg-*` |
+| `border` | `fn border(self, impl IntoProp<f32>) -> Self` | `border-*` (width) |
+| `border_color` | `fn border_color(self, impl IntoProp<Color>) -> Self` | `border-*` (color) |
+| `ring` | `fn ring(self, f32, impl IntoProp<Color>) -> Self` | `ring-*`, outside the border |
+| `outline` | `fn outline(self, f32, Color) -> Self` | `outline-*`, the same as `ring` |
+| `rounded` | `fn rounded(self, impl IntoProp<f32>) -> Self` | `rounded-*`, every corner |
+| `rounded_t` | `fn rounded_t(self, impl IntoProp<f32>) -> Self` | `rounded-t-*` |
+| `rounded_r` | `fn rounded_r(self, impl IntoProp<f32>) -> Self` | `rounded-r-*` |
+| `rounded_b` | `fn rounded_b(self, impl IntoProp<f32>) -> Self` | `rounded-b-*` |
+| `rounded_l` | `fn rounded_l(self, impl IntoProp<f32>) -> Self` | `rounded-l-*` |
+| `rounded_tl` | `fn rounded_tl(self, impl IntoProp<f32>) -> Self` | `rounded-tl-*` |
+| `rounded_tr` | `fn rounded_tr(self, impl IntoProp<f32>) -> Self` | `rounded-tr-*` |
+| `rounded_br` | `fn rounded_br(self, impl IntoProp<f32>) -> Self` | `rounded-br-*` |
+| `rounded_bl` | `fn rounded_bl(self, impl IntoProp<f32>) -> Self` | `rounded-bl-*` |
+
+The curve of every corner in a window is set once with `AppConfig::corner_shape(CornerShape::Squircle)`. The default is `CornerShape::Round`.
+
+```rust
+text("Selected").px(10.0).py(4.0).rounded(999.0).ring(2.0, rgb(0x3b82f6))
+```
+
+## Effects
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `shadow` | `fn shadow(self, Shadow) -> Self` | `shadow-*` |
+| `shadow_none` | `fn shadow_none(self) -> Self` | `shadow-none` |
+| `opacity` | `fn opacity(self, impl IntoProp<f32>) -> Self` | `opacity-*`, a fraction from 0 to 1 |
+| `backdrop_blur` | `fn backdrop_blur(self, impl IntoProp<f32>) -> Self` | `backdrop-blur-*`, blurs what is behind |
+| `material` | `fn material(self, impl IntoProp<Material>) -> Self` | CrownOS glass rendered by the compositor |
+
+`Shadow` has four presets, `Shadow::sm()`, `Shadow::md()`, `Shadow::lg()` and `Shadow::xl()`, and a constructor, `Shadow::new(color, blur, offset)`. `Material` has `Material::thin()` and `Material::thick()`. When the compositor does not offer materials, the node is drawn with an in-app backdrop blur.
+
+```rust
+vstack(text("Glass"))
+    .p(20.0)
+    .rounded(20.0)
+    .bg(rgba(0xffffff26))
+    .backdrop_blur(24.0)
+    .shadow(Shadow::xl())
+```
+
+## Transforms
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `translate` | `fn translate(self, impl IntoProp<Vector>) -> Self` | `translate-*` on both axes |
+| `translate_x` | `fn translate_x(self, impl IntoProp<f32>) -> Self` | `translate-x-*` |
+| `translate_y` | `fn translate_y(self, impl IntoProp<f32>) -> Self` | `translate-y-*` |
+| `scale` | `fn scale(self, impl IntoProp<f32>) -> Self` | `scale-*`, as a factor |
+| `scale_x` | `fn scale_x(self, impl IntoProp<f32>) -> Self` | `scale-x-*` |
+| `scale_y` | `fn scale_y(self, impl IntoProp<f32>) -> Self` | `scale-y-*` |
+| `rotate` | `fn rotate(self, impl IntoProp<f32>) -> Self` | `rotate-*`, in degrees |
+| `origin` | `fn origin(self, f32, f32) -> Self` | `origin-*`, as a fraction of the size |
+
+Transforms do not change layout. `translate_x` and `translate_y` each set the whole translation, so the later one replaces the earlier one. Use `translate(Vector::new(x, y))` to move on both axes.
+
+## Text
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `text_size` | `fn text_size(self, impl IntoProp<f32>) -> Self` | `text-*` (size) |
+| `text_color` | `fn text_color(self, impl IntoProp<Color>) -> Self` | `text-*` (color) |
+| `text_blur` | `fn text_blur(self, impl IntoProp<f32>) -> Self` | `blur-*` on the glyphs only |
+| `font_weight` | `fn font_weight(self, u16) -> Self` | `font-*` (weight), 100 to 900 |
+| `font_medium` | `fn font_medium(self) -> Self` | `font-medium` |
+| `font_semibold` | `fn font_semibold(self) -> Self` | `font-semibold` |
+| `font_bold` | `fn font_bold(self) -> Self` | `font-bold` |
+| `font_family` | `fn font_family(self, impl Into<String>) -> Self` | `font-*` (family) |
+| `italic` | `fn italic(self) -> Self` | `italic` |
+| `leading` | `fn leading(self, impl IntoProp<f32>) -> Self` | `leading-*`, a multiple of the font size |
+| `tracking` | `fn tracking(self, impl IntoProp<f32>) -> Self` | `tracking-*`, letter spacing |
+| `text_left` | `fn text_left(self) -> Self` | `text-left` (start) |
+| `text_center` | `fn text_center(self) -> Self` | `text-center` |
+| `text_right` | `fn text_right(self) -> Self` | `text-right` (end) |
+| `text_justify` | `fn text_justify(self) -> Self` | `text-justify` |
+| `truncate` | `fn truncate(self) -> Self` | `truncate`, one line with an ellipsis |
+| `line_clamp` | `fn line_clamp(self, u32) -> Self` | `line-clamp-*` |
+
+Text properties inherit. Set them on a container and every text inside picks them up unless it sets its own.
+
+## Interaction
+
+| Method | Signature | Tailwind |
+|---|---|---|
+| `cursor` | `fn cursor(self, CursorIcon) -> Self` | `cursor-*` |
+| `pointer_events_none` | `fn pointer_events_none(self) -> Self` | `pointer-events-none` |
+| `pointer_events_auto` | `fn pointer_events_auto(self) -> Self` | `pointer-events-auto` |
+
+`CursorIcon` has `Default`, `Pointer`, `Text`, `Crosshair`, `Move`, `Grab`, `Grabbing`, `NotAllowed`, `Wait`, `Progress`, `EwResize`, `NsResize`, `NeswResize`, `NwseResize`, `ColResize` and `RowResize`.
+
+## What each group costs
+
+Layout methods (padding, margin, size, flex, gap, alignment, grid, position, `display_none`) rerun layout for the affected part of the tree when a bound value changes. Paint methods (background, border, ring, corners, shadow) skip layout and re-record the repaint boundary that holds the node. Opacity, transforms and backdrop blur also skip layout, and the render thread only composes the frame again. `hidden`, `z` and `top_layer` skip layout as well. Text methods reshape the text and rerun layout, because the text size can change. `overflow_hidden` and `overflow_scroll` touch both layout and paint.
+
+The same split decides what a variant accepts. Variants take paint, transform and text properties and ignore layout properties. See [variants](/docs/crownui/api/variants).

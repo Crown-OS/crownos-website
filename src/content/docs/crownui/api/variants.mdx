@@ -1,0 +1,206 @@
+---
+title: Variants
+description: Restyle an element while it is hovered, pressed, focused, disabled or dark, and animate it in and out.
+api: FN Element::hover
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn primary(label: &'static str) -> impl View {
+    button(label)
+        .bg(rgb(0x3b82f6))
+        .text_color(WHITE)
+        .hover(|style| style.bg(rgb(0x2563eb)))
+        .active(|style| style.bg(rgb(0x1d4ed8)).scale(0.97))
+        .focus_visible(|style| style.ring(2.0, rgb(0x93c5fd)))
+        .when_disabled(|style| style.opacity(0.4))
+        .dark(|style| style.bg(rgb(0x60a5fa)).text_color(rgb(0x0f172a)))
+        .transition(Spring::snappy())
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+impl<K: Kind> Element<K> {
+    pub fn hover(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn active(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn focus(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn focus_visible(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn when_disabled(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn dark(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn enter(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn exit(self, style: impl FnOnce(VariantStyle) -> VariantStyle) -> Self
+    pub fn transition(self, curve: impl Into<Curve>) -> Self
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+Variants restyle an element while a state holds: hovered, pressed, focused, disabled or in dark mode. They are Tailwind's `hover:`, `active:`, `focus:`, `focus-visible:`, `disabled:` and `dark:` prefixes. `enter`, `exit` and `transition` on the same type control how those changes animate.
+
+Each variant method takes a closure that receives an empty `VariantStyle` and returns it with styles added. `VariantStyle` implements [`Styled`](/docs/crownui/api/styled), so you call the same methods you use on the element. The styles apply on top of the element's base style while the state holds, and they are removed when it ends.
+
+Variants are methods of `Element<K>`, the type every widget returns. They are not part of `Styled`, so you cannot nest a variant inside another variant.
+
+## Parameters
+
+<ParamField name="style" type="impl FnOnce(VariantStyle) -> VariantStyle" required>
+  Builds the styles for the state. It runs once, when you call the method. Values inside it are literals or bound sources such as `bind(..)`.
+</ParamField>
+
+<ParamField name="curve" type="impl Into<Curve>" required>
+  For `transition` only. A `Spring` or a `Curve`. See [Spring and Curve](/docs/crownui/api/spring-curve).
+</ParamField>
+
+## Returns
+
+<ResponseField name="element" type="Element<K>">
+  The same element with one more modifier, ready for more chained calls.
+</ResponseField>
+
+## hover
+
+Applies while the pointer is over the element or any of its children.
+
+```rust
+text("Row").p(8.0).rounded(6.0).hover(|style| style.bg(rgba(0x0f172a0d)))
+```
+
+## active
+
+Applies while the element is pressed, from pointer down until pointer up. A press goes to the innermost element under the pointer that has a click listener and is not disabled, so the element needs an `on_click`.
+
+```rust
+button("Press")
+    .on_click(|_cx, _| println!("pressed"))
+    .active(|style| style.scale(0.96))
+    .transition(Spring::crisp())
+```
+
+## focus
+
+Applies while the element has keyboard focus, whether the focus came from a click or from the keyboard.
+
+```rust
+let query = cx.signal(String::new());
+text_field(query, "Search").focus(|style| style.bg(WHITE).ring(1.0, rgb(0x3b82f6)))
+```
+
+## focus_visible
+
+Applies while the element has focus that arrived by keyboard, such as Tab. Clicking a button does not show it. Use it for focus rings, so mouse users do not see a ring after every click.
+
+```rust
+button("Save").focus_visible(|style| style.ring(2.0, rgb(0x3b82f6)))
+```
+
+## when_disabled
+
+Applies while the element is disabled through `.disabled(..)` from the `Semantic` trait. Disabling also blocks clicks and makes agents and tests get the error CUI0106 when they act on the node. The method is called `when_disabled` because `disabled` is the method that sets the state.
+
+```rust
+let draft = cx.signal(String::new());
+button("Send")
+    .disabled(bind(move |rt| draft.with(rt, String::is_empty)))
+    .when_disabled(|style| style.opacity(0.4))
+```
+
+## dark
+
+Applies while the window's color scheme is `ColorScheme::Dark`. Set the scheme with `AppConfig::color_scheme` or by writing to `cx.color_scheme()`. See [dark mode](/docs/crownui/styling#dark-mode).
+
+```rust
+vstack(text("Card")).bg(WHITE).dark(|style| style.bg(rgb(0x1e293b)).text_color(WHITE))
+```
+
+## enter
+
+Gives the style the element starts from when it is first mounted. It then animates to its real style.
+
+```rust
+vstack(text("Saved")).p(12.0).enter(|style| style.opacity(0.0).translate_y(12.0))
+```
+
+## exit
+
+Gives the style the element animates to when it is removed. It stays on screen until the animation ends, then it is freed. Only the root of the removed subtree uses its `exit` style, and its children leave with it.
+
+```rust
+vstack(text("Saved")).p(12.0).exit(|style| style.opacity(0.0).scale(0.95))
+```
+
+`enter` and `exit` animate with the element's transition or the nearest one above it. Without one, they use `Spring::smooth()`. Both read only the paint and transform properties of the style, such as opacity, scale, translate and background.
+
+## transition
+
+Animates every change of this element and of every element inside it with `curve`. A child's own transition takes precedence over the one it inherits. Without a transition, changes apply at once.
+
+```rust
+vstack((text("One"), text("Two"))).transition(Spring::smooth())
+```
+
+## The VariantStyle type
+
+`VariantStyle` collects the styles of one variant. It has every [`Styled`](/docs/crownui/api/styled) method. It filters what it keeps by the kind of property.
+
+| Kind | Methods | In a state variant | In `enter` and `exit` |
+|---|---|---|---|
+| Paint | `bg`, `border`, `border_color`, `ring`, `outline`, `rounded` and the per corner forms, `shadow`, `shadow_none`, `opacity`, `backdrop_blur`, `hidden`, `z`, `top_layer` | Applied | Applied |
+| Transform | `translate`, `translate_x`, `translate_y`, `scale`, `scale_x`, `scale_y`, `rotate`, `origin` | Applied | Applied |
+| Text | `text_size`, `text_color`, `text_blur`, `font_weight`, `font_medium`, `font_semibold`, `font_bold`, `font_family`, `italic`, `leading`, `tracking`, `text_left`, `text_center`, `text_right`, `text_justify`, `truncate`, `line_clamp` | Applied | No effect |
+| Interaction | `cursor`, `material`, `pointer_events_none`, `pointer_events_auto` | Kept, with no effect | No effect |
+| Layout | padding, margin, sizes, `aspect`, flex, gap, alignment, grid, position and insets, `display_none`, `overflow_hidden`, `overflow_scroll` | Ignored with CUI0201 | Ignored with CUI0201 |
+
+Set a cursor, a material or pointer events on the element itself, or bind them to a signal.
+
+## Diagnostics
+
+- CUI0201: a layout property was used in a variant. It is ignored and logged as a warning. The same happens when a bound value inside a variant returns a layout property.
+- CUI0202: a modifier that is not a style was used in a variant, such as `style.on_click(..)` or `style.label(..)`. It is ignored. `enter` and `exit` also log CUI0202 for a bound value, because they capture their styles once and take literals only.
+
+Both codes are listed in [errors](/docs/crownui/errors).
+
+```rust
+// CUI0201: padding is a layout property, the hover keeps the old padding
+button("Bad").hover(|style| style.p(20.0))
+
+// Works: scale changes the drawn size without layout
+button("Good").hover(|style| style.scale(1.05))
+```
+
+## Order and precedence
+
+Variants always apply on top of the base style, whatever order you call them in. When two active variants set the same property, the one you declared later wins. A pressed button is also hovered, so declare `hover` before `active` to let the pressed color show.
+
+```rust
+button("Order")
+    .hover(|style| style.bg(rgb(0x2563eb)))
+    .active(|style| style.bg(rgb(0x1d4ed8))) // wins while pressed
+```
+
+## Bound values in variants
+
+State variants accept bound values, so a hover color follows a theme.
+
+```rust
+let accent = cx.signal(rgb(0x3b82f6));
+button("Themed").hover(move |style| style.bg(bind(move |rt| accent.get(rt))))
+```
+
+The binding runs as its own observer and updates the variant's value when `accent` changes, even while the variant is not active.
+
+## Why variants work this way
+
+The UI thread tracks hover, press, focus and disabled for each element. When one changes, it recomputes the drawn style of that one element from its base style and its active variants and sends the result to the render thread. No closure runs, no signal flushes and layout does not run. With a transition, the render thread animates the change on its own clock.
+
+That design is why variants refuse layout properties. A hover that changed padding would move siblings and run layout on every pointer move across a list. Keeping variants to paint, transforms and text keeps a hover to one recomputed style and one message.
+
+It has these costs:
+
+- A variant cannot grow or move a box in the layout. Use `scale` or `translate` for the look, or bind a size to a signal that a listener sets.
+- There is no `group-hover`. A parent's hover does not restyle its children through variants. Set a signal from `on_pointer_enter` and `on_pointer_leave` on the parent and bind the children to it.
+- Text properties in a variant reshape the text, which runs layout for that text. Prefer color and opacity changes for frequent states such as hover.

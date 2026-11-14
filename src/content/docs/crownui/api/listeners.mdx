@@ -1,0 +1,327 @@
+---
+title: Listeners
+description: "DOM-named event listeners on every element, each with its event payload."
+api: FN view::Listeners
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+let count = cx.signal(0);
+
+button("Add")
+    .on_click(move |cx, event| {
+        let step = if event.modifiers.shift_key { 10 } else { 1 };
+        count.update(cx, |n| *n += step);
+    })
+    .on_key_down(|_, event| {
+        if event.repeat {
+            event.prevent_default();
+        }
+    })
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub trait Listeners: Styled {
+    fn on_click(self, handler: impl FnMut(&mut Cx, &mut Event<ClickEvent>) + 'static) -> Self;
+    // one method per listener, listed below
+    fn shortcut(self, keybind: Keybind) -> Self;
+}
+
+impl<T: Styled> Listeners for T {}
+```
+</ResponseExample>
+</ApiExamples>
+
+The `Listeners` trait adds DOM-named event listeners to every element. It is implemented for every `Styled` type and is in the prelude.
+
+Every listener method takes a handler and returns the element, so calls chain. A handler is `FnMut(&mut Cx, &mut Event<T>) + 'static`. It gets the context, which derefs to the reactive runtime, and the event. An element can have several listeners of the same kind. They run in the order they were added.
+
+## Parameters
+
+<ParamField name="handler" type="impl FnMut(&mut Cx, &mut Event<T>) + 'static" required>
+  Runs when the event reaches this element. `T` depends on the listener.
+</ParamField>
+
+<ParamField name="keybind" type="Keybind" required>
+  For `shortcut` only. The key combination that clicks this element.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Self" type="Self">
+  The same element with the listener added.
+</ResponseField>
+
+## Every listener
+
+| Method | DOM event | Event payload | Fires when |
+|---|---|---|---|
+| `on_click` | `click` | `ClickEvent` | Primary button click or tap. Also Enter or Space on the focused element, and `.shortcut`. |
+| `on_double_click` | `dblclick` | `ClickEvent` | The second click of a double click, before its `click`. |
+| `on_context_menu` | `contextmenu` | `ClickEvent` | Secondary button click. |
+| `on_long_press` | none | `LongPressEvent` | A press held in place for 500 ms. |
+| `on_pointer_down` | `pointerdown` | `PointerEvent` | A pointer button goes down over the element. |
+| `on_pointer_up` | `pointerup` | `PointerEvent` | A pointer button goes up over the element. |
+| `on_pointer_move` | `pointermove` | `PointerEvent` | The pointer moves over the element. |
+| `on_pointer_enter` | `pointerenter` | `PointerEvent` | The pointer enters the element. Does not bubble. |
+| `on_pointer_leave` | `pointerleave` | `PointerEvent` | The pointer leaves the element. Does not bubble. |
+| `on_pointer_cancel` | `pointercancel` | `PointerEvent` | The platform takes the pointer away mid-press. |
+| `on_wheel` | `wheel` | `WheelEvent` | A wheel or touchpad scroll over the element. |
+| `on_scroll` | `scroll` | `ScrollEvent` | A scroll container's offset changed. |
+| `on_key_down` | `keydown` | `KeyboardEvent` | A key goes down while the element or a descendant has focus. |
+| `on_key_up` | `keyup` | `KeyboardEvent` | A key goes up while the element or a descendant has focus. |
+| `on_input` | `input` | `InputEvent` | Every edit of a text field. |
+| `on_change` | `change` | `InputEvent` | A text field's value is committed with Enter or on blur. |
+| `on_submit` | `submit` | `InputEvent` | Enter in a text field. |
+| `on_text_input` | `compositionupdate`, `beforeinput` | `TextInputEvent` | Input method composition, committed text or a paste for the focused element. |
+| `on_focus` | `focus` | `FocusEvent` | The element gains focus. |
+| `on_blur` | `blur` | `FocusEvent` | The element loses focus. |
+| `on_drag_start` | `dragstart` | `DragEvent` | A pointer drag crosses the 6 px slop. |
+| `on_drag` | `drag` | `DragEvent` | Each move during a pointer drag. |
+| `on_drag_end` | `dragend` | `DragEvent` | The pointer drag ends, with the release velocity. |
+| `on_pinch` | none | `PinchEvent` | Each step of a touchpad pinch. |
+| `on_drag_over` | `dragenter`, `dragover` | `DragOverEvent` | A system drag from any app enters or moves over the element. |
+| `on_drag_leave` | `dragleave` | `DragLeaveEvent` | The system drag leaves the element without dropping. |
+| `on_drop` | `drop` | `DropEvent` | Data is dropped on the element in the type a `dragover` handler accepted. |
+
+`shortcut(keybind)` is the one method that takes no handler. While the element is mounted and enabled, the key combination clicks it, whatever has focus.
+
+## Event wrapper
+
+`Event<T>` derefs to `T`, so `event.position` reads the payload directly.
+
+| Method | Description |
+|---|---|
+| `detail(&self) -> &T` | The payload. |
+| `stop_propagation(&mut self)` | Stops the event from reaching ancestors. |
+| `prevent_default(&mut self)` | Cancels the default action: focus on pointer down, scrolling on wheel, activation and focus movement on key down, closing on a close request. |
+| `is_propagation_stopped(&self) -> bool` | Whether a handler stopped propagation. |
+| `is_default_prevented(&self) -> bool` | Whether a handler prevented the default. |
+| `is_synthetic(&self) -> bool` | Whether a test, an MCP agent or assistive technology injected the event. |
+
+## Event payloads
+
+`ClickEvent`, `DragEvent`, `DragOverEvent`, `DragLeaveEvent`, `DropEvent`, `FocusEvent` and `InputEvent` are exported from `crownui::ext`. So are `KeyboardEvent`, `PointerEvent`, `WheelEvent`, `Key`, `NamedKey`, `Keybind` and `Modifiers`. `ScrollEvent`, `LongPressEvent` and `PinchEvent` come from the `view` crate and `TextInputEvent` from the `input` crate. Handlers rarely name these types, because the closure infers them.
+
+### ClickEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `position` | `Point` | Relative to the target's top-left corner. |
+| `count` | `u32` | Consecutive clicks: 1, 2 or 3. |
+| `modifiers` | `Modifiers` | Modifier keys held at the time. |
+
+### PointerEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `pointer_id` | `PointerId` | Which pointer. `PointerId::MOUSE` is the mouse. |
+| `pointer_type` | `PointerType` | `Mouse`, `Touch` or `Pen`. |
+| `position` | `Point` | Logical pixels from the window's top-left corner. |
+| `button` | `Option<PointerButton>` | `Primary`, `Secondary`, `Auxiliary`, `Back`, `Forward` or `Other(u32)`. |
+| `modifiers` | `Modifiers` | Modifier keys held. |
+| `timestamp` | `Duration` | Monotonic event time. |
+
+### KeyboardEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | `Key` | Logical key, like DOM `key`: `Character(char)`, `Named(NamedKey)` or `Unidentified`. |
+| `code` | `PhysicalKey` | Physical key, like DOM `code`. Holds the evdev scancode. |
+| `text` | `Option<String>` | Text the key types, if any. |
+| `repeat` | `bool` | Whether the key is auto-repeating. |
+| `modifiers` | `Modifiers` | Modifier keys held. |
+
+### Modifiers
+
+| Item | Description |
+|---|---|
+| `shift_key`, `ctrl_key`, `alt_key`, `meta_key` | `bool` fields, named as in the DOM. |
+| `Modifiers::NONE` | No modifiers held. |
+| `is_empty(self) -> bool` | Whether no modifier is held. |
+
+### WheelEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `delta` | `WheelDelta` | `Pixels(Vector)` from touchpads or `Lines(Vector)` from notched wheels. `to_pixels(line_height)` converts either. |
+| `position` | `Point` | Pointer position in window coordinates. |
+| `modifiers` | `Modifiers` | Modifier keys held. |
+
+### ScrollEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `offset` | `Vector` | The scroll container's new content offset. |
+
+### InputEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `value` | `String` | The full new value of the field. |
+
+### TextInputEvent
+
+| Variant | Description |
+|---|---|
+| `Preedit { text: String, cursor: Option<(usize, usize)> }` | Composition in progress. |
+| `Commit(String)` | Text to insert. Pastes arrive this way too. |
+| `DeleteSurrounding { before: usize, after: usize }` | Bytes to delete around the caret. |
+
+### FocusEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `visible` | `bool` | True when focus arrived by keyboard, like CSS `:focus-visible`. |
+
+### LongPressEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `position` | `Point` | Relative to the target. |
+
+### PinchEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `scale` | `f32` | Scale relative to the start of the gesture. |
+| `rotation` | `f32` | Rotation in degrees since the previous event. |
+
+### DragEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `position` | `Point` | Pointer position relative to the target. |
+| `delta` | `Vector` | Movement since the previous drag event. |
+| `total` | `Vector` | Movement since the drag started. |
+| `velocity` | `Vector` | Logical pixels per second. Set on `on_drag_end` only. |
+
+### DragOverEvent
+
+| Member | Description |
+|---|---|
+| `position: Point` | Pointer position in window coordinates. |
+| `mime_types: Vec<String>` | Types the dragged data can be read as. |
+| `source_actions: DndActions` | What the source allows. |
+| `modifiers: Modifiers` | Modifier keys held, as this window last saw them. |
+| `offers(&self, mime_type: &str) -> bool` | Whether the drag can be read as `mime_type`. |
+| `accept(&mut self, mime_type: impl Into<String>)` | Lets it drop here as `mime_type`, preferring a copy. |
+| `accept_with(&mut self, mime_type: impl Into<String>, action: DndAction)` | Lets it drop here, preferring `action`. |
+| `is_accepted(&self) -> bool` | Whether a handler along the path already accepted it. |
+
+### DragLeaveEvent
+
+A unit struct. It carries no data.
+
+### DropEvent
+
+| Field | Type | Description |
+|---|---|---|
+| `position` | `Point` | Drop position in window coordinates. |
+| `mime_type` | `String` | The accepted type. |
+| `data` | `Vec<u8>` | The dropped bytes. |
+| `action` | `DndAction` | The action the source and window settled on. |
+| `modifiers` | `Modifiers` | Modifier keys held at the drop. |
+
+## Examples
+
+### Stop a click from reaching the card
+
+```rust
+vstack((
+    text("Invoice 2041"),
+    button("Pay").on_click(move |cx, event| {
+        pay(cx);
+        event.stop_propagation();
+    }),
+))
+.on_click(move |cx, _| open_invoice(cx))
+```
+
+### Close on Escape
+
+```rust
+use crownui::ext::{Key, NamedKey};
+
+panel.on_key_down(move |cx, event| {
+    if event.key == Key::Named(NamedKey::Escape) {
+        open.set(cx, false);
+        event.stop_propagation();
+    }
+})
+```
+
+### Keyboard shortcut
+
+```rust
+use crownui::ext::Keybind;
+
+let undo: Keybind = "Ctrl+Z".parse()?;
+button("Undo").shortcut(undo).on_click(move |cx, _| history.undo(cx))
+```
+
+### Keep focus in a field
+
+```rust
+button("Bold")
+    .on_pointer_down(|_, event| event.prevent_default())
+    .on_click(move |cx, _| toggle_bold(cx))
+```
+
+### Ctrl+wheel zoom
+
+```rust
+canvas(painter)
+    .on_wheel(move |cx, event| {
+        if event.modifiers.ctrl_key {
+            let step = event.delta.to_pixels(40.0).y;
+            zoom.update(cx, |zoom| *zoom = (*zoom - step / 400.0).clamp(0.25, 8.0));
+            event.prevent_default();
+        }
+    })
+```
+
+### Drag to move
+
+```rust
+let offset = cx.signal(Vector::ZERO);
+
+card.translate(offset).on_drag(move |cx, event| {
+    let delta = event.delta;
+    offset.update(cx, |offset| *offset = *offset + delta);
+})
+```
+
+### Accept a file drop
+
+```rust
+zone.on_drag_over(|_, event| {
+    if event.offers("text/uri-list") {
+        event.accept("text/uri-list");
+    }
+})
+.on_drop(move |cx, event| {
+    let uris = String::from_utf8_lossy(&event.data).into_owned();
+    import(cx, &uris);
+})
+```
+
+## Listeners from a Kind
+
+A widget's `Kind::mount` adds listeners to its node with `cx.add_listener(node, Listener::Click(Box::new(handler)))`. `Listener` has one variant per method above, each holding a `Handler<T>`, which is `Box<dyn FnMut(&mut Cx, &mut Event<T>)>`. `Listener::kind()` returns its `ListenerKind`. `Listener`, `ListenerKind` and `NodeId` are in `crownui::ext`. See [custom components](/docs/crownui/custom-components).
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Events guide" icon="zap" href="/docs/crownui/events">
+    Bubbling, focus, the gesture arena and the tradeoffs.
+  </Card>
+  <Card title="Clipboard and drag" icon="copy" href="/docs/crownui/clipboard-and-drag">
+    System drag and drop and the clipboard.
+  </Card>
+</CardGroup>

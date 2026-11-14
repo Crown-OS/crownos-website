@@ -1,0 +1,132 @@
+---
+title: store
+description: Keep state that belongs to a component but should never trigger an update.
+api: FN cx.store
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="A request counter"
+let generation = cx.store(0_u64);
+
+button("Search").on_click(move |cx, _| {
+    let ticket = generation.update(cx, |generation| {
+        *generation += 1;
+        *generation
+    });
+    start_search(cx, ticket, generation);
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+impl Runtime {
+    pub fn store<T: 'static>(&mut self, value: T) -> Store<T>
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`store` puts `value` in the runtime and returns a `Store<T>` handle. Like a signal, the value lives in the current scope and is dropped when the scope is disposed. Unlike a signal, a store is untracked. Reading it subscribes nothing and writing it notifies nobody.
+
+Use a store for data the screen does not show: callbacks, caches, counters that cancel stale work, a queue, or the previous value of something. You call it as `cx.store(..)` because `Cx` derefs to `Runtime`.
+
+## Parameters
+
+<ParamField name="value" type="T: 'static" required>
+  The initial value. `T` does not need `Clone` or `PartialEq`, so boxed closures and channels work.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Store<T>" type="Copy handle">
+  A key into the runtime. It implements `Copy`, `Clone`, `PartialEq`, `Eq`, `Hash` and `Debug`. It does not implement `IntoProp`, because a property bound to it would never update.
+</ResponseField>
+
+## Store methods
+
+<ResponseField name="with" type="fn<R>(self, &Runtime, impl FnOnce(&T) -> R) -> R">
+  Lends `&T`. It takes `&Runtime`, so it works with a shared borrow. Panics with `CUI0001` when the store was disposed.
+</ResponseField>
+
+<ResponseField name="update" type="fn<R>(self, &mut Runtime, impl FnOnce(&mut T) -> R) -> R">
+  Lends `&mut T` and returns whatever the closure returns. Panics when the store was disposed.
+</ResponseField>
+
+<ResponseField name="try_update" type="fn<R>(self, &mut Runtime, impl FnOnce(&mut T) -> R) -> Option<R>">
+  Same as `update`, but returns `None` when the store was disposed.
+</ResponseField>
+
+A store has no `get` or `set`. `update` covers both, because it returns a value: `store.update(cx, std::mem::take)` drains it, and `store.update(cx, |slot| *slot = value)` replaces it.
+
+## Store or signal
+
+| | `Signal<T>` | `Store<T>` |
+|---|---|---|
+| A read inside `bind`, `memo` or `effect` | subscribes | does nothing |
+| A write | re-runs subscribers | re-runs nothing |
+| Usable as a property | yes, when `T: Clone` | no |
+| Read borrow | `&mut Runtime` (tracked) or `&Runtime` (untracked) | `&Runtime` |
+| Write returns a value | no | yes, from `update` |
+| Fits | what the screen shows | callbacks, caches, tickets, queues |
+
+Pick a signal when a change must reach the screen. Pick a store when a change must not, or when re-running observers would be wasted work.
+
+## Examples
+
+### Keep a callback
+
+A component that accepts an `on_select` handler stores it. To call it with `cx`, take it out of the store first, because the store is part of the runtime that `cx` owns. Put it back afterwards.
+
+```rust
+type SelectHandler = Box<dyn FnMut(&mut Cx, usize)>;
+
+let on_select: Store<Option<SelectHandler>> = cx.store(Some(Box::new(handler)));
+
+button(label).on_click(move |cx, _| {
+    if let Some(mut handler) = on_select.update(cx, Option::take) {
+        handler(cx, index);
+        on_select.update(cx, |slot| *slot = Some(handler));
+    }
+})
+```
+
+### Cancel stale work
+
+The kit tooltip bumps a generation counter on every hover and every leave. A delayed reveal only shows the tooltip when its ticket still matches. The counter never needs to re-render anything, so it is a store.
+
+```rust
+fn wait(cx: &mut Cx, generation: Store<u64>, ticket: u64, visible: Signal<bool>) {
+    cx.request_animation_frame(move |cx, _now| {
+        if generation.with(cx, |current| *current != ticket) {
+            return;
+        }
+        visible.set(cx, true);
+    });
+}
+```
+
+### Remember a previous value
+
+An effect that animates from the old value to the new one needs the old value without depending on it.
+
+```rust
+let previous = cx.store(None::<usize>);
+
+cx.effect(move |rt| {
+    let current = index.get(rt);
+    let from = previous.update(rt, |slot| slot.replace(current));
+    direction.set(rt, from.map_or(0, |from| current.cmp(&from) as i8));
+});
+```
+
+## Why it works this way
+
+The framework has no `RefCell`, so there is nowhere else to keep component-local mutable data that a closure can reach. A store gives that data the same lifetime rules as a signal: it belongs to a scope, it is freed with the scope, and its handle is `Copy`. It skips the parts of a signal that cost work, namely dependency tracking on read and subscriber notification on write.
+
+The framework uses stores itself. The queue of tree commands that every bound property writes into is a `Store<Vec<Command>>`, drained after each flush. Nothing needs to react to the queue, so tracking it would be wasted work.
+
+The cost is that nothing reacts to a store. A store read inside `bind` returns the value once and never again. If the screen shows it, it belongs in a signal.
+
+See [signal](/docs/crownui/api/signal), [effect](/docs/crownui/api/effect) and [State](/docs/crownui/state).

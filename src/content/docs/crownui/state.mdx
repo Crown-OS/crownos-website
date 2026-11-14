@@ -1,60 +1,274 @@
 ---
 title: State
-description: Signals, memos and bindings drive fine-grained updates without a virtual DOM.
+description: Signals, memos, effects and stores hold all app state in one runtime, and bound properties update only what changed.
 ---
 
-`component` runs its closure once to build the view. The closure never runs again. Updates happen
-because a property reads a signal inside `bind`, so only that property changes when the signal
-changes.
+A `component` runs its closure once to build the view. The closure never runs again. The screen changes because properties are bound to signals: when a signal changes, the properties that read it update, and nothing else does. There is no virtual DOM and no diff.
 
-## Signals
+This page builds up the model one piece at a time. Each piece has an API page with every method listed.
 
-- `cx.signal(value)` creates a `Signal<T>`. Read it with `get`, `with` or `with2`. Write it with
-  `set` or `update`.
-- `cx.memo(..)` derives a value and recomputes only when its inputs change.
-- `bind(move |rt| ..)` turns any expression into a reactive property.
+## A first signal
 
-Any property accepts a literal, a `Signal`, a `Memo` or a `bind`.
+`cx.signal(value)` stores a value and returns a `Signal<T>` handle. The handle is `Copy`, so a closure captures it with `move` and you never clone it or wrap it in `Rc`.
+
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let count = cx.signal(0);
+            vstack((
+                text(bind(move |rt| format!("Count: {}", count.get(rt)))),
+                button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+            ))
+            .gap(12.0)
+            .p(24.0)
+        }),
+        AppConfig::new("Counter").size(320, 200),
+    )
+}
+```
+
+Three things happen here:
+
+1. `cx.signal(0)` creates the value inside the component's scope.
+2. `bind(..)` reads `count` and becomes the text's content. Reading inside a `bind` subscribes it.
+3. The click handler writes `count`. After the handler returns, the runtime flushes, the `bind` re-runs, and the new string is applied to that one text node. The rest of the view is not rebuilt.
+
+## Reading and writing
+
+Every read and write takes the runtime as its first argument. A `Cx` derefs to the runtime, and `bind`, `memo` and `effect` closures receive it as `rt`.
+
+| Method | Does | Subscribes |
+|---|---|---|
+| `get(rt)` | clones the value | yes |
+| `with(rt, f)` | lends `&T` to `f` | yes |
+| `with_untracked(rt, f)` | lends `&T` to `f` | no |
+| `try_get(rt)` | clones, or `None` if disposed | yes |
+| `set(rt, value)` | replaces the value | |
+| `update(rt, f)` | mutates in place | |
+| `try_set(rt, value)` | replaces, or `false` if disposed | |
+| `update_from(rt, other, f)` | mutates using another signal | the source |
+
+Use `get` for small `Clone` values and `with` for anything you do not want to copy, such as a `Vec`.
 
 ```rust
-let count = cx.signal(0);
-text(bind(move |rt| format!("Count: {}", count.get(rt))))
+let todos = cx.signal(Vec::<Todo>::new());
+
+text(bind(move |rt| {
+    let left = todos.with(rt, |list| list.iter().filter(|todo| !todo.done).count());
+    format!("{left} left")
+}))
 ```
+
+## Binding properties
+
+Every property accepts `impl IntoProp<T>`. That covers a literal, a `Signal<T>`, a `Memo<T>` and a `bind(..)` closure.
+
+```rust
+let name = cx.signal(String::from("Ada"));
+let width = cx.signal(240.0_f32);
+let on = cx.signal(false);
+
+text(name)
+    .w(width)
+    .opacity(bind(move |rt| if on.get(rt) { 1.0 } else { 0.5 }))
+```
+
+A signal fits only a property of its own type. `Signal<i32>` does not fit `.w(..)`, which takes `f32`, so convert inside a `bind`. See [bind](/docs/crownui/api/bind).
+
+## Derived values with memo
+
+`cx.memo(..)` computes a value from other signals and stores it. When its inputs change it recomputes, and if the result is equal to the old one, nothing downstream runs.
+
+```rust
+let items = cx.signal(vec![3, 4, 5]);
+let total = cx.memo(move |rt| items.with(rt, |items| items.iter().sum::<i32>()));
+let is_large = cx.memo(move |rt| total.get(rt) > 100);
+
+text(bind(move |rt| format!("Total: {}", total.get(rt))))
+    .text_color(bind(move |rt| if is_large.get(rt) { rgb(0xdc2626) } else { rgb(0x0f172a) }))
+```
+
+Adding an item changes `total` every time but flips `is_large` only when it crosses 100. The color binding re-runs only on that flip. See [memo](/docs/crownui/api/memo).
+
+## Side effects
+
+`cx.effect(..)` runs a closure now and again whenever the signals it read change. Use it to keep two pieces of state in step, or to push state somewhere outside the view.
+
+```rust
+let query = cx.signal(String::new());
+let history = cx.signal(Vec::<String>::new());
+
+cx.effect(move |rt| {
+    let current = query.get(rt);
+    if !current.is_empty() {
+        history.update(rt, |log| log.push(current));
+    }
+});
+```
+
+Writes made inside an effect run their subscribers in the next pass of the same flush. An effect that writes a signal it reads loops, and the runtime stops it after 64 passes with a logged error. See [effect](/docs/crownui/api/effect).
+
+## Untracked state with stores
+
+`cx.store(value)` holds data the screen does not show: a callback, a cache, a counter that cancels stale work. Reading a store subscribes nothing and writing it re-runs nothing.
+
+```rust
+let clicks = cx.store(0_u32);
+
+button("Track").on_click(move |cx, _| {
+    let total = clicks.update(cx, |clicks| {
+        *clicks += 1;
+        *clicks
+    });
+    tracing::info!("clicked {total} times");
+})
+```
+
+See [store](/docs/crownui/api/store) for a full comparison with signals.
 
 ## Read first, then write
 
-Because `Cx` derefs to the runtime, reads and writes both need `&mut`. Read the value into a local
-first, then write.
+`Cx` derefs to the runtime, so reads and writes both need `&mut cx`. A `with` closure holds that borrow while it runs. You cannot write another signal from inside it.
 
 ```rust
-let initial = todo.with(cx, |todo| todo.done);
-let done = cx.signal(initial);
+// Does not compile: `cx` is already borrowed by `with`.
+draft.with(cx, |draft| title.set(cx, draft.clone()));
 ```
 
-<Tip>
-  There is no `Rc`, `RefCell` or `Mutex` anywhere in the framework. State lives in one runtime that
-  you reach through `&mut Cx`.
-</Tip>
+Read into a local first, then write.
 
-## Lists and structure
+```rust
+let text = draft.with(cx, |draft| draft.trim().to_owned());
+title.set(cx, text);
+```
 
-<AccordionGroup>
-  <Accordion title="show">
-    `show(condition, then, otherwise)` mounts one of two branches and unmounts the hidden one.
-  </Accordion>
-  <Accordion title="for_each">
-    `for_each(items, key, row)` renders a keyed list and gives each row its own signal.
-  </Accordion>
-  <Accordion title="lazy_for_each and lazy_vstack">
-    Mount only the visible rows of a long list.
-  </Accordion>
-  <Accordion title="keyed and error_boundary">
-    `keyed(..)` rebuilds a branch when a derived value changes. `error_boundary(..)` catches a
-    panicking component and shows a fallback.
-  </Accordion>
-</AccordionGroup>
+Two helpers cover the cases where you need two values at once.
 
-## Async work
+`cx.with2(a, b, f)` lends two signals together:
 
-With the default `tokio` feature, `cx.spawn(future, on_done)` runs a future off the UI thread and
-calls `on_done` with its result back on the UI thread.
+```rust
+let full_name = cx.with2(first, last, |first, last| format!("{first} {last}"));
+
+text(bind(move |rt| rt.with2(first, last, |first, last| format!("{first} {last}"))))
+```
+
+`target.update_from(cx, source, f)` mutates one signal with a borrowed view of another:
+
+```rust
+button("Add step").on_click(move |cx, _| {
+    total.update_from(cx, step, |total, step| *total += *step)
+})
+```
+
+Both take `Signal` handles. To mix in a memo, read the memo into a local first.
+
+## Scopes and disposal
+
+Every signal, memo, store and effect belongs to a scope. When a scope is disposed, everything in it is freed, its child scopes go first, and its cleanups run.
+
+These views open a scope:
+
+- `component(..)`, for its whole build,
+- each branch of `show(..)`, disposed when the branch hides,
+- each row of `for_each(..)` and the lazy lists, disposed when the row leaves,
+- each build of `keyed(..)`, disposed when the key changes.
+
+```rust
+show(
+    expanded,
+    || component(|cx| {
+        let draft = cx.signal(String::new());
+        cx.on_cleanup(|_| tracing::info!("details closed"));
+        text_field(draft, "Notes")
+    }),
+    || text("Collapsed"),
+)
+```
+
+Each time `expanded` turns false, the branch's scope is disposed: `draft` is freed and the cleanup runs. When it turns true again, the closure builds a fresh branch with a fresh `draft`. Keep a signal in an outer component if it must survive the toggle.
+
+`cx.on_cleanup(..)` registers work to run when the current scope ends. Use it to stop a thread or release a resource the component started.
+
+## State that outlives its component
+
+A handle stays a valid `Copy` value after its scope is gone. Using it then panics with `CUI0001`. This happens when a callback runs after the component unmounted, such as a task completion or a timer.
+
+Use the `try_` methods in those callbacks:
+
+```rust
+cx.spawn(fetch_weather(), move |cx, report| {
+    forecast.try_set(cx, report);
+});
+```
+
+- `try_get` returns `None` instead of panicking.
+- `try_set` returns `false` instead of panicking.
+- `Store::try_update` returns `None` instead of panicking.
+- `is_alive` tells you without touching the value.
+
+Event handlers run in the window's root scope, not the scope of the component that attached them. Signals you create inside a handler live as long as the window. Create state in the component body.
+
+## Sharing state through the environment
+
+Pass signals down as arguments when only a few components need them. They are `Copy`, so this costs nothing. When many components at different depths need the same value, provide it.
+
+`cx.provide(value)` puts a signal in the current scope's environment. `cx.environment::<T>()` finds the nearest one by type, walking up the scope chain.
+
+```rust
+#[derive(Clone)]
+struct Session {
+    user: String,
+}
+
+fn app() -> impl View {
+    component(|cx| {
+        cx.provide(Session { user: "ada".to_owned() });
+        vstack((header(), content()))
+    })
+}
+
+fn header() -> impl View {
+    component(|cx| {
+        let Some(session) = cx.environment::<Session>() else {
+            return text("Signed out");
+        };
+        text(bind(move |rt| session.with(rt, |session| session.user.clone())))
+    })
+}
+```
+
+The kit theme works the same way. `use_theme(cx)` returns the nearest provided `Theme`, and `provide_theme(cx, theme)` overrides it for a subtree. See [provide](/docs/crownui/api/provide).
+
+## Why it works this way
+
+Every value lives in one `reactive::Runtime` that the UI thread owns. Handles are keys into it. This is what lets the framework have no `Rc`, no `RefCell`, no `Mutex` and no `Arc<Mutex<..>>`, which is a rule for all framework code. The borrow checker sees a single owner, closures capture plain `Copy` keys, and there is no reference counting on any update path.
+
+The view is built once and kept. The alternative, rebuilding a description of the UI on every change and diffing it, makes every update redo the build for the rebuilt part of the tree. With fine-grained signals, the reactive part of an update runs only the observers that read the changed value. Layout and painting then handle the nodes those observers marked. The flush is glitch free: observers run in height order, so a binding never sees a memo's stale value, and memos stop propagation when their value is unchanged.
+
+That model has costs, and you meet them in everyday code:
+
+- Every read takes `&mut`. A tracked read records a dependency, which mutates the runtime. That is why you read into a local before you write, and why `with2` and `update_from` exist.
+- Nothing re-runs your component. Logic that depends on a signal has to live in a `bind`, a `memo`, an `effect` or a structural view like `show`. Code in the component body that reads `count.get(cx)` reads it once.
+- `set` always notifies. Signals do not require `PartialEq`, so they cannot skip equal writes. Put a `memo` in front when you need that.
+- Handles do not keep values alive. A handle that outlives its scope panics on use. The `try_` methods exist for that case.
+- The runtime is single threaded by design. Other threads talk to it through `cx.spawn` and channels. See [Async](/docs/crownui/async).
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Lists" icon="layers" href="/docs/crownui/lists">
+    Keyed rows with `for_each`, each with its own signal and scope.
+  </Card>
+  <Card title="Async" icon="refresh" href="/docs/crownui/async">
+    Run futures off the UI thread and bring results back.
+  </Card>
+  <Card title="Reactivity internals" icon="cpu" href="/docs/crownui/reactivity">
+    How the flush orders observers and caps cycles.
+  </Card>
+  <Card title="Cx reference" icon="code" href="/docs/crownui/api/cx">
+    Every method on the context, grouped by purpose.
+  </Card>
+</CardGroup>

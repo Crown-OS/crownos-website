@@ -1,0 +1,498 @@
+---
+title: Events
+description: "Listen to clicks, keys, pointers, scrolling, text input and gestures with DOM-named listeners that bubble."
+---
+
+CrownUI listeners use DOM event names. You write `.on_click`, `.on_key_down` and `.on_pointer_move` the same way you would in a browser. Every handler receives the context and a mutable event: `(&mut Cx, &mut Event<T>)`. Events bubble from the target to the root, and a handler can stop them or cancel the framework's default action.
+
+All listener methods come from the `Listeners` trait, which is in the prelude. It is implemented for every element that is `Styled`, so any view can listen to any event.
+
+## Your first listener
+
+A click handler gets the context, so it can read and write signals directly.
+
+```rust
+use crownui::prelude::*;
+
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        vstack((
+            text(bind(move |rt| format!("Clicked {} times", count.get(rt)))),
+            button("Click me").on_click(move |cx, _| count.update(cx, |n| *n += 1)),
+        ))
+        .gap(8.0)
+    })
+}
+```
+
+The closure is `FnMut` and `'static`. Signals are `Copy` keys, so `move` puts a copy of `count` in the closure and nothing else needs cloning.
+
+## The event wrapper
+
+`Event<T>` wraps the payload and carries the DOM flags. It derefs to `T`, so `event.position` reads a field of the payload directly.
+
+| Method | What it does |
+|---|---|
+| `detail(&self) -> &T` | The payload. Deref gives the same thing. |
+| `stop_propagation(&mut self)` | Ancestors do not receive the event. |
+| `prevent_default(&mut self)` | Cancels the framework's default action. |
+| `is_propagation_stopped(&self) -> bool` | Whether a handler stopped it. |
+| `is_default_prevented(&self) -> bool` | Whether a handler cancelled the default. |
+| `is_synthetic(&self) -> bool` | Whether a test, an MCP agent or assistive technology injected it. |
+
+```rust
+button("Delete").on_click(move |cx, event| {
+    let by_agent = event.is_synthetic();
+    let skip_confirm = event.modifiers.shift_key;
+    if skip_confirm && !by_agent {
+        delete_selection(cx);
+    } else {
+        confirming.set(cx, true);
+    }
+})
+```
+
+## Bubbling
+
+An event starts at its target and walks up through every ancestor. Each ancestor with a listener of the same kind runs it. A card that is clickable as a whole still hears clicks on the buttons inside it, unless the button stops the event.
+
+```rust
+let opened = cx.signal(0);
+let starred = cx.signal(false);
+
+vstack((
+    text("Quarterly report"),
+    button("Star").on_click(move |cx, event| {
+        starred.update(cx, |on| *on = !*on);
+        event.stop_propagation();
+    }),
+))
+.p(16.0)
+.rounded(12.0)
+.on_click(move |cx, _| opened.update(cx, |n| *n += 1))
+```
+
+Without `stop_propagation`, pressing Star would also open the card. This is the DOM model, so the same reasoning you use on the web applies here.
+
+Pointer enter and leave are the exception. They fire once on each element the pointer enters or leaves and do not bubble, like DOM `pointerenter` and `pointerleave`.
+
+## Default actions
+
+Some events have a built-in effect after the handlers run. `prevent_default` cancels it.
+
+| Event | Default action |
+|---|---|
+| `pointerdown` | Moves keyboard focus to the first focusable element under the pointer, or clears focus. |
+| `wheel` | Scrolls the nearest scroll container under the pointer. |
+| `keydown` | Enter or Space clicks the focused element. Tab, Shift+Tab and the arrow keys move focus. |
+| close request | `cx.on_close_requested` handlers keep the window open with `prevent_default`. |
+
+For example, a canvas that zooms on Ctrl+wheel must stop the page from scrolling at the same time:
+
+```rust
+let zoom = cx.signal(1.0_f32);
+
+canvas(move |rt, size, list| {
+    let scale = zoom.get(rt);
+    // draw at `scale`
+})
+.w_full()
+.h(400.0)
+.on_wheel(move |cx, event| {
+    if !event.modifiers.ctrl_key {
+        return;
+    }
+    let step = event.delta.to_pixels(40.0).y;
+    zoom.update(cx, |zoom| *zoom = (*zoom * (1.0 - step / 400.0)).clamp(0.25, 8.0));
+    event.prevent_default();
+})
+```
+
+## Clicks
+
+`on_click`, `on_double_click` and `on_context_menu` all receive a `ClickEvent`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `position` | `Point` | Where the click landed, relative to the target's top-left corner. |
+| `count` | `u32` | Consecutive clicks: 1, 2 or 3. |
+| `modifiers` | `Modifiers` | `shift_key`, `ctrl_key`, `alt_key` and `meta_key` at the time. |
+
+A click fires for the primary button or a tap. Enter and Space on a focused element also click it. A second quick click fires `on_double_click` first and then `on_click` with `count` set to 2. A triple click reports `count` 3, and the next click starts again at 1. `on_context_menu` fires on a secondary click.
+
+Modifiers make list selection short to write:
+
+```rust
+let selected = cx.signal(Vec::<usize>::new());
+
+for_each(rows, |row| row.id, move |cx, row| {
+    let id = row.with(cx, |row| row.id);
+    text(bind(move |rt| row.with(rt, |row| row.title.clone())))
+        .p(8.0)
+        .on_click(move |cx, event| {
+            let extend = event.modifiers.ctrl_key;
+            selected.update(cx, |picked| {
+                if !extend {
+                    picked.clear();
+                }
+                picked.push(id);
+            });
+        })
+})
+```
+
+## Keyboard
+
+`on_key_down` and `on_key_up` receive a `KeyboardEvent` (exported as `crownui::ext::KeyboardEvent`).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `key` | `Key` | The logical key after layout and modifiers, like DOM `key`: `Key::Character('a')`, `Key::Named(NamedKey::Enter)` or `Key::Unidentified`. |
+| `code` | `PhysicalKey` | The physical key position, like DOM `code`. It holds the evdev scancode. |
+| `text` | `Option<String>` | The text the key types, if any. |
+| `repeat` | `bool` | Whether the key is held and auto-repeating. |
+| `modifiers` | `Modifiers` | Held modifier keys. |
+
+Key events go to the focused element and then bubble through its ancestors. When nothing has focus, they go to the root. So a handler on the root view hears every key that no focused element stopped.
+
+```rust
+use crownui::ext::{Key, NamedKey};
+
+vstack(content)
+    .on_key_down(move |cx, event| {
+        if event.key == Key::Named(NamedKey::Escape) && open.get(cx) {
+            open.set(cx, false);
+            event.stop_propagation();
+        }
+    })
+```
+
+`NamedKey` covers Enter, Tab, Space, Backspace, Delete, Escape, the four arrows, Home, End, PageUp, PageDown, Insert, the modifier keys themselves, CapsLock, ContextMenu, PrintScreen and `F(1)` to `F(24)`.
+
+## Shortcuts
+
+A `Keybind` is a key plus exact modifiers. Parse it from text or build it as a constant.
+
+```rust
+use crownui::ext::{Key, Keybind, Modifiers, NamedKey};
+
+const ESCAPE: Keybind = Keybind {
+    key: Key::Named(NamedKey::Escape),
+    modifiers: Modifiers::NONE,
+};
+
+let save: Keybind = "Ctrl+S".parse()?;
+assert_eq!(save.to_string(), "Ctrl+S");
+```
+
+Parsing accepts `ctrl` or `control`, `shift`, `alt` or `option`, and `meta`, `super`, `cmd` or `win`, in any order and any case. A single character is a character key. Anything longer is a DOM key name such as `Enter` or `F5`. A shortcut with no key fails with `KeybindParseError::MissingKey`, and an unknown name fails with `KeybindParseError::UnknownKey`. `Display` prints the canonical form, for example `Ctrl+Shift+K`.
+
+`.shortcut(keybind)` makes the key combination click the element while it is mounted:
+
+```rust
+button("Save")
+    .shortcut(save)
+    .on_click(move |cx, _| document.save(cx))
+```
+
+<Warning>
+  The shortcut works no matter where focus is. The window checks shortcuts before it dispatches `keydown`, so a key handler elsewhere does not see the key and cannot cancel it. A disabled element ignores its shortcut. `Keybind::matches` compares letters without case but compares modifiers exactly, so `Ctrl+S` does not fire for Ctrl+Shift+S. The sound recorder app binds Space to its record button and Escape to its stop button this way.
+</Warning>
+
+## Focus
+
+An element is focusable when it is not disabled and one of these holds:
+
+- it has the role `Button`, `Link`, `TextField`, `SearchField`, `Checkbox`, `Switch` or `Slider`
+- it has an `on_click` listener
+- you set `.focusable(true)`
+
+`.focusable(false)` removes an element from focus even when it would qualify.
+
+A pointer press focuses the first focusable element under the pointer, walking from the deepest element outward. Pressing on empty space clears focus. Call `prevent_default` in `on_pointer_down` to keep focus where it was, for example on a toolbar button that acts on the focused text field.
+
+### Tab order
+
+Tab moves to the next focusable element and Shift+Tab to the previous one, wrapping at either end. The order follows position on screen: top to bottom, then left to right, measured from each element's window rectangle. Hidden elements are skipped. The arrow keys move focus spatially to the nearest focusable element in that direction. Focus keys do nothing while Ctrl, Alt or Meta is held.
+
+Enter or Space on a focused element with an `on_click` listener clicks it.
+
+### Focus events and styles
+
+`on_focus` and `on_blur` receive a `FocusEvent` with one field, `visible: bool`. It is true when focus arrived by keyboard, like CSS `:focus-visible`.
+
+Style the two cases with variants. `.focus(..)` applies whenever the element has focus. `.focus_visible(..)` applies only after keyboard navigation, so a mouse click does not draw a ring.
+
+```rust
+button("Continue")
+    .rounded(8.0)
+    .focus_visible(|s| s.ring(2.0, rgb(0x3b82f6)))
+    .on_focus(move |cx, event| {
+        if event.visible {
+            hint.set(cx, "Press Enter to continue".into());
+        }
+    })
+    .on_blur(move |cx, _| hint.set(cx, String::new()))
+```
+
+### Focus from code
+
+`cx.request_focus(node)` moves focus to a node after the current event. Outside an event, for example while a component mounts, it applies by the end of the frame. To focus a field as it appears, wrap it in a small `View` that builds it and asks for focus:
+
+```rust
+struct Autofocus<V>(V);
+
+impl<V: View> View for Autofocus<V> {
+    fn build(self, cx: &mut Cx) -> NodeId {
+        let node = self.0.build(cx);
+        cx.request_focus(node);
+        node
+    }
+}
+
+let password = cx.signal(String::new());
+Autofocus(text_field(password, "Password"))
+```
+
+`NodeId` comes from `crownui::ext`.
+
+## Pointer events
+
+The pointer listeners receive a `PointerEvent` for mouse, touch and pen alike.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `pointer_id` | `PointerId` | Which pointer. `PointerId::MOUSE` is the mouse. |
+| `pointer_type` | `PointerType` | `Mouse`, `Touch` or `Pen`. |
+| `position` | `Point` | Logical pixels from the window's top-left corner. |
+| `button` | `Option<PointerButton>` | `Primary`, `Secondary`, `Auxiliary`, `Back`, `Forward` or `Other(u32)`. |
+| `modifiers` | `Modifiers` | Held modifier keys. |
+| `timestamp` | `Duration` | Monotonic event time. |
+
+`on_pointer_down`, `on_pointer_up` and `on_pointer_move` run along the path of elements under the pointer, deepest first. `on_pointer_enter` and `on_pointer_leave` run once per element as the pointer crosses its edge. `on_pointer_cancel` runs when the platform takes the pointer away mid-press.
+
+<Note>
+  Pointer positions are in window coordinates. Click, long press and drag gesture positions are relative to the target. Subtract the target's origin, or use `cx.observe_rect(node)`, when you need local coordinates from a raw pointer event.
+</Note>
+
+<Tip>
+  For hover styling you rarely need listeners. `.hover(|s| s.bg(..))` and `.active(|s| ..)` restyle without any code, and `.cursor(CursorIcon::Pointer)` sets the cursor shape.
+</Tip>
+
+### Letting the pointer pass through
+
+`.pointer_events_none()` makes an element and its subtree invisible to hit testing, like CSS `pointer-events: none`. Clicks go to whatever is underneath. A descendant opts back in with `.pointer_events_auto()`.
+
+```rust
+zstack((
+    photo,
+    text("Draft")
+        .text_size(48.0)
+        .opacity(0.3)
+        .pointer_events_none(),
+))
+```
+
+On a window whose root is set to none, the elements set back to auto also become the surface's input region. Everywhere else, clicks fall through to the windows behind. A dock or an on-screen display uses this to take input only where it draws.
+
+## Wheel and scroll
+
+`on_wheel` receives a `WheelEvent` with `delta`, `position` and `modifiers`. The delta is `WheelDelta::Pixels(Vector)` from touchpads or `WheelDelta::Lines(Vector)` from a notched wheel. `delta.to_pixels(line_height)` turns either into pixels. The framework uses 40 pixels per line when it scrolls.
+
+Unless a handler prevents it, a wheel event scrolls the nearest ancestor with `.overflow_scroll()`, clamped to its content. When the offset actually changes, that container fires `on_scroll` with a `ScrollEvent` whose `offset` is the new content offset.
+
+```rust
+let at_top = cx.signal(true);
+
+scroll_view(long_article)
+    .h(600.0)
+    .on_scroll(move |cx, event| {
+        let top = event.offset.y <= 0.0;
+        if at_top.get(cx) != top {
+            at_top.set(cx, top);
+        }
+    })
+```
+
+To scroll from code, use a `ScrollHandle` (see [lists](/docs/crownui/lists)).
+
+## Text input and IME
+
+Text fields fire three high-level events. Each gets an `InputEvent` with the full `value: String`.
+
+| Listener | DOM name | When |
+|---|---|---|
+| `on_input` | `input` | Every edit. |
+| `on_change` | `change` | The value is committed with Enter or when the field loses focus. |
+| `on_submit` | `submit` | Enter in the field. |
+
+```rust
+let query = cx.signal(String::new());
+
+text_field(query, "Search")
+    .on_input(move |cx, event| {
+        let typed = event.value.clone();
+        suggestions.set(cx, lookup(&typed));
+    })
+    .on_submit(move |cx, event| {
+        let typed = event.value.clone();
+        open_result(cx, &typed);
+    })
+```
+
+The field already writes into its signal, so `on_input` is for side effects such as search suggestions.
+
+`on_text_input` is the low-level hook for input methods. It receives a `TextInputEvent` for the focused element, a type from the `input` crate (`crownui::input` in the published bundle):
+
+| Variant | Meaning |
+|---|---|
+| `Preedit { text, cursor }` | The input method's composition in progress, with an optional cursor range. |
+| `Commit(String)` | Finished text to insert. |
+| `DeleteSurrounding { before, after }` | Delete this many bytes before and after the caret. |
+
+```rust
+use input::TextInputEvent;
+
+custom_editor.on_text_input(move |cx, event| match event.detail() {
+    TextInputEvent::Commit(inserted) => {
+        let inserted = inserted.clone();
+        buffer.update(cx, |text| text.push_str(&inserted));
+    }
+    TextInputEvent::Preedit { text, .. } => {
+        let composing = text.clone();
+        preedit.set(cx, composing);
+    }
+    TextInputEvent::DeleteSurrounding { .. } => {}
+})
+```
+
+A paste from `cx.paste_from_clipboard()` also arrives as a `Commit` on the focused element. The built-in `text_field` and the kit text input insert commits and handle surrounding deletes. They ignore preedit, so composition text is not shown inline while you type with an input method.
+
+## Gestures
+
+A press can turn into several gestures. CrownUI decides which one with recognizers, and it creates them lazily: an element only gets a click recognizer if it has `on_click` or `on_double_click`, a drag recognizer if it has a drag listener, and so on.
+
+### Long press
+
+`on_long_press` fires when a press stays within 6 logical pixels for 500 ms. It receives a `LongPressEvent` with `position` relative to the target.
+
+```rust
+row.on_long_press(move |cx, event| {
+    let at = event.position;
+    menu_at.set(cx, Some(at));
+})
+```
+
+### Pinch
+
+`on_pinch` fires for touchpad pinches over the element. It receives a `PinchEvent` with `scale`, relative to the start of the gesture, and `rotation`, in degrees since the previous event. The pinch goes to the deepest element under the pointer that listens for it.
+
+```rust
+let zoom = cx.signal(1.0_f32);
+let tilt = cx.signal(0.0_f32);
+
+photo
+    .scale(zoom)
+    .rotate(tilt)
+    .on_pinch(move |cx, event| {
+        let scale = event.scale.clamp(0.5, 4.0);
+        let turn = event.rotation;
+        zoom.set(cx, scale);
+        tilt.update(cx, |tilt| *tilt += turn);
+    })
+```
+
+`on_pinch` reports the updates of a pinch but not its start or end, so each new pinch starts again from a scale of 1. Rotation is a delta, so add it up as above.
+
+### Drag
+
+`on_drag_start`, `on_drag` and `on_drag_end` are the pointer drag gesture. They fire after the pointer moves more than 6 logical pixels while pressed. Each receives a `DragEvent`:
+
+| Field | Meaning |
+|---|---|
+| `position` | Pointer position relative to the target. |
+| `delta` | Movement since the previous drag event. |
+| `total` | Movement since the drag started. |
+| `velocity` | Release velocity in logical pixels per second. Set on `on_drag_end` only. |
+
+A draggable card moves with `translate`, which the render thread applies without a new layout:
+
+```rust
+let offset = cx.signal(Vector::ZERO);
+
+vstack(text("Drag me"))
+    .p(16.0)
+    .rounded(12.0)
+    .bg(rgb(0x1f2937))
+    .translate(offset)
+    .cursor(CursorIcon::Grab)
+    .on_drag(move |cx, event| {
+        let delta = event.delta;
+        offset.update(cx, |offset| *offset = *offset + delta);
+    })
+    .on_drag_end(move |cx, event| {
+        if event.velocity.length() > 1500.0 {
+            dismissed.set(cx, true);
+        }
+    })
+```
+
+The velocity is a least squares fit over the last 100 ms of samples, so a quick flick reads as fast even if the final event was slow.
+
+These are pointer gestures inside the window. Dragging data to another app is a different system. See [clipboard and drag](/docs/crownui/clipboard-and-drag).
+
+### The gesture arena
+
+When a press lands, every recognizer on every element under the pointer joins one arena for that pointer. Each one votes as the press develops: pending, accept or reject. The first recognizer to accept wins, and all the others are cancelled.
+
+| Recognizer | Accepts when | Rejects when |
+|---|---|---|
+| Click | Released within 6 px and within 500 ms. | Moved beyond 6 px or held too long. |
+| Long press | Held within 6 px for 500 ms. | Moved beyond 6 px or released early. |
+| Drag | Moved beyond 6 px. | Released before that. |
+| Pinch | A touchpad pinch begins. | Any pointer press. |
+
+The arena resolves the conflicts that matter in practice:
+
+- A card with `on_click` and `on_drag` gets a click for a still press and a drag once the pointer travels. The click never fires after a drag.
+- A button inside a draggable list row still clicks. Dragging from the button drags the row.
+- A row with `on_click` and `on_long_press` clicks on a short tap and long presses on a hold. Never both.
+- If the press ends with nobody decided, the arena hands the win to its first member, the deepest element.
+
+The click count grows when the next press comes within 400 ms and 10 px of the previous click, up to three.
+
+Disabled elements do not join the arena, and gesture events on them are dropped.
+
+## Testing events
+
+`crowntest` drives the same dispatch path. `app.click(role(Role::Button).name("Save"))`, `app.press_key("Ctrl+S")`, `app.type_text("hello")`, `app.scroll(query, dy)` and `app.drag(query, x, y)` all inject synthetic events, so `is_synthetic` is true in your handlers. See [testing](/docs/crownui/testing).
+
+## Why it works this way
+
+DOM names were chosen because most people and every coding agent already know them. `on_click`, `stop_propagation` and `prevent_default` mean what they mean on the web, so nobody learns a second vocabulary. Bubbling follows from that choice. It lets a container handle events for everything inside it, which is how a list row, a card or a dialog reacts to its children without wiring each one.
+
+Handlers get `&mut Cx` instead of capturing state. All state lives in one runtime on the UI thread, so a handler reads and writes signals with no locks, no `Rc` and no `RefCell`. The cost is the borrow rule from [state](/docs/crownui/state): read a value into a local first, then write.
+
+The gesture arena comes from Flutter. The browser model fires `click` after any press and release, so web apps add their own thresholds to tell drags from clicks. The arena makes that decision once, in the framework, with the same slop and timing for every element. Its cost is that a click is only known at release, because until then the same press still turns into a drag or a long press. Clicks do not wait for a possible second click, though. The first click fires at once, and the second fires `on_double_click` and then `on_click` with `count` 2. An element that does different things on single and double click sees the single click action first, so check `event.count` or make the single click action harmless.
+
+Focus order comes from geometry, not from the tree. That keeps Tab order right when a layout reorders children visually, and it removes `tabindex`. The cost is that you cannot hand-pick an order that disagrees with the screen. Dialogs that need a trapped order, such as the kit dialog, call `cx.request_focus` themselves.
+
+Shortcuts run before key dispatch so a focused text field cannot swallow them. That is right for app commands such as Save. For keys a text field needs, such as Space, scope the shortcut to an element that is only mounted when typing is not possible, or handle the key in `on_key_down` instead.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Clipboard and drag" icon="copy" href="/docs/crownui/clipboard-and-drag">
+    Move data between apps with the clipboard and system drag and drop.
+  </Card>
+  <Card title="Listeners API" icon="code" href="/docs/crownui/api/listeners">
+    Every listener with its event type and fields.
+  </Card>
+  <Card title="Accessibility" icon="info" href="/docs/crownui/accessibility">
+    How focus, roles and synthetic clicks reach screen readers.
+  </Card>
+  <Card title="Testing" icon="check-circle" href="/docs/crownui/testing">
+    Drive these events from `crowntest`.
+  </Card>
+</CardGroup>

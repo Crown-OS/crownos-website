@@ -1,0 +1,190 @@
+---
+title: Contributing
+description: "Workspace commands, invariants, naming and diagnostic rules, and recipes for changing CrownUI."
+---
+
+CrownUI changes go through `cargo xtask`, keep a short list of invariants and follow fixed recipes for new widgets, modifiers and backends. `AGENTS.md` at the repository root holds the same rules in short form for AI agents. Read it first.
+
+## Toolchain
+
+The workspace pins Rust 1.97 in `rust-toolchain.toml`, with `rustfmt` and `clippy`. `rustup` picks it up on the first `cargo` command. Building the default features needs the Wayland client libraries. The Impeller renderer is downloaded as a prebuilt library by the `impellers` crate.
+
+## Workspace commands
+
+Everything runs through `cargo xtask`. Add `--json` to any command for machine-readable output.
+
+| Task | Command |
+|---|---|
+| Check the crates you changed: clippy, tests, and rustfmt on changed files | `cargo xtask check` |
+| Check named crates | `cargo xtask check view widgets` |
+| Enforce the crate layering | `cargo xtask layers` |
+| Write the public API snapshots | `cargo xtask api` |
+| Fail when the public API changed without a snapshot update | `cargo xtask api --check` |
+| List pending insta snapshots | `cargo xtask snapshot` |
+| Run frame benchmarks | `cargo xtask bench` |
+| Compare with GPUI, Qt, Electron and Tauri | `cargo xtask compare` |
+| Recompile the Impeller shaders | `cargo xtask shaders` |
+| Fail when a compiled shader is stale | `cargo xtask shaders --check` |
+| Assemble the publishable `crownui` crate | `cargo xtask bundle` |
+| List kit widget previews | `cargo xtask preview --list` |
+| Render one kit widget | `cargo xtask preview <name> [--png <path>]` |
+| Run an example | `cargo run -p crownui --example counter` |
+| One crate's gates by hand | `cargo clippy -p <crate> --all-targets -- -D warnings && cargo test -p <crate>` |
+
+### check
+
+`cargo xtask check` finds the crates touched by your uncommitted changes, runs `cargo clippy -p <crate> --all-targets -- -D warnings` and `cargo test -p <crate>` on each, and runs `rustfmt --check` on the changed `.rs` files. Run it before every commit. Pass crate names to check specific crates whatever changed.
+
+Format only the files you touch. Never run `cargo fmt --all` in sibling repositories such as crownpositor, which are not fmt-clean.
+
+### layers
+
+The workspace is split into layers in `layers.toml`. A crate may depend only on crates in lower layers, plus the same-layer edges listed under `[allow]`. `cargo xtask layers` fails on any other edge.
+
+| Layer | Crates |
+|---|---|
+| base | `geometry` |
+| foundations | `input`, `reactive`, `motion`, `inspect`, `crownconfig`, `audio` |
+| contracts | `windowing`, `graphics`, `layouting`, `semantics`, `gesture` |
+| implementations | `impeller`, `taffy-layout`, `accessibility`, `mcp` |
+| core | `view`, `runtime` |
+| components | `widgets` |
+| public | `crownui`, `crowntest`, `crownmcp`, `crowndev`, `capture` |
+| tools | `xtask` |
+
+The allowed same-layer edges are `runtime` on `view`, `crowndev` on `crownui` and `capture` on `crowntest`.
+
+### api
+
+`cargo xtask api` writes `api/<crate>.txt` for `crownui`, `view`, `widgets`, `reactive`, `graphics`, `windowing` and `audio` with `cargo public-api`. Install it with `cargo install cargo-public-api`. It needs a nightly toolchain. Commit the snapshot with any change to a public signature, so reviewers see the API change as a diff. `--check` fails when the snapshot is out of date.
+
+### snapshot
+
+Tests compare text snapshots with `insta`. A changed snapshot leaves a `.snap.new` file next to the old one. `cargo xtask snapshot` lists every pending file in the workspace. Review each diff, then accept it with `cargo insta review` or by renaming `.snap.new` to `.snap`.
+
+### bench
+
+`cargo xtask bench` runs frame benchmarks on seeded trees of 256, 1,000 and 10,000 nodes, one benchmark per kind of change, and reports work counters with the timings.
+
+```sh
+cargo xtask bench --save-baseline main
+cargo xtask bench --baseline main --sizes 1000,10000 --iterations 200
+```
+
+### compare
+
+`cargo xtask compare` builds the same scenarios in CrownUI, GPUI, Qt Quick, Electron and Tauri and measures every app from the outside: startup, memory, list scrolling, animation and a settings window. Results go to `benchmarks/results/<date>.md`. See `benchmarks/README.md` before a run. A locked screen or a parallel build skews the numbers.
+
+```sh
+cargo xtask compare --frameworks crownui,qt --scenarios list --runs 3 --duration 5
+cargo xtask compare --uncapped
+cargo xtask compare --no-build
+```
+
+### shaders
+
+`cargo xtask shaders` compiles every `impeller/shaders/*.frag` into the `.iplr` file committed next to it, with the `impellerc` from the Impeller SDK the build downloaded. That keeps compiled shaders in step with the linked engine. `--check` fails when a committed shader is stale.
+
+### bundle
+
+`cargo xtask bundle` assembles the single publishable `crownui` crate in `target/bundle/crownui`, with every library compiled in as a module (`crownui::view`, `crownui::widgets` and so on), and verifies it with `cargo package`. Its dependencies are listed in `xtask/bundle/manifest.toml`. Publish with `cargo publish --manifest-path target/bundle/crownui/Cargo.toml`.
+
+### preview
+
+`cargo xtask preview --list` lists every kit widget preview. `cargo xtask preview <name>` prints its text snapshot, and `--png <path>` renders it on the GPU to a PNG.
+
+## Invariants
+
+Every change keeps these true. Review checks them.
+
+- No `Mutex`, `RefCell`, `Rc` or `Arc<Mutex<..>>` in framework code. State lives in `reactive::Runtime` and is reached through `&mut Cx`. Threads talk through channels only.
+- Libraries use `thiserror`. Binaries, examples and xtask use `anyhow`. No `unwrap` or `expect` in libraries.
+- One concept per file. `mod.rs` and `lib.rs` only declare and re-export. Helpers live in `src/util/<name>.rs`.
+- No macros in the public authoring API. rust-analyzer and agents must see real types.
+- Every diagnostic carries a stable code, indexed in [Errors](/docs/crownui/errors).
+- Every crate's `README.md` is its crate-level doc: purpose, public API, invariants and non-goals.
+
+## Naming
+
+Names come from vocabularies people already know. Builders are SwiftUI nouns (`vstack`, `text`, `button`). Style methods are Tailwind classes with literal values (`.p(16.0)`, `.rounded(8.0)`). Events are DOM names (`.on_click`, `.on_key_down`). Test and agent actions are Testing Library verbs (`click`, `type_text`, `press_key`). [Naming](/docs/crownui/naming) is the canonical table. A new modifier or listener adds its row there in the same change.
+
+## Diagnostic codes
+
+A new error or warning gets the next free code in its area and a row in [Errors](/docs/crownui/errors) with where, meaning and fix. The message starts with the code: `"CUI0409: .."`.
+
+| Range | Area |
+|---|---|
+| `CUI00xx` | `reactive` |
+| `CUI01xx` | semantic queries and actions |
+| `CUI02xx` | style variants |
+| `CUI03xx` | error boundaries |
+| `CUI04xx` | runtime |
+| `CUI05xx` | widgets |
+| `CUI06xx` | `crownconfig` |
+| `CUI07xx` | `audio` |
+| `CUI08xx` | reserved for video |
+
+Never reuse a code for a different meaning. Old logs and old agent sessions still point at it.
+
+## Recipes
+
+### Add a widget
+
+1. Write `widgets/src/<name>.rs` with a `pub struct <Name>Kind` that implements `view::Kind` (`NAME`, `mount`) and `pub fn <name>(..) -> Element<<Name>Kind>`.
+2. In `mount`, call `cx.set_role`, `cx.set_default_style(node, StyleProp::..)` for defaults, `cx.set_children`, `cx.add_listener(node, Listener::Click(..))` and `cx.bind_style` for reactive defaults.
+3. Re-export it in `widgets/src/lib.rs`, add a row to `widgets/README.md` and add it to `crownui::prelude`.
+4. Test it with `crowntest`: `TestApp::new(..)`, `click(role(..).name(..))` and `insta::assert_snapshot!(app.snapshot())`.
+
+[Custom components](/docs/crownui/custom-components) walks through a full example.
+
+### Add a style modifier
+
+1. Add a `StyleProp` variant in `view/src/style_prop.rs` with its `impact()` and `apply()`.
+2. Add the Tailwind-named method to `Styled` in `view/src/styled.rs` and a row in [Naming](/docs/crownui/naming).
+3. If it paints, map it in `runtime/src/render/record.rs`, and in `VisualValues` if it animates.
+
+### Add a kit widget
+
+Rebuild it from the `widgets` primitives and `canvas`. Read every color from `use_theme(cx)`, never a literal. Size and animate it like the crownuikit original, with the springs in `widgets/src/util/spring.rs`. Add a `previews/<name>.rs` entry and a `widgets/tests/kit_<name>.rs` test. Theme colors come from `crownconfig` (`appearance.ron`, `theme.ron`). Nothing outside `crownconfig` imports `crownos-config`.
+
+### Add a backend
+
+- A windowing backend is a feature-gated module under `windowing/src/<backend>/` that implements `Platform`, `WindowControl` and `PlatformSurface`, plus a runner that drives `ApplicationHandler<P>`. Nothing above it changes.
+- A graphics backend implements `graphics::GraphicsBackend` (a text system and a renderer that share a layout type) and `CreateRenderer<S>` for the surfaces it supports. It translates `DrawList` and `Composition`. `impeller` is the reference.
+
+### Add a CrownOS protocol
+
+Write the XML in `crownos-protocols/protocols/`, the server in `crownpositor/protocols/src/` and the client in `windowing/src/wayland/protocols/`. Surface it through `CrownEvent` and `Capabilities`. Version every interface.
+
+## Before you send a change
+
+<Steps>
+  <Step title="Check">
+    `cargo xtask check` passes.
+  </Step>
+  <Step title="Layers">
+    `cargo xtask layers` passes.
+  </Step>
+  <Step title="API">
+    `cargo xtask api --check` passes, or the change includes the updated `api/*.txt`.
+  </Step>
+  <Step title="Snapshots">
+    `cargo xtask snapshot` reports no pending snapshots.
+  </Step>
+  <Step title="Docs">
+    New diagnostics have rows in [Errors](/docs/crownui/errors), and new modifiers or listeners have rows in [Naming](/docs/crownui/naming).
+  </Step>
+  <Step title="README">
+    The crate's `README.md` still describes its public API.
+  </Step>
+</Steps>
+
+## Why the rules exist, and what they cost
+
+The no-lock rule keeps the UI thread simple. Every piece of state lives in one runtime that only the UI thread touches, so there are no data races to reason about and no lock to hold during a frame. Background work posts results back through channels. The cost is that you cannot share a value between threads by wrapping it in `Arc<Mutex<..>>`. You send it instead, which takes a few more lines.
+
+The layering keeps contracts apart from implementations. `view` does not know about Wayland or Impeller, so a headless platform and a recording renderer can stand in for them in every test, and a new backend touches one crate. The cost is ceremony. A shortcut from `widgets` into `runtime` is rejected, and the type must move to a lower layer instead.
+
+The no-macros rule exists because the people writing CrownUI code include AI agents. A macro hides its expansion from rust-analyzer and from a model reading the source. A function shows its signature everywhere. The cost is more verbose authoring, such as a tuple of children instead of a JSX-like block.
+
+API snapshots and stable diagnostic codes make every public change visible. A reviewer sees a signature change as a line in `api/view.txt`, and a code in a log line points to one row in the docs. The cost is a second file to update with each change, which `cargo xtask api --check` enforces.

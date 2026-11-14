@@ -1,0 +1,372 @@
+---
+title: Clipboard and drag
+description: "Copy, paste and drag data between apps with MIME types, HTML-style drop targets and system drags."
+---
+
+Apps exchange data in two ways: the clipboard and drag and drop. CrownUI models both the way the web does. Data is a set of MIME types with bytes, a drop target accepts a type in `on_drag_over` and receives the bytes in `on_drop`, and a clipboard read names the types it wants in order of preference. Because these map directly onto the Wayland data device, the same code exchanges data with every other app on the desktop, CrownUI or not.
+
+All the types on this page are in the prelude: `ClipboardData`, `DragSource`, `DragIcon`, `DndAction`, `DndActions` and `DragOutcome`.
+
+## Copy and paste text
+
+For plain text, two calls are enough.
+
+```rust
+use crownui::prelude::*;
+
+fn share_link(url: Signal<String>) -> impl View {
+    hstack((
+        text(url).flex_1().truncate(),
+        button("Copy").on_click(move |cx, _| {
+            let link = url.get(cx);
+            cx.copy_to_clipboard(link);
+        }),
+    ))
+    .gap(8.0)
+}
+```
+
+`cx.copy_to_clipboard(text)` puts the text on the system clipboard. `cx.paste_from_clipboard()` asks for the clipboard's text and delivers it to the focused element as a paste. The paste arrives as a `TextInputEvent::Commit` through `on_text_input`, so a focused `text_field` inserts it at the caret.
+
+A Paste button next to a field has one catch. Pressing the button moves focus to the button on pointer down, before `on_click` runs on release, so the paste would go to the button. Keep focus in the field by calling `prevent_default` in the button's `on_pointer_down`:
+
+```rust
+let note = cx.signal(String::new());
+
+vstack((
+    text_field(note, "Note"),
+    button("Paste")
+        .on_pointer_down(|_, event| event.prevent_default())
+        .on_click(|cx, _| cx.paste_from_clipboard()),
+))
+```
+
+`text_field` already handles Ctrl+C, Ctrl+X and Ctrl+V on its own. Copy and cut take the whole value.
+
+## Several MIME types
+
+A file manager copies files as a list of URIs, as GNOME's copied-files format, and as plain text paths. Other apps pick whichever type they understand. `cx.set_clipboard` offers the same content in several types at once:
+
+```rust
+const URI_LIST: &str = "text/uri-list";
+const GNOME_FILES: &str = "x-special/gnome-copied-files";
+const PLAIN: &str = "text/plain;charset=utf-8";
+
+button("Copy").on_click(move |cx, _| {
+    let paths = selection.get(cx);
+    let uris = paths.iter().map(|path| format!("file://{path}")).collect::<Vec<_>>().join("\n");
+    cx.set_clipboard(vec![
+        (URI_LIST.to_owned(), uris.clone().into_bytes()),
+        (GNOME_FILES.to_owned(), format!("copy\n{uris}").into_bytes()),
+        (PLAIN.to_owned(), paths.join("\n").into_bytes()),
+    ]);
+})
+```
+
+An item in a text type is also offered under the other text types: `text/plain;charset=utf-8`, `UTF8_STRING`, `text/plain` and `STRING`. Apps that only know one of them still get the text.
+
+`cx.read_clipboard(mime_types, on_read)` reads the clipboard in the first of `mime_types` it holds. List them best first. The callback receives `Some(ClipboardData)` with `mime_type` and `data`, or `None` when the clipboard holds none of the types.
+
+```rust
+button("Paste").on_click(move |cx, _| {
+    cx.read_clipboard(&[GNOME_FILES, URI_LIST], move |cx, data| {
+        let Some(data) = data else {
+            status.set(cx, "Nothing to paste".into());
+            return;
+        };
+        let uris = String::from_utf8_lossy(&data.data).into_owned();
+        let cut = data.mime_type == GNOME_FILES && uris.starts_with("cut\n");
+        paste_files(cx, &uris, cut);
+    });
+})
+```
+
+The read is asynchronous. The clipboard belongs to another process, which streams the bytes back later, so the callback runs on the UI thread in a later turn of the event loop. It is `FnOnce` and receives `&mut Cx`, so it updates signals like any handler.
+
+## Pointer drags inside the window
+
+`on_drag_start`, `on_drag` and `on_drag_end` are the pointer drag gesture. They report movement inside the window and carry no data. Use them to move a slider thumb, resize a panel or reorder a list. The gesture starts after the pointer travels 6 logical pixels, so the same element still clicks on a still press. See [events](/docs/crownui/events#drag) for the fields and the gesture arena.
+
+```rust
+let width = cx.signal(280.0_f32);
+
+hstack((
+    sidebar.w(width),
+    vstack(())
+        .w(4.0)
+        .h_full()
+        .cursor(CursorIcon::ColResize)
+        .on_drag(move |cx, event| {
+            let delta = event.delta.x;
+            width.update(cx, |width| *width = (*width + delta).clamp(200.0, 480.0));
+        }),
+    content.flex_1(),
+))
+```
+
+Dragging data out of the window to another app, or between windows, uses the system drag below.
+
+## Accepting drops
+
+A drop target listens with three HTML-named listeners.
+
+| Listener | HTML event | Payload |
+|---|---|---|
+| `on_drag_over` | `dragenter` and `dragover` | `DragOverEvent` |
+| `on_drag_leave` | `dragleave` | `DragLeaveEvent`, which carries nothing |
+| `on_drop` | `drop` | `DropEvent` |
+
+`on_drag_over` runs when a drag from any app enters the window and on every move. It runs along the path of elements under the pointer, deepest first, like any bubbling event. A handler looks at what the drag offers and calls `accept` to let it drop here. If no handler accepts, the window refuses the drag and a release over it drops nothing.
+
+```rust
+const URI_LIST: &str = "text/uri-list";
+
+fn drop_zone() -> impl View {
+    component(|cx| {
+        let hovering = cx.signal(false);
+        let dropped = cx.signal(Vec::<String>::new());
+
+        vstack((
+            text("Drop files here"),
+            for_each(dropped, |uri| uri.clone(), |_cx, uri| text(uri)),
+        ))
+        .p(24.0)
+        .rounded(12.0)
+        .border(2.0)
+        .border_color(bind(move |rt| {
+            if hovering.get(rt) { rgb(0x3b82f6) } else { rgb(0xd1d5db) }
+        }))
+        .on_drag_over(move |cx, event| {
+            if event.offers(URI_LIST) {
+                event.accept(URI_LIST);
+                if !hovering.get(cx) {
+                    hovering.set(cx, true);
+                }
+            }
+        })
+        .on_drag_leave(move |cx, _| hovering.set(cx, false))
+        .on_drop(move |cx, event| {
+            hovering.set(cx, false);
+            let uris = String::from_utf8_lossy(&event.data)
+                .lines()
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            dropped.update(cx, |list| list.extend(uris));
+        })
+    })
+}
+```
+
+### What the drag offers
+
+`DragOverEvent` has these fields and methods:
+
+| Member | Meaning |
+|---|---|
+| `position: Point` | Pointer position in window coordinates. |
+| `mime_types: Vec<String>` | The types the dragged data can be read as, like HTML `DataTransfer.types`. |
+| `source_actions: DndActions` | What the source allows, like HTML `effectAllowed`. |
+| `modifiers: Modifiers` | Modifier keys held, as this window last saw them. |
+| `offers(&self, mime_type: &str) -> bool` | Whether the drag can be read as this type. |
+| `accept(&mut self, mime_type)` | Let it drop here, read as `mime_type`, preferring a copy. |
+| `accept_with(&mut self, mime_type, action)` | Let it drop here, preferring `action`. |
+| `is_accepted(&self) -> bool` | Whether a handler deeper in the path already accepted it. |
+
+The bytes are not available during `on_drag_over`, only the type names. The data is transferred once, on drop, in the type you accepted.
+
+### Copy, move or ask
+
+`DndAction` is the HTML `dropEffect`: `Copy` (the default), `Move` or `Ask`. A target prefers one with `accept_with`, and the platform settles on an action the source allows. The usual desktop convention is Shift to move and Ctrl to copy:
+
+```rust
+.on_drag_over(move |cx, event| {
+    if !event.offers(URI_LIST) {
+        return;
+    }
+    let wants_move = event.modifiers.shift_key && event.source_actions.contains(DndAction::Move);
+    if wants_move {
+        event.accept_with(URI_LIST, DndAction::Move);
+    } else {
+        event.accept(URI_LIST);
+    }
+})
+```
+
+### The drop
+
+`on_drop` receives a `DropEvent`:
+
+| Field | Meaning |
+|---|---|
+| `position: Point` | Drop position in window coordinates. |
+| `mime_type: String` | The type you accepted. |
+| `data: Vec<u8>` | The bytes the source sent. |
+| `action: DndAction` | The action the source and this window settled on. |
+| `modifiers: Modifiers` | Modifier keys held at the drop. |
+
+After `DndAction::Move`, the source removes its original. After `DndAction::Ask`, your app asks the user what to do, for example with a context menu at `event.position`.
+
+`on_drag_leave` fires on each element the drag moves off, and on all of them when the drag leaves the window. Use it to clear highlight state.
+
+## Starting a drag to other apps
+
+`cx.start_drag(source, on_end)` hands data to the compositor, which moves the drag icon with the pointer across every window on screen. Call it while the pointer button is held, from `on_drag_start` or `on_pointer_down`.
+
+```rust
+fn file_row(path: String) -> impl View {
+    let label = path.clone();
+    hstack((kit::icon(icons::FILE), text(label)))
+        .gap(8.0)
+        .p(8.0)
+        .cursor(CursorIcon::Grab)
+        .on_drag_start(move |cx, _| {
+            let uri = format!("file://{path}\n");
+            let source = DragSource {
+                items: vec![
+                    ("text/uri-list".to_owned(), uri.into_bytes()),
+                    ("text/plain;charset=utf-8".to_owned(), path.clone().into_bytes()),
+                ],
+                icon: None,
+                actions: DndActions::COPY_MOVE,
+            };
+            let moved_path = path.clone();
+            cx.start_drag(source, move |cx, outcome| {
+                if outcome == DragOutcome::Dropped(DndAction::Move) {
+                    remove_from_list(cx, &moved_path);
+                }
+            });
+        })
+}
+```
+
+Here `kit` and `icons` come from `use crownui::kit::{self, icons}`.
+
+`DragSource` has three public fields and a `Default`:
+
+| Field | Meaning |
+|---|---|
+| `items: Vec<(String, Vec<u8>)>` | The same content in every MIME type it is offered as. |
+| `icon: Option<DragIcon>` | The picture that follows the pointer. `None` shows only the cursor. |
+| `actions: DndActions` | What a target may do. The default is `DndActions::COPY_MOVE`. |
+
+`on_end` receives a `DragOutcome`. `Dropped(action)` means a target took the data with that action. `Cancelled` means the user released it where nothing accepted it, or the platform aborted it.
+
+`start_drag` returns `false` while an earlier drag is still in flight, and drops both the source and the callback. Only one drag runs at a time.
+
+Data you drag out of one window and drop on another window of the same app arrives through that window's `on_drop`, exactly as a drag from another app does.
+
+### Drag icons
+
+A `DragIcon` is a bitmap the compositor draws, so it moves smoothly even while the pointer is over other apps.
+
+| Field | Meaning |
+|---|---|
+| `width`, `height: u32` | Size in pixels. |
+| `rgba: Vec<u8>` | Straight alpha RGBA8 pixels. |
+| `logical_width`, `logical_height: u32` | The size it is shown at, in logical pixels. |
+| `hotspot: Point` | The point of the icon held under the pointer, in logical pixels from its top-left. |
+
+Make the pixels at the device scale so the icon stays sharp on a HiDPI screen:
+
+```rust
+let scale = cx.scale_factor().get(cx);
+let side = (32.0 * scale).round() as u32;
+let icon = DragIcon {
+    width: side,
+    height: side,
+    rgba: render_thumbnail(side),
+    logical_width: 32,
+    logical_height: 32,
+    hotspot: Point::new(16.0, 16.0),
+};
+let source = DragSource { icon: Some(icon), ..DragSource::default() };
+```
+
+### Action sets
+
+`DndActions` is a set of `DndAction`s, like HTML `effectAllowed`.
+
+| Item | Meaning |
+|---|---|
+| `NONE`, `COPY`, `MOVE`, `ASK` | The empty set and the single actions. |
+| `COPY_MOVE` | Copy or move. What most drags allow, and the default. |
+| `ALL` | Every action. |
+| `contains(action) -> bool` | Whether the set holds the action. |
+| `union(other)` or `a \| b` | Both sets together. |
+| `of(action)` or `DndActions::from(action)` | The set holding one action. |
+| `is_empty() -> bool` | Whether the set is empty. |
+| `iter()` | The actions in the set, copy first. |
+
+## Testing
+
+`crowntest` plays the role of the platform for both systems. In this test, `copier()` is a view with Copy and Paste buttons and a text that shows what was pasted, and `drop_zone()` is the drop target from above extended to accept moves.
+
+```rust
+use crownui::ext::Modifiers;
+use crownui::prelude::*;
+use crowntest::{Role, TestApp, role};
+
+#[test]
+fn copying_offers_every_type_and_pasting_reads_one() {
+    let mut app = TestApp::new(copier());
+    app.click(role(Role::Button).name("Copy"));
+    assert_eq!(app.clipboard().len(), 3);
+
+    app.set_clipboard(&[("text/uri-list", b"file:///b")]);
+    app.click(role(Role::Button).name("Paste")).serve_clipboard();
+    assert_eq!(app.text_of(role(Role::Text)), "text/uri-list file:///b");
+}
+
+#[test]
+fn a_shift_drag_is_accepted_as_a_move() {
+    let mut app = TestApp::new(drop_zone());
+    app.hold_modifiers(Modifiers { shift_key: true, ..Modifiers::NONE });
+    app.drag_enter(20.0, 20.0, &["text/uri-list"], DndActions::COPY_MOVE);
+    let preferred = app.drag_acceptance().flatten().map(|accepted| accepted.action);
+    assert_eq!(preferred, Some(DndAction::Move));
+    app.drag_over(40.0, 40.0)
+        .drop_data(40.0, 40.0, "text/uri-list", b"file:///c", DndAction::Move);
+}
+```
+
+| Helper | What it does |
+|---|---|
+| `set_clipboard(&[(mime, bytes)])` | Puts items on the clipboard, as another app copying them would. |
+| `clipboard()` | What the clipboard holds once pending requests are served. |
+| `serve_clipboard()` | Answers the app's pending copies, pastes and reads. |
+| `drag_enter(x, y, &[mime], actions)` | A drag from another app enters at `(x, y)`. |
+| `drag_over(x, y)` | The drag moves. |
+| `drag_leave()` | The drag leaves without dropping. |
+| `drop_data(x, y, mime, bytes, action)` | The drag drops. |
+| `drag_acceptance()` | How the window answered, if that changed since the last call. |
+| `end_drag(outcome)` | A drag the app started ends. |
+| `hold_modifiers(modifiers)` | Holds modifier keys for the next events. |
+
+## Why it works this way
+
+MIME types and bytes are what the Wayland data device moves, and they are what HTML's `DataTransfer` exposes. Using the same model means a CrownUI file list drags into Nautilus, a terminal or a browser without any adapter, and drops from them land in CrownUI with no special casing. The cost is that there are no typed objects. You serialize on one side and parse on the other, even between two windows of your own app.
+
+Acceptance happens in `on_drag_over` because the compositor asks the window under the pointer, on every move, whether it takes the drag and in which type. The answer has to be ready right away, so it comes from your handler, synchronously, from type names alone. Reading the bytes on every move would mean a round trip to another process per pointer event. CrownUI forwards the answer to the platform only when it changes, so a handler that accepts on every move costs nothing extra.
+
+Clipboard reads are callbacks because the bytes come from another process. A blocking read would freeze the UI thread for as long as the other app takes to answer. The callback runs later on the UI thread with full access to `Cx`, so there is still nothing to lock.
+
+The drag icon is a bitmap and not a live view because the compositor draws it. That keeps it moving at the display's rate over any window, including when your UI thread is busy. The cost is that the icon is fixed for the whole drag. Render it at the device scale with `cx.scale_factor()` so it stays sharp.
+
+Only one system drag runs at a time, because a pointer drives one drag. `start_drag` reports `false` instead of queueing a second one.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="zap" href="/docs/crownui/events">
+    Pointer drags, bubbling and the gesture arena.
+  </Card>
+  <Card title="Listeners API" icon="code" href="/docs/crownui/api/listeners">
+    `on_drag_over`, `on_drop` and every other listener.
+  </Card>
+  <Card title="Drawing" icon="image" href="/docs/crownui/drawing">
+    Render pixels for a drag icon and size them with the scale factor.
+  </Card>
+  <Card title="Testing" icon="check-circle" href="/docs/crownui/testing">
+    The `crowntest` harness.
+  </Card>
+</CardGroup>

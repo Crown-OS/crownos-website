@@ -1,0 +1,402 @@
+---
+title: Windows
+description: Open windows, draw title bars, handle close requests, run panels and docks, and choose materials and frame pacing.
+---
+
+Every CrownUI app is one or more windows. A window starts from an `AppConfig` and runs a view.
+Once it is open, a handful of calls on `Cx` move it, close it, resize a panel and change how it
+takes the keyboard.
+
+## Open a window
+
+[`crownui::run`](/docs/crownui/api/run) opens one window and blocks until it closes.
+
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|_cx| text("Hello").p(24.0)),
+        AppConfig::new("Notes")
+            .app_id("org.example.notes")
+            .size(960, 640)
+            .min_size(480, 360),
+    )
+}
+```
+
+- `size` is the first content size in logical pixels. The default is 800 by 600.
+- `min_size` stops the user from shrinking the window below a size your layout needs.
+- `app_id` lets the compositor and the launcher match the window to its desktop entry and icon.
+
+Every option is listed on the [AppConfig](/docs/crownui/api/app-config) page.
+
+| Option | Method | Default |
+| --- | --- | --- |
+| Title | `AppConfig::new(title)` | `"CrownUI"` |
+| Size | `.size(w, h)` | 800 by 600 |
+| Smallest size | `.min_size(w, h)` | none |
+| App id | `.app_id(id)` | none |
+| Material | `.material(material)` | none |
+| Clear color | `.clear_color(color)` | `WHITE` |
+| Light or dark | `.color_scheme(scheme)` | `ColorScheme::Light` |
+| Extra font | `.font(bytes, alias)` | none |
+| MCP server | `.mcp(enabled)` | `false` |
+| Screen readers | `.accessibility(enabled)` | `true` |
+| Layer surface | `.layer(options)` | none |
+| Corner curve | `.corner_shape(shape)` | `CornerShape::Round` |
+| Frame | `.decorations(decorations)` | `Decorations::Client` |
+| Frame pacing | `.frame_pacing(pacing)` | `FramePacing::Display` |
+
+## Title bars and decorations
+
+By default the app draws its own frame. This is `Decorations::Client`. CrownUI makes the window
+resizable from its edges and shows the resize cursor there. You put a title bar in your own layout.
+The kit has the two pieces it needs:
+
+- `kit::title_bar_spacer()` is empty space that grows like `spacer()`. Dragging it moves the window,
+  and double-clicking it maximizes or restores the window.
+- `kit::window_controls()` is the maximize, minimize and close buttons, drawn and ordered like the
+  compositor's own title bar. Their accessible names are "Maximize", "Minimize" and "Close".
+
+```rust title="title_bar.rs"
+use crownui::kit::{title_bar_spacer, window_controls};
+use crownui::prelude::*;
+
+fn title_bar() -> impl View {
+    hstack((
+        text("Notes").font_semibold().px(12.0),
+        title_bar_spacer(),
+        window_controls(),
+    ))
+    .items_center()
+    .h(40.0)
+}
+```
+
+To build your own controls, call these from any handler:
+
+| Call | Does |
+| --- | --- |
+| `cx.begin_window_move()` | Starts an interactive move. Call it from a pointer-down handler. |
+| `cx.minimize_window()` | Minimizes the window. |
+| `cx.toggle_maximize_window()` | Maximizes the window, or restores it. |
+| `cx.request_close()` | Asks to close, exactly like the close button. Close listeners still run. |
+| `cx.close_window()` | Closes at once without asking the close listeners. |
+
+```rust
+vstack(text("Drag me"))
+    .on_pointer_down(|cx, _| cx.begin_window_move())
+    .on_double_click(|cx, _| cx.toggle_maximize_window())
+```
+
+To let the compositor draw the frame instead, pass `Decorations::Server`. It is not in the prelude.
+The published `crownui` crate exposes it as `crownui::windowing::Decorations`.
+
+```rust
+use crownui::windowing::Decorations;
+
+AppConfig::new("Terminal").decorations(Decorations::Server)
+```
+
+## Close requests
+
+When the user clicks close, or the compositor asks the window to close, CrownUI calls every
+`on_close_requested` listener. Without listeners the window closes at once. A listener calls
+`event.prevent_default()` to keep the window open, and the app calls `cx.close_window()` later when
+it is ready.
+
+```rust title="editor.rs"
+fn editor() -> impl View {
+    component(|cx| {
+        let body = cx.signal(String::new());
+        let asking = cx.signal(false);
+        cx.on_close_requested(move |cx, event| {
+            if body.with(cx, |body| !body.is_empty()) {
+                event.prevent_default();
+                asking.set(cx, true);
+            }
+        });
+        vstack((
+            text_field(body, "Write something"),
+            show(
+                asking,
+                move || {
+                    hstack((
+                        text("Discard your changes?"),
+                        button("Keep editing").on_click(move |cx, _| asking.set(cx, false)),
+                        button("Discard").on_click(|cx, _| cx.close_window()),
+                    ))
+                    .gap(8.0)
+                },
+                || spacer(),
+            ),
+        ))
+        .p(16.0)
+        .gap(12.0)
+    })
+}
+```
+
+The listener lives as long as the component that registered it. When that component unmounts, the
+listener goes with it.
+
+Tests drive the same path. `TestApp::request_close()` acts like the close button and returns whether
+the window closed. `TestApp::take_close_request()` reports a later `cx.close_window()`. With the published `crownui` crate, the harness
+is `crownui::crowntest`.
+
+```rust title="src/editor.rs"
+#[cfg(test)]
+mod tests {
+    use crowntest::{Role, TestApp, role};
+
+    use super::editor;
+
+    #[test]
+    fn asks_before_closing_with_text() {
+        let mut app = TestApp::new(editor());
+        app.click(role(Role::TextField)).type_text("draft");
+        assert!(!app.request_close());
+        app.click(role(Role::Button).name("Discard"));
+        assert!(app.take_close_request());
+    }
+}
+```
+
+## Materials
+
+A material is a background the compositor draws behind the window: a blur of what is under it, a
+tint, a rim along the edge and a shadow. `AppConfig::material` puts one behind the whole window and
+sets the clear color to `TRANSPARENT` so it shows through.
+
+```rust
+AppConfig::new("Player")
+    .material(Material::thin())
+    .corner_shape(CornerShape::Squircle)
+```
+
+`Material::thin()` is a frosted glass. `Material::thick()` blurs more and is more opaque. You can
+also fill in the fields yourself:
+
+```rust
+let glass = Material {
+    corner_radius: 20.0,
+    border_width: 1.0,
+    blur: Some(MaterialBlur {
+        radius: 32.0,
+        tint: rgba(0x1e293b66),
+        saturation: 1.4,
+    }),
+    shadow: Some(MaterialShadow {
+        radius: 24.0,
+        offset: Vector::new(0.0, 8.0),
+        color: rgba(0x00000059),
+    }),
+};
+```
+
+- `corner_radius` is the corner radius of the window shape.
+- `border_width` is the width of the refractive rim along the edge.
+- `blur.radius` is the blur radius in logical pixels. A radius that rounds to 0 turns the blur off.
+- `blur.tint` is the color laid over the blurred backdrop.
+- `blur.saturation` multiplies chroma. 1 leaves the backdrop alone and above 1 adds vibrancy.
+- `shadow` has a radius, an offset and a color.
+
+Elements can carry a material too, with `.material(..)`, for a glass card inside a window.
+
+Materials need the CrownOS background effects protocol. Read `cx.platform_capabilities()` to see
+what the compositor offers. When its `materials` field is false, CrownUI draws element materials
+with its own backdrop blur. A window material has no such fallback: the window stays transparent.
+Give it an opaque clear color in that case.
+
+```rust
+let capabilities = cx.platform_capabilities();
+let background = bind(move |rt| {
+    if capabilities.with(rt, |caps| caps.materials) {
+        TRANSPARENT
+    } else {
+        rgb(0x1e293b)
+    }
+});
+vstack(content).bg(background)
+```
+
+## Corner shape
+
+`AppConfig::corner_shape(CornerShape::Squircle)` draws every rounded corner in the window as the
+compositor's squircle, kit widgets included. The default, `CornerShape::Round`, is a circular arc.
+Pick squircle when your window sits next to compositor-drawn shapes on CrownOS, so the corners match.
+
+## Several windows
+
+[`crownui::run_windows`](/docs/crownui/api/run-windows) opens one window per `(view, config)` pair
+and returns when the last one closes. Each window has its own UI and its own signals. Share state
+through channels and `cx.spawn`.
+
+```rust
+crownui::run_windows(vec![
+    (library().boxed(), AppConfig::new("Library")),
+    (mini_player().boxed(), AppConfig::new("Now playing").size(360, 120)),
+])
+```
+
+## Panels, docks and overlays
+
+A layer surface is a window that belongs to the desktop shell: a bar, a dock, a launcher, a
+notification strip, a lock screen or a wallpaper. Pass [`LayerOptions`](/docs/crownui/api/layer-options)
+to `AppConfig::layer`. Everything else in the app stays the same.
+
+<Tabs>
+  <Tab title="Top bar">
+
+```rust
+LayerOptions::new("example-bar", Anchor::TOP | Anchor::LEFT | Anchor::RIGHT)
+    .height(LayerExtent::Fixed(36))
+    .exclusive_zone(36)
+```
+
+  </Tab>
+  <Tab title="Dock">
+
+```rust
+LayerOptions::new("example-dock", Anchor::BOTTOM)
+    .width(LayerExtent::Fixed(640))
+    .height(LayerExtent::Fixed(72))
+    .margin(LayerMargin { bottom: 8, ..LayerMargin::default() })
+```
+
+  </Tab>
+  <Tab title="Launcher">
+
+```rust
+LayerOptions::new("example-launcher", Anchor::NONE)
+    .layer(Layer::Overlay)
+    .width(LayerExtent::Fixed(640))
+    .height(LayerExtent::Fixed(420))
+    .exclusive_zone(-1)
+    .keyboard(KeyboardInteractivity::Exclusive)
+```
+
+  </Tab>
+</Tabs>
+
+- The namespace names the surface for the compositor's rules.
+- `anchor` picks the output edges. `Anchor::NONE` centers the surface and `Anchor::ALL` covers the
+  output.
+- `layer` picks the stacking band: `Background`, `Bottom`, `Top` (the default) or `Overlay`.
+- `exclusive_zone` reserves space so windows are not placed under the surface. -1 also covers the
+  space other surfaces reserved.
+- `keyboard` says whether the surface takes keys.
+
+A full app config for a panel usually turns off the white clear color and the screen reader bridge:
+
+```rust
+AppConfig::new("Bar")
+    .app_id("example-bar")
+    .clear_color(TRANSPARENT)
+    .accessibility(false)
+    .layer(bar_options)
+```
+
+### Resize and focus at runtime
+
+Two calls change a layer surface after it opens. Normal windows ignore both.
+
+- `cx.set_layer_height(LayerExtent)` resizes the surface along its height. A bar uses it to grow to
+  the output height while a popup is open, and to shrink back after.
+- `cx.set_keyboard_interactivity(KeyboardInteractivity)` changes when it takes the keyboard, for
+  example `OnDemand` only while a reply field is open.
+
+```rust
+fn open_popup(cx: &mut Cx, open: Signal<bool>) {
+    open.set(cx, true);
+    cx.set_layer_height(LayerExtent::Output);
+}
+```
+
+`cx.output_size()` returns a `Signal<Option<Size>>` with the logical size of the output the window
+is on, once the compositor has reported it. A layer surface reads it to place itself against the
+whole screen.
+
+## Frame pacing
+
+A window draws a frame only when something changed. With the default `FramePacing::Display`, each
+frame also waits for the compositor's frame callback, so the app draws at most one frame per
+display refresh. In the toolkit comparison in `benchmarks/results/2026-11-07T07-43Z.md`, the idle
+hello app drew 0 frames and used 0.0 ms of CPU per second.
+
+`FramePacing::Unpaced` draws the next frame as soon as the last one is submitted. Frames the
+display cannot show are dropped. It exists to measure how fast the pipeline is. Do not ship it.
+
+```rust
+AppConfig::new("Bench").frame_pacing(FramePacing::Unpaced)
+```
+
+Animations run on the render thread on their own clock, so they keep moving when a handler on the
+UI thread is slow. For motion the render thread cannot run, such as a simulation or a value that
+drives layout, call `cx.request_animation_frame(|cx, time| ..)`. It runs once per display frame,
+like the DOM's `requestAnimationFrame`. Ask again from inside the callback to keep animating.
+
+## Keeping the screen awake
+
+`cx.set_idle_inhibited(true)` stops the screen from blanking and the system from sleeping while the
+window is visible. A video player or a recorder turns it on while it plays. It is released with the
+window, so a crash never keeps the machine awake.
+
+## Platform capabilities
+
+`cx.platform_capabilities()` returns a `Signal<Capabilities>`. Check it before you rely on a
+compositor feature:
+
+| Field | True when |
+| --- | --- |
+| `materials` | the compositor draws `Material` backgrounds |
+| `composited_materials` | the compositor composites a layer surface over its glass and cuts both with one edge |
+| `layer_shell` | windows can be layer surfaces |
+| `idle_inhibit` | a window can keep the system awake |
+| `fractional_scale` | non-integer scale factors arrive unrounded |
+| `presentation_time` | frame callbacks carry presentation timestamps |
+| `visibility_hints` | the platform reports whether each window is visible |
+| `text_input` | input-method text input is available |
+| `popups` | popups can extend outside their parent window |
+| `app_icons` | a launcher can tell the compositor where it shows app icons |
+| `surface_animation` | the compositor animates subsurface transforms and opacity itself |
+| `touchpad_gestures` | multi-finger touchpad gestures are reported |
+
+## Why windows work this way
+
+### Client-side decorations by default
+
+CrownUI apps on CrownOS put their controls inside their own toolbars, next to search fields and
+tabs. A server-drawn title bar would add a second strip above that. Drawing the frame in the app
+also means the title bar uses the same theme, fonts and corner shape as the content. The cost is
+that you have to place `window_controls()` and a `title_bar_spacer()` yourself. A window without
+them cannot be moved or closed with the mouse.
+
+### The compositor draws materials
+
+A blur of what is behind a window needs the pixels of other windows. Only the compositor has those,
+so a window material is a request to the compositor, not something CrownUI paints. That keeps the
+blur live as windows move behind yours, and the app draws none of it. The cost is that it depends
+on the CrownOS protocol. Elsewhere the window material does nothing, and element materials fall
+back to an in-app blur of the window's own content.
+
+### Config at start, calls at runtime
+
+The things a compositor sets up when it creates a surface, such as the layer role, the anchor and
+the decorations, are in `AppConfig`, which CrownUI reads once. The things that change while the app
+runs are calls on `Cx`. You cannot turn a normal window into a panel without opening a new window.
+
+### A layer surface costs memory for its whole size
+
+Every pixel of a surface costs GPU memory, whether or not anything is drawn there. A bar that keeps
+a full-height surface for its popups keeps buffers the size of the whole output alive. That is why
+`set_layer_height` exists, and why a bar grows only while a popup is open.
+
+## Related
+
+- [AppConfig](/docs/crownui/api/app-config)
+- [LayerOptions](/docs/crownui/api/layer-options)
+- [run](/docs/crownui/api/run) and [run_windows](/docs/crownui/api/run-windows)
+- [Async work](/docs/crownui/async)
+- [Testing](/docs/crownui/testing)

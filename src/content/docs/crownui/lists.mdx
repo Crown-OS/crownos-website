@@ -1,0 +1,415 @@
+---
+title: Lists and conditional content
+description: Switch branches with show and keyed, render lists with for_each, and scroll long lists with the lazy lists.
+sidebarTitle: Lists
+---
+
+A component builds once, so content that changes shape needs a structural view. `show` and `keyed`
+switch between branches. `for_each` renders a list. `lazy_vstack`, `lazy_list` and `lazy_grid`
+render long lists by mounting only what is in view. `error_boundary` replaces a part that fails.
+
+Most examples on this page build parts of a small mail client, one step at a time.
+
+## Show or hide content
+
+`show(condition, then, otherwise)` mounts one of two branches. The condition is a `bool`, a
+`Signal<bool>`, a `Memo<bool>` or a `bind` closure. Both branches are closures with no arguments.
+
+```rust title="compose_panel.rs"
+use crownui::prelude::*;
+
+fn compose_panel() -> impl View {
+    component(|cx| {
+        let open = cx.signal(false);
+        let draft = cx.signal(String::new());
+        vstack((
+            button("New message").on_click(move |cx, _| open.update(cx, |open| *open = !*open)),
+            show(
+                open,
+                move || text_field(draft, "Write something").label("Message"),
+                || vstack(()).display_none(),
+            ),
+        ))
+        .gap(8.0)
+    })
+}
+```
+
+When `open` flips, `show` unmounts the old branch and builds the other one. The hidden branch holds
+no nodes, observers or tasks.
+
+Use `vstack(()).display_none()` for the branch that shows nothing. While it is active, the `show`
+itself collapses and leaves no gap between its siblings.
+
+<Tip>
+  State created inside a branch is lost when the branch unmounts. `draft` above is created outside
+  the branch, so the text survives closing and opening the panel.
+</Tip>
+
+To keep a node mounted and only stop painting it, use `.hidden(condition)` instead. It keeps the
+node's state and its space in the layout.
+
+```rust
+text("Sending…").hidden(bind(move |rt| !sending.get(rt)))
+```
+
+## Switch between many branches
+
+`keyed(key, build)` derives a value and rebuilds its branch only when the value changes. Use it for
+pages, tabs, and loading states.
+
+```rust title="folder_view.rs"
+#[derive(Clone, Copy, PartialEq)]
+enum Folder {
+    Inbox,
+    Sent,
+    Trash,
+}
+
+fn folder_view(folder: Signal<Folder>, messages: Signal<Vec<Message>>) -> impl View {
+    keyed(
+        move |rt| folder.get(rt),
+        move |_cx, folder| match folder {
+            Folder::Inbox => message_list(messages).boxed(),
+            Folder::Sent => text("Sent mail").boxed(),
+            Folder::Trash => text("Trash is empty").text_color(rgb(0x64748b)).boxed(),
+        },
+    )
+    .flex_1()
+}
+```
+
+Each arm has its own type, so each one calls `.boxed()`. Make the key as coarse as you can. A key
+that changes on every keystroke rebuilds the branch on every keystroke. Let bindings inside the
+branch handle the fine changes.
+
+## Render a list
+
+`for_each(items, key, row)` renders one row per item of a `Signal<Vec<T>>`.
+
+```rust title="message_list.rs"
+#[derive(Clone, PartialEq)]
+struct Message {
+    id: u64,
+    from: String,
+    subject: String,
+    unread: bool,
+}
+
+fn message_row(message: Signal<Message>) -> impl View {
+    hstack((
+        text(bind(move |rt| message.with(rt, |message| message.from.clone())))
+            .w(140.0)
+            .truncate(),
+        text(bind(move |rt| message.with(rt, |message| message.subject.clone())))
+            .grow(1.0)
+            .truncate(),
+    ))
+    .gap(12.0)
+    .px(16.0)
+    .py(10.0)
+    .text_color(bind(move |rt| {
+        if message.with(rt, |message| message.unread) { rgb(0x0f172a) } else { rgb(0x64748b) }
+    }))
+}
+
+fn message_list(messages: Signal<Vec<Message>>) -> impl View {
+    for_each(messages, |message: &Message| message.id, |_cx, message| message_row(message))
+        .gap(2.0)
+}
+```
+
+The three arguments:
+
+- `items` is the `Signal<Vec<T>>`. `T` must be `Clone + PartialEq`.
+- `key` is a function pointer, `fn(&T) -> K`. Pass a closure that captures nothing. Keys must be unique.
+- `row` builds a row from `(cx, Signal<T>)`. It runs once per new key.
+
+### How rows update
+
+When the list changes, `for_each` matches rows by key:
+
+<Steps>
+  <Step title="Known key">
+    The row stays. If the item changed, the row's signal is set, and only the bindings that read it
+    update.
+  </Step>
+  <Step title="New key">
+    A new row mounts with a fresh signal.
+  </Step>
+  <Step title="Missing key">
+    The row unmounts and its scope is freed.
+  </Step>
+  <Step title="Order">
+    The rows are put in the new order.
+  </Step>
+</Steps>
+
+So marking messages read updates one text color per changed row, and nothing else.
+
+```rust
+button("Mark all read").on_click(move |cx, _| {
+    messages.update(cx, |list| list.iter_mut().for_each(|message| message.unread = false));
+})
+```
+
+The row's signal is a copy that `for_each` writes. Setting it does not change the list. Write to the
+list signal.
+
+<Warning>
+  Use a stable id as the key, never the index. With index keys, removing the first message gives
+  every row below it a different message, while row-local state stays with the position.
+</Warning>
+
+## Enter and exit animations on rows
+
+Put `.enter(..)` and `.exit(..)` on the row root.
+
+```rust title="toast_stack.rs"
+fn toast_stack(toasts: Signal<Vec<Toast>>) -> impl View {
+    for_each(toasts, |toast: &Toast| toast.id, |_cx, toast| {
+        text(bind(move |rt| toast.with(rt, |toast| toast.message.clone())))
+            .p(12.0)
+            .rounded(10.0)
+            .bg(rgb(0x1e293b))
+            .text_color(WHITE)
+            .enter(|style| style.opacity(0.0).translate_y(-8.0))
+            .exit(|style| style.opacity(0.0).scale(0.96))
+            .transition(Spring::smooth())
+    })
+    .gap(8.0)
+    .items_center()
+}
+```
+
+- `.enter(f)` is the style a new row starts from. It animates to its real style.
+- `.exit(f)` is the style a removed row animates to. The row leaves the semantic tree at once, so tests, agents and screen readers stop seeing it, but it stays drawn until the animation ends.
+- The curve is the row's `.transition`, or the nearest ancestor's. Without one, enter and exit use `Spring::smooth()`.
+- Only the root of a removed subtree plays its exit. An `.exit` on a child inside the row does nothing when the row goes.
+
+Rows keep their nodes when the list changes, so a row with a `.transition` also animates its new
+position. When a toast above it is removed, the toasts below slide up.
+
+<Tip>
+  `.transition` animates every change in the row, including colors from bindings. If you want only
+  the enter and exit motion, leave `.transition` out. The default spring still drives them.
+</Tip>
+
+Enter animations also play when the window first shows. A list that is full at startup animates
+every row in.
+
+<Warning>
+  Do not put enter or exit on rows of a lazy list. Lazy rows mount and unmount as they cross the
+  edge of the overscan, so the animations run while the user scrolls, not when the data changes.
+</Warning>
+
+## Long lists
+
+`for_each` mounts every row. For thousands of rows, use a lazy list. All of them mount only the rows
+in view plus 4 rows of overscan on each side, and all of them need a fixed row height. They contain
+their own scroll view, so do not wrap them in `scroll_view`. Give them a bounded height.
+
+<Tabs>
+  <Tab title="lazy_vstack">
+    `lazy_vstack` takes the same arguments as `for_each`, plus a row height.
+
+    ```rust
+    fn inbox(messages: Signal<Vec<Message>>) -> impl View {
+        lazy_vstack(
+            messages,
+            |message: &Message| message.id,
+            44.0,
+            |cx, message| {
+                let id = message.with_untracked(cx, |message| message.id);
+                vstack(message_row(message)).key(id)
+            },
+        )
+        .flex_1()
+    }
+    ```
+
+    Rows keep their state while they stay in the window, and an edited item updates only its row.
+    `lazy_vstack` does not key its rows, so the `.key(id)` keeps each row's semantic id stable while
+    rows mount and unmount around it. `.key` is a method of `Element`, and `message_row` returns
+    `impl View`, so the row is wrapped in a `vstack` to carry the key.
+
+    `lazy_vstack` is a thin wrapper around `lazy_for_each` from the `view` crate, which takes a
+    viewport you feed yourself. The `crownui` prelude does not export `lazy_for_each`. Use
+    `lazy_vstack`.
+  </Tab>
+  <Tab title="lazy_list">
+    `lazy_list(count, revision, row_height, row)` addresses rows by index. The row builder reads your
+    data by index, so nothing is cloned per row.
+
+    ```rust
+    fn big_inbox(messages: Signal<Vec<Message>>) -> impl View {
+        component(move |cx| {
+            let count = cx.signal(0_usize);
+            let revision = cx.signal(0_u64);
+            cx.effect(move |rt| {
+                let len = messages.with(rt, Vec::len);
+                rt.untrack(|rt| {
+                    count.set(rt, len);
+                    revision.update(rt, |revision| *revision += 1);
+                });
+            });
+            lazy_list(count, revision, 44.0, move |cx, index| {
+                let subject = messages
+                    .with_untracked(cx, |list| list.get(index).map(|message| message.subject.clone()))
+                    .unwrap_or_default();
+                text(subject).px(16.0).truncate()
+            })
+            .content_padding(8.0)
+            .flex_1()
+        })
+    }
+    ```
+
+    Bump `revision` whenever the data behind any index changes, including inserts and removals. Each
+    bump builds every mounted row again, so row-local state does not survive it.
+  </Tab>
+  <Tab title="lazy_grid">
+    `lazy_grid(count, revision, cell, gap, item)` fits as many columns of at least `cell.width` as
+    the width allows, and shares the spare width between them.
+
+    ```rust
+    lazy_grid(count, revision, Size::new(96.0, 112.0), (8.0, 8.0), |_cx, index| {
+        vstack(text(format!("Photo {index}")).text_size(12.0))
+            .rounded(8.0)
+            .bg(rgb(0xe2e8f0))
+            .justify_end()
+            .p(6.0)
+    })
+    .content_padding(16.0)
+    .flex_1()
+    ```
+  </Tab>
+</Tabs>
+
+## Scroll from code with ScrollHandle
+
+A `ScrollHandle` reads and drives a `scroll_view`, `lazy_list` or `lazy_grid`. Create it in a
+component and attach it with `.scroll_handle(handle)`.
+
+```rust title="selectable_list.rs"
+fn selectable_list(count: Signal<usize>, revision: Signal<u64>) -> impl View {
+    component(move |cx| {
+        let handle = ScrollHandle::new(cx);
+        let selected = cx.signal(0_usize);
+        let select = move |cx: &mut Cx, index: usize| {
+            selected.set(cx, index);
+            handle.ensure_visible(cx, index);
+        };
+        vstack((
+            hstack((
+                button("First").on_click(move |cx, _| select(cx, 0)),
+                button("Last").on_click(move |cx, _| {
+                    let last = count.get(cx).saturating_sub(1);
+                    select(cx, last);
+                }),
+            ))
+            .gap(8.0),
+            lazy_list(count, revision, 32.0, move |_cx, index| {
+                text(format!("Item {index}"))
+                    .px(12.0)
+                    .bg(bind(move |rt| if selected.get(rt) == index { rgb(0xdbeafe) } else { TRANSPARENT }))
+            })
+            .scroll_handle(handle)
+            .flex_1(),
+        ))
+        .h_full()
+    })
+}
+```
+
+The handle's methods:
+
+- `offset()`, `size()`, `content_size()` and `columns()` return signals you can bind to.
+- `scroll_to_offset(cx, offset)` scrolls to a point, clamped to the content.
+- `scroll_to_index(cx, index)` puts an item's row at the top.
+- `ensure_visible(cx, index)` scrolls as little as needed to show an item.
+- `visible_range(cx)` returns the items in view. An effect that calls it re-runs on scroll, which is how you load thumbnails for the visible page only.
+
+The index methods need a `lazy_list` or `lazy_grid`. On a plain `scroll_view` they do nothing. See
+[scroll_view](/docs/crownui/api/scroll-view) for every method.
+
+## Catch failures with error_boundary
+
+`error_boundary(child, fallback)` shows `fallback(message)` in place of `child()` when reactive code
+inside the child panics after it has mounted.
+
+```rust title="preview_pane.rs"
+fn preview_pane(selected: Signal<Option<Message>>) -> impl View {
+    error_boundary(
+        move || {
+            text(bind(move |rt| {
+                selected.with(rt, |message| message.as_ref().map(|message| message.subject.clone()))
+                    .expect("a message is selected")
+            }))
+        },
+        |message| text(format!("Preview failed: {message}")).text_color(rgb(0xdc2626)),
+    )
+}
+```
+
+The pane mounts while a message is selected. If the selection later becomes `None`, the binding
+panics and the fallback appears. The boundary catches panics in bindings, memos and effects inside
+it. It does not catch a panic in an event handler, a panic in plain code while the child first
+builds, or a panic in a binding that first runs while the child first builds. CrownUI logs `CUI0301` with the component path and
+swaps in the fallback. The fallback stays until something above rebuilds the boundary. See
+[error_boundary](/docs/crownui/api/error-boundary) for a retry pattern.
+
+## Choosing the right tool
+
+| Need | Use |
+|---|---|
+| A fixed set of children, known at build time | a tuple, a `Vec` or an `Option` in a stack |
+| Content that is either there or not | `show` |
+| One of several shapes | `keyed` |
+| Up to a few hundred rows that have their own state or animate in and out | `for_each` |
+| Thousands of rows from a `Signal<Vec<T>>`, where rows keep their state | `lazy_vstack` |
+| Very large or index-based data, a list you scroll from code, or content padding | `lazy_list` |
+| Tiles that reflow with the window width | `lazy_grid` |
+| Rows of different heights | `for_each` inside a `scroll_view`, because the lazy lists need a fixed height |
+
+## Why lists work this way
+
+`for_each` matches rows by a key function, not by position. A moved row keeps its nodes, focus,
+local state and running animations. Per-row signals turn an edit of one item into an update of one
+row's bindings. The cost is linear work on every change: `for_each` clones the whole `Vec`, hashes
+every key and compares every item with its last value, and it mounts every row whether it is visible
+or not.
+
+The lazy lists require a fixed row height so the visible window is arithmetic. The first row in view
+is the scroll offset divided by the row height, and no row outside the window is ever measured. The
+cost is that rows cannot vary in height, and text inside a row must be clamped with `.truncate()` or
+`.line_clamp(..)`.
+
+`lazy_list` works by index and revision so it never clones your data. A folder of 100,000 files
+stays in your store, and the list only asks for the rows in view. The cost is that a revision bump
+rebuilds every mounted row, losing row-local state and replaying enter animations. `lazy_vstack`
+makes the opposite trade. It keeps per-row state and signals like `for_each`, but it clones the
+visible items on every scroll step and needs the whole `Vec` in a signal.
+
+The comparison benchmark scrolls a 10,000-row `lazy_list` at 2,400 px/s. With frames paced by the
+display, CrownUI ran 2.35 M instructions per frame against 5.23 M for GPUI, but used 2.36 CPU ms per
+frame against 1.95 for GPUI. With pacing off, it drew 2,303 frames per second against 2,356 for GPUI, at 0.31 against 0.42 CPU ms per frame. Qt used fewer instructions than both, 0.74 M per frame in the paced run. The figures come from
+`benchmarks/results/2026-11-07T07-43Z.md` and `2026-11-07T08-08Z.md`. See
+[Performance](/docs/crownui/performance).
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Views" icon="book" href="/docs/crownui/views">
+    Elements, children and components.
+  </Card>
+  <Card title="for_each" icon="code" href="/docs/crownui/api/for-each">
+    Every parameter of the keyed list.
+  </Card>
+  <Card title="lazy_list" icon="zap" href="/docs/crownui/api/lazy-list">
+    lazy_list, lazy_grid, lazy_vstack and lazy_index.
+  </Card>
+  <Card title="error_boundary" icon="alert" href="/docs/crownui/api/error-boundary">
+    What a boundary catches and how to retry.
+  </Card>
+</CardGroup>

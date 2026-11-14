@@ -1,0 +1,308 @@
+---
+title: Layout
+description: "Arrange views with flexbox and grid through taffy: stacks, sizes, alignment, positioning, overflow and measurement."
+---
+
+Every element in CrownUI is a CSS box laid out by [taffy](https://docs.rs/taffy), a Rust implementation of flexbox and CSS grid. You arrange boxes with stacks and Tailwind-named layout methods. Sizes and offsets are logical pixels.
+
+```rust
+use crownui::prelude::*;
+
+fn toolbar() -> impl View {
+    hstack((
+        text("Documents").font_semibold(),
+        spacer(),
+        button("New"),
+        button("Share"),
+    ))
+    .items_center()
+    .gap(8.0)
+    .px(16.0)
+    .h(48.0)
+}
+```
+
+## Defaults that differ from CSS
+
+Three defaults matter before anything else.
+
+- A box lays out its children in a column. CSS defaults to a row. `hstack` switches to a row for you.
+- Children stretch across the cross axis unless you set `items_*` or `self_*`.
+- Children shrink when space runs out, because `shrink` starts at 1, as in CSS.
+
+## Stacks
+
+Stacks are the containers you use most. Each takes its children as a tuple, a `Vec` or an `Option`.
+
+| Builder | Lays out | CSS |
+|---|---|---|
+| `vstack(children)` | Top to bottom. | `flex flex-col` |
+| `hstack(children)` | Start to end. | `flex flex-row` |
+| `zstack(children)` | On top of each other. The first child sizes the stack. | `relative` plus `absolute inset-0` children |
+| `spacer()` | An empty box with `grow(1.0)` that pushes its siblings apart. | `flex-1` |
+
+```rust
+zstack((
+    vstack(()).w(320.0).h(180.0).rounded(12.0).bg(rgb(0x6366f1)),
+    vstack(text("Now playing").text_color(WHITE))
+        .justify_end()
+        .p(12.0),
+))
+```
+
+In a `zstack`, every child after the first becomes `absolute` with `inset(0.0)`, so it covers the first child. A child you already made `absolute` keeps its own offsets.
+
+## Spacing
+
+Padding is space inside the box, margin is space outside it, and gap is space between children.
+
+```rust
+let name = cx.signal(String::new());
+vstack((text("Name"), text_field(name, "Your name")))
+    .p(16.0)    // all edges
+    .px(20.0)   // left and right, overrides p for those edges
+    .gap(6.0)   // between the label and the field
+    .mb(24.0)   // below the whole group
+```
+
+- Padding: `p`, `px`, `py`, `pt`, `pr`, `pb`, `pl`.
+- Margin: `m`, `mx`, `my`, `mt`, `mr`, `mb`, `ml`.
+- Gap: `gap` sets both axes. `gap_x` sets the space between columns, and `gap_y` the space between rows.
+
+Prefer `gap` over margins on children. A gap only appears between children, so you never fight a stray margin on the last item.
+
+## Sizes
+
+```rust
+vstack(text("Sidebar"))
+    .w(240.0)
+    .min_w(180.0)
+    .max_w(320.0)
+    .h_full()
+```
+
+| Method | Sets |
+|---|---|
+| `.w(px)`, `.h(px)` | Width and height. |
+| `.size(px)` | Width and height to the same value. |
+| `.min_w(px)`, `.max_w(px)`, `.min_h(px)`, `.max_h(px)` | Limits. |
+| `.w_full()`, `.h_full()` | 100% of the parent. |
+| `.w_frac(0.5)`, `.h_frac(0.25)` | A fraction of the parent, like `w-1/2`. |
+| `.aspect(16.0 / 9.0)` | Width divided by height. Set one side and the other follows. |
+
+A box without a size takes the size of its content. Text, images and canvases are measured leaves, so taffy asks them how big they want to be.
+
+## Flex: grow, shrink and basis
+
+Inside a stack, `grow`, `shrink` and `basis` decide how children share the space along the main axis.
+
+```rust
+hstack((
+    vstack(text("Navigation")).w(220.0).shrink(0.0),
+    vstack(text("Content")).flex_1(),
+    vstack(text("Inspector")).basis(280.0).shrink(1.0),
+))
+```
+
+- `.grow(1.0)` takes a share of the free space. Two children with `grow(1.0)` and `grow(2.0)` split it one to two.
+- `.shrink(0.0)` keeps a child at its size when space runs out. The default is 1.
+- `.basis(px)` is the starting size before growing or shrinking.
+- `.flex_1()` is `grow(1.0).shrink(1.0).basis(0.0)`. Siblings with `flex_1` end up the same size whatever their content.
+- `.flex_wrap()` moves children to a new line when they do not fit.
+
+`flex_row`, `flex_col`, `flex_row_reverse` and `flex_col_reverse` change the direction of any box. A `vstack(..).flex_row()` is the same as an `hstack`.
+
+## Alignment
+
+`items_*` aligns children on the cross axis. `justify_*` distributes them on the main axis. `self_*` overrides the cross axis alignment for one child.
+
+```rust
+hstack((
+    vstack(()).size(40.0).rounded(20.0).bg(rgb(0xcbd5e1)),
+    vstack((text("Ada Lovelace").font_semibold(), text("Online"))),
+    spacer(),
+    button("Message"),
+))
+.items_center()
+.gap(12.0)
+```
+
+| Cross axis (`items_*`, `self_*`) | Main axis (`justify_*`) |
+|---|---|
+| `items_start`, `self_start` | `justify_start` |
+| `items_center`, `self_center` | `justify_center` |
+| `items_end`, `self_end` | `justify_end` |
+| `items_stretch`, `self_stretch` | `justify_between` |
+| `items_baseline` | `justify_around` |
+| | `justify_evenly` |
+
+Start and end follow the flex direction. In a `flex_row_reverse` box, `justify_start` packs children at the right edge.
+
+## Grid
+
+`grid_cols(n)` turns a box into a grid with `n` equal columns. Children fill it row by row.
+
+```rust
+vstack(
+    (0..6)
+        .map(|index| text(format!("Cell {index}")).p(12.0).rounded(8.0).bg(rgba(0x3b82f61a)))
+        .collect::<Vec<_>>(),
+)
+.grid_cols(3)
+.gap(8.0)
+```
+
+For columns of different widths, pass `GridTrack`s to `grid_template_cols`. `GridTrack::Length(px)` is fixed, `GridTrack::Fraction(f)` takes a share of the rest like `1fr`, and `GridTrack::Auto` fits its content.
+
+```rust
+let (name, email) = (cx.signal(String::new()), cx.signal(String::new()));
+vstack((
+    text("Name"), text_field(name, "Full name"),
+    text("Email"), text_field(email, "you@example.com"),
+))
+.grid_template_cols(vec![GridTrack::Auto, GridTrack::Fraction(1.0)])
+.gap_x(12.0)
+.gap_y(8.0)
+.items_center()
+```
+
+`.col_span(2)` and `.row_span(2)` stretch a child over several tracks. `.grid()` makes a grid without explicit columns, which gives one automatic column.
+
+## Absolute positioning
+
+`.absolute()` takes a box out of the flow and places it with offsets against its parent. Siblings lay out as if it were not there.
+
+```rust
+zstack((
+    text("Inbox").px(10.0).py(6.0),
+    text("3")
+        .absolute()
+        .top(-4.0)
+        .right(-6.0)
+        .px(4.0)
+        .rounded(999.0)
+        .bg(rgb(0xef4444))
+        .text_color(WHITE)
+        .text_size(10.0),
+))
+```
+
+- `.inset(px)` sets all four offsets. `.top`, `.right`, `.bottom` and `.left` set one each.
+- `.relative()` puts a box back in the flow. It is the default.
+- `.z(index)` orders siblings when they overlap. Higher values paint on top.
+
+## Overflow and scrolling
+
+A box lets its children draw outside it by default. `.overflow_hidden()` clips them to the rounded shape of the box.
+
+```rust
+vstack(vstack(()).w(400.0).h(300.0).bg(rgb(0xf59e0b)))
+    .w(200.0)
+    .h(150.0)
+    .rounded(12.0)
+    .overflow_hidden()
+```
+
+`.overflow_scroll()` makes a scroll container at the layout level. Its content can be larger than the box. Use `scroll_view(content)` in apps. It clips the content, scrolls it with the wheel or touchpad, and takes a `ScrollHandle` through `.scroll_handle(..)` for scrolling from code. Give it a constrained size such as `.h(300.0)` or `.grow(1.0)` so the content has room to overflow. See [lists](/docs/crownui/lists) for long scrolling lists.
+
+## The top layer
+
+`.top_layer()` paints a node above every other node in the window and lets it escape the clips of its ancestors. It is the CSS top layer that popovers and dialogs use. A menu inside an `overflow_hidden` card stays fully visible.
+
+```rust
+vstack((button("Rename"), button("Delete")))
+    .absolute()
+    .top(32.0)
+    .top_layer()
+    .bg(WHITE)
+    .shadow(Shadow::lg())
+```
+
+The node keeps its place in the layout. Only the painting moves to the top.
+
+## Hiding: display_none and hidden
+
+The two ways to hide a node behave differently.
+
+```rust
+text("Details").display_none()   // gone from layout, takes no space or gap
+text("Details").hidden(true)     // keeps its space, stops painting
+```
+
+`display_none` is Tailwind's `hidden` class, CSS `display: none`. Siblings close the gap. `hidden(..)` is CSS `visibility: hidden`. It accepts a signal, so it can toggle without moving anything around it.
+
+```rust
+let saving = cx.signal(false);
+hstack((text("Saving").hidden(bind(move |rt| !saving.get(rt))), button("Save")))
+```
+
+To mount or unmount a whole branch, use `show(cond, || then, || otherwise)`. It builds only the visible branch and frees the other one.
+
+## Reactive layout
+
+Every length method takes a literal, a signal, a memo or a `bind` closure. Binding a size reruns layout for that part of the tree when the value changes.
+
+```rust
+component(|cx| {
+    let expanded = cx.signal(false);
+    vstack(text("Panel"))
+        .w(bind(move |rt| if expanded.get(rt) { 420.0 } else { 340.0 }))
+        .transition(Spring::smooth())
+        .on_click(move |cx, _| expanded.update(cx, |open| *open = !*open))
+})
+```
+
+With a `.transition(..)` on the node or an ancestor, the render thread animates the frame from the old rectangle to the new one. Layout itself jumps to the final value at once.
+
+## Measuring a node
+
+`cx.observe_size(node)` returns a `Signal<Size>` that follows the laid out size of a node. `cx.observe_rect(node)` returns a `Signal<Rect>` with its position in the window. Both update after every layout pass that moves the node.
+
+You need the node's `NodeId`, which you get when you build a view yourself. A small `View` that wraps another view does it.
+
+```rust
+use crownui::ext::NodeId;
+use crownui::prelude::*;
+
+struct ReportWidth<V> {
+    view: V,
+    width: Signal<f32>,
+}
+
+impl<V: View> View for ReportWidth<V> {
+    fn build(self, cx: &mut Cx) -> NodeId {
+        let node = self.view.build(cx);
+        let size = cx.observe_size(node);
+        let width = self.width;
+        cx.effect(move |rt| {
+            let measured = size.get(rt).width;
+            width.set(rt, measured);
+        });
+        node
+    }
+}
+```
+
+Use it to pick a layout from the space you have, such as two columns above 600 pixels and one below.
+
+<Warning>
+  Do not feed a measured size straight back into the size of the same node. That loops through layout on every pass.
+</Warning>
+
+## Pixel snapping
+
+Taffy runs with its rounding turned off, so layouts stay in fractional logical pixels. At a scale factor of 1.25 a 10.3 pixel box stays 10.3 pixels wide. The renderer draws rounded rectangles, borders and shadows with an analytic edge shader that keeps edges one device pixel wide at any position, so fractional positions still look sharp.
+
+Nodes with a `.material(..)` are the exception. They snap their window-space edges to the device pixel grid, because the compositor cuts the glass behind them on whole pixels.
+
+## Why layout works this way
+
+CrownUI keeps one persistent taffy tree next to the element tree. When a signal changes a size, only that node is restyled and taffy recomputes the parts that depend on it. GPUI clears and rebuilds its taffy tree every frame. CrownUI builds the UI once, so it can keep the tree and skip that work.
+
+Layout runs on the UI thread, and the render thread interpolates frames. This split is why a layout change animates smoothly even when the UI thread is busy. It also has costs.
+
+- Layout jumps to its final value right away. Hit testing, focus and the semantic tree see the final rectangle while the drawn frame is still moving. A click during the animation lands on where the node is going, not where it appears.
+- A layout change in a large subtree costs UI-thread time. Prefer transforms such as `translate_y` and `scale` for motion that does not need to move siblings, because they skip layout entirely.
+- Variants such as `hover` cannot change layout properties. A hover that resized a box would rerun layout on every pointer move.
+
+Fractional layout has its own tradeoff. Rounding every box to whole pixels makes adjacent boxes line up but shifts content by up to half a pixel at fractional scales, and it makes animation step. CrownUI keeps exact positions and relies on the edge shader for sharpness. Materials pay the snapping cost because the compositor works in whole pixels.

@@ -1,0 +1,265 @@
+---
+title: Reactivity
+description: How the reactive runtime stores signals, tracks reads, flushes changes without glitches and recovers from panics, all without Rc, RefCell or locks.
+sidebarTitle: Reactivity
+---
+
+All reactive state in a CrownUI window lives in one `reactive::Runtime`. Signals, memos, stores, effects and scopes are entries in that runtime. The handles you hold are small `Copy` keys, and every read or write borrows the runtime through `&mut`. Below are the runtime's internals and the tradeoffs behind them. For the everyday API, see [State](/docs/crownui/state).
+
+## One owner, many keys
+
+The runtime keeps three slot maps:
+
+- signals, each holding a boxed value, the observers subscribed to it and a height,
+- observers, each holding a compute closure, the signals it read last time, an optional output signal, a height, its scope and two flags,
+- scopes, each holding the signals, observers, cleanups, child scopes, provided values and error handler created in it.
+
+A memo is an observer with an output signal. An effect is an observer without one. A store is a signal that nobody subscribes to.
+
+The handles are keys into those maps:
+
+```rust title="reactive/src/handles.rs"
+pub struct Signal<T> {
+    pub(crate) id: SignalId,
+    marker: PhantomData<fn() -> T>,
+}
+```
+
+`SignalId` is a slotmap key: an index plus a generation. `Signal<T>`, `Memo<T>` and `Store<T>` implement `Copy` for every `T`, because they hold no `T`. Moving a signal into ten closures copies eight bytes ten times. There is no reference count and nothing to clone.
+
+The generation catches stale handles. When a scope is disposed, its slots are freed. A handle that outlives its scope then points at a dead or reused slot, and the lookup fails instead of reading the wrong value. `get`, `set`, `update` and `with` panic with `CUI0001` in that case. `try_get` and `try_set` return `None` or `false`, and `is_alive` checks first.
+
+```rust
+if let Some(name) = name.try_get(cx) {
+    title.set(cx, name);
+}
+```
+
+## Reading subscribes
+
+While an observer runs, the runtime collects every signal it reads into a small list. When the observer finishes, `resubscribe` compares that list with the previous one: it drops the observer from signals it no longer read and adds it to new ones. Dependencies are dynamic. A memo that reads `a` only when `flag` is true stops depending on `a` as soon as `flag` turns false.
+
+Reads that should not subscribe go through `untrack`, `with_untracked` or a `Store`.
+
+## Scopes
+
+Scopes form a tree. `create_scope` makes a child of the current scope, and every signal, observer and cleanup created while a scope is current belongs to it. `dispose_scope` frees a scope in this order:
+
+1. its child scopes, recursively,
+2. its cleanups, newest first,
+3. its observers, which unsubscribe from their sources,
+4. its signals.
+
+The view layer creates a scope for every `component` and every dynamic branch. `show`, `keyed`, `for_each` rows and lazy list rows each mount in their own scope, so unmounting a branch frees everything it created, including the effects that bind its properties. `cx.on_cleanup(..)` runs code at that moment.
+
+```rust
+fn ticker(log: Signal<Vec<String>>) -> impl View {
+    component(move |cx| {
+        log.update(cx, |lines| lines.push("mounted".into()));
+        cx.on_cleanup(move |rt| {
+            let _ = log.try_set(rt, vec!["unmounted".into()]);
+        });
+        text("Ticking")
+    })
+}
+```
+
+`try_set` is used in the cleanup because `log` may belong to a scope that is being disposed at the same time.
+
+Scopes also carry the environment. `provide(value)` stores a signal on the current scope, and `environment::<T>()` walks up the scope chain to the nearest one of type `T`. The kit theme reaches every widget this way. See [provide](/docs/crownui/api/provide).
+
+## The flush
+
+Writes do not run observers right away. `set` and `update` change the value and mark the subscribers dirty. `flush` then runs dirty observers until everything is consistent. In a CrownUI app you never call `flush` yourself: the `Ui` calls it after every event handler, task completion and animation frame.
+
+### Height order
+
+Every signal and observer has a height. A plain signal has height 0. An observer's height is one more than the highest source it read, and a memo's output signal takes its observer's height. Dirty observers wait in a min-heap keyed by height, so the flush always runs the lowest dirty observer first.
+
+That ordering makes the flush glitch free. An observer never runs while one of its inputs is still stale, because every input has a lower height and runs first. Here is a diamond:
+
+```rust
+use reactive::{FlushError, Runtime};
+
+fn main() -> Result<(), FlushError> {
+    let mut rt = Runtime::new();
+    let first = rt.signal(String::from("Ada"));
+    let last = rt.signal(String::from("Lovelace"));
+    let full = rt.memo(move |rt| format!("{} {}", first.get(rt), last.get(rt)));
+    let length = rt.memo(move |rt| full.with(rt, |name| name.len()));
+    let runs = rt.store(0);
+    rt.effect(move |rt| {
+        let line = format!("{} has {} bytes", full.get(rt), length.get(rt));
+        runs.update(rt, |count| *count += 1);
+        println!("{line}");
+    });
+
+    first.set(&mut rt, String::from("Grace"));
+    rt.flush()?;
+    assert_eq!(runs.with(&rt, |count| *count), 2);
+    Ok(())
+}
+```
+
+`full` has height 1, `length` height 2 and the effect height 3. After `first` changes, the flush runs `full`, then `length`, then the effect once. The effect never sees the new name with the old length.
+
+### Memo equality cutoff
+
+A memo requires `T: PartialEq`. After it computes, it compares the new value with the stored one. When they are equal, it keeps the old value and notifies nobody. Propagation stops there.
+
+```rust
+let count = rt.signal(3);
+let is_even = rt.memo(move |rt| count.get(rt) % 2 == 0);
+let renders = rt.store(0);
+rt.effect(move |rt| {
+    is_even.get(rt);
+    renders.update(rt, |count| *count += 1);
+});
+
+count.set(&mut rt, 5);
+let stats = rt.flush()?;
+assert_eq!(stats.observers_run, 1);
+assert_eq!(renders.with(&rt, |count| *count), 1);
+```
+
+The memo ran once and still said `false`, so the effect did not run. Put a memo between a busy signal and expensive work whenever the work only depends on a coarse fact about the signal.
+
+### Effects write in the next pass
+
+An effect may write signals. Those writes do not join the current pass. The subscribers go into a queue for the next pass, and the flush starts that pass once the current one is empty. A memo's own output is the one exception, since a memo changing is how a pass propagates.
+
+```rust
+let celsius = rt.signal(20.0_f32);
+let fahrenheit = rt.signal(68.0_f32);
+rt.effect(move |rt| {
+    let value = celsius.get(rt) * 9.0 / 5.0 + 32.0;
+    fahrenheit.set(rt, value);
+});
+rt.effect(move |rt| println!("{} F", fahrenheit.get(rt)));
+
+celsius.set(&mut rt, 100.0);
+let stats = rt.flush()?;
+assert_eq!(stats.passes, 2);
+```
+
+Each pass is height ordered on its own, so each pass is glitch free. A derived value is still better as a memo than as an effect that writes a signal: the memo stays in one pass and gets the equality cutoff.
+
+### The pass cap and cycles
+
+An effect that writes a signal it reads triggers itself in the next pass, forever. The flush stops after 64 passes, clears every queue and returns `FlushError::Cycle`.
+
+```rust
+let n = rt.signal(0);
+rt.effect(move |rt| {
+    let value = n.get(rt);
+    n.set(rt, value + 1);
+});
+n.set(&mut rt, 5);
+assert!(matches!(rt.flush(), Err(FlushError::Cycle { passes: 64 })));
+```
+
+The view layer logs the error and keeps running, so a cycle shows up as a log line instead of a frozen window.
+
+## Panics, quarantine and error boundaries
+
+Each observer runs inside `catch_unwind`. When one panics, the runtime:
+
+1. marks the observer quarantined, so it never runs again,
+2. turns the panic payload into an `ObserverPanic` with the observer's scope and message,
+3. walks up from that scope to the nearest scope with an error handler, and calls it.
+
+When no scope has a handler, the panic waits in `take_panics()`. The rest of the flush continues.
+
+```rust
+let boundary = rt.create_scope();
+rt.set_error_boundary(boundary, |_, panic| eprintln!("caught: {}", panic.message));
+let divisor = rt.signal(1);
+rt.with_scope(boundary, |rt| {
+    rt.effect(move |rt| {
+        if divisor.get(rt) == 0 {
+            panic!("division by zero");
+        }
+    });
+});
+divisor.set(&mut rt, 0);
+rt.flush()?;
+```
+
+`error_boundary` in `view` builds on this. It mounts the child in its own scope and installs a handler on it. When something inside panics, the handler stores the message and queues a rebuild. The rebuild logs `CUI0301`, unmounts the broken branch and mounts `fallback(message)` in its place.
+
+```rust
+component(|cx| {
+    let explode = cx.signal(false);
+    vstack((
+        button("Break").on_click(move |cx, _| explode.set(cx, true)),
+        error_boundary(
+            move || {
+                text(bind(move |rt| {
+                    if explode.get(rt) {
+                        panic!("boom");
+                    }
+                    "Fine".to_string()
+                }))
+            },
+            |message| text(format!("Recovered: {message}")),
+        ),
+    ))
+})
+```
+
+Clicking the button makes the bound text panic. The boundary replaces it with "Recovered: boom", and the button keeps working.
+
+## How the view layer uses the runtime
+
+`Cx` derefs to `Runtime`, which is why `cx.signal(0)` and `count.get(cx)` work. Properties go through the runtime too. A property built from a signal, a memo or `bind(..)` becomes an effect. The effect computes the value once at mount and returns it as the initial style. On every later run, it pushes a command such as `Command::Style(node, prop)` or `Command::Text(node, text)` into a store.
+
+Effects never touch the element tree directly. After each flush, the `Ui` drains the command store and applies the commands to the tree, which marks the affected nodes for layout or rendering. Applying commands can write signals again, for example a size observer, so the `Ui` repeats flush and apply until no command is left.
+
+This is how a signal write turns into a small set of render ops. The write marks the effects that read it. Each effect queues one command for one node. That node, and only that node, is queued for the next frame. See [Frame pipeline](/docs/crownui/frame-pipeline).
+
+## Borrowing rules
+
+`with` lends `&T` while the runtime stays borrowed, so you cannot write any signal inside the closure, and you cannot read a second signal with `with` inside it. Read first, then write:
+
+```rust
+let initial = todo.with(cx, |todo| todo.done);
+let done = cx.signal(initial);
+```
+
+For two values at once, use `with2`. To change one signal from another, use `update_from`:
+
+```rust
+let label = cx.with2(first, last, |first, last| format!("{first} {last}"));
+total.update_from(cx, delta, |total, delta| *total += *delta);
+```
+
+## Why it works this way
+
+The runtime is the single owner of every reactive value, and Rust's borrow checker guards it at compile time. That replaces the usual mix of `Rc<RefCell<..>>` that signal libraries use:
+
+- No runtime borrow errors. A `RefCell` can panic when two closures borrow the same value. Here, two borrows of the runtime do not compile.
+- Free handles. A `Copy` key costs nothing to move into a closure, and there is no clone-before-move noise.
+- Deterministic cleanup. Values die with their scope, in a known order, and cleanups run then. Reference cycles between closures cannot keep state alive.
+- No locks. The runtime is single threaded by construction. Work on other threads goes through `cx.spawn`, and the result comes back to the UI thread as a closure that runs with `&mut Cx`.
+
+Height ordering and the memo cutoff give fine-grained updates without a virtual DOM. A component runs once. Only effects whose inputs changed run again, and only the nodes those effects touch get new render ops.
+
+## What it costs
+
+- Every access needs `&mut`. Reading a signal needs `&mut Runtime`, because reads subscribe the running observer. That is why code reads into a local before it writes, and why `with2` and `update_from` exist.
+- Dynamic typing inside. Values are stored as `Box<dyn Any>` and downcast on every access. The handle's type parameter makes the downcast always succeed for live handles, but it is still a check per read.
+- Dangling handles fail at run time. A handle kept past its scope compiles fine and panics with `CUI0001` when used. The type system does not tie a handle's life to its scope.
+- One runtime per window. Each window has its own `Ui` and runtime, so signals are not shared between windows. State two windows show lives outside the UI and reaches each through `cx.spawn`.
+- A quarantined observer stays dead. A panicking effect never runs again on its own. Only an error boundary that rebuilds the branch brings that part of the UI back.
+- No `Send`. Handles and values never cross threads. Async work must hand its result back instead of writing a signal from another thread.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="State" icon="book" href="/docs/crownui/state">
+    The everyday API: signals, memos, bind and stores.
+  </Card>
+  <Card title="Signal" icon="code" href="/docs/crownui/api/signal">
+    Every method of Signal with its signature.
+  </Card>
+</CardGroup>

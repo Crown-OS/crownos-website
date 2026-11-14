@@ -3,13 +3,17 @@ title: Quickstart
 description: Install the native libraries, add CrownUI to a project and open your first window.
 ---
 
-CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor.
+CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor. This page takes you
+from an empty directory to a running counter app.
 
-## Install
+## Install and run
 
 <Steps>
   <Step title="Install the native libraries">
+    CrownUI links against Wayland, Vulkan, EGL, fontconfig, FreeType and D-Bus.
+
     <CodeGroup>
+
     ```bash title="Arch Linux"
     sudo pacman -S base-devel wayland wayland-protocols libxkbcommon \
       vulkan-icd-loader vulkan-headers mesa fontconfig freetype2 dbus
@@ -20,16 +24,18 @@ CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor.
       libxkbcommon-dev libvulkan-dev libegl1-mesa-dev libgbm-dev \
       libfontconfig-dev libfreetype-dev libdbus-1-dev
     ```
+
     </CodeGroup>
   </Step>
-  <Step title="Add the crate">
+  <Step title="Create a project and add the crate">
     ```bash
-    cargo new hello && cd hello
+    cargo new counter
+    cd counter
     cargo add crownui
     ```
   </Step>
   <Step title="Write the app">
-    ```rust title="src/main.rs" {6-9}
+    ```rust title="src/main.rs"
     use crownui::prelude::*;
 
     fn main() -> Result<(), crownui::RunError> {
@@ -37,8 +43,11 @@ CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor.
             component(|cx| {
                 let count = cx.signal(0);
                 vstack((
-                    text(bind(move |rt| format!("Count: {}", count.get(rt)))),
-                    button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+                    text(bind(move |rt| format!("Count: {}", count.get(rt)))).text_size(24.0),
+                    button("+1")
+                        .on_click(move |cx, _| count.update(cx, |count| *count += 1))
+                        .hover(|style| style.scale(1.04))
+                        .transition(Spring::snappy()),
                 ))
                 .p(24.0)
                 .gap(12.0)
@@ -55,23 +64,118 @@ CrownUI needs Rust 1.97 or newer and runs on Linux under a Wayland compositor.
   </Step>
 </Steps>
 
-<Note>
-  The first build downloads the Impeller SDK (about 23 MB) into `.impeller_cache/`. Set
-  `IMPELLER_CACHE_DIR` to a vendored copy for offline builds, and enable the `static` feature to
-  link Impeller into your binary.
-</Note>
+The first build downloads the Impeller SDK (about 23 MB) into `.impeller_cache/`. Later builds reuse
+it.
 
-## Features
+## What the code does
+
+- `use crownui::prelude::*` brings in every builder, modifier, signal type and color an app needs.
+- `crownui::run(view, config)` opens a window and runs until it closes. Call it from `main` before
+  you start other threads.
+- `component(|cx| ..)` runs its closure once. It creates state and returns the view tree.
+- `cx.signal(0)` creates a `Signal<i32>`, a small `Copy` handle to a value in the runtime.
+- `text(bind(move |rt| ..))` is a text whose content is recomputed whenever a signal it reads
+  changes. Here only this one text updates when you click.
+- `button("+1").on_click(..)` handles clicks. Handlers get `(&mut Cx, &mut Event<T>)`.
+- `.hover(|style| style.scale(1.04))` is a variant that applies while the pointer is over the
+  button. `.transition(Spring::snappy())` animates the change with a spring.
+- `.p(24.0)` and `.gap(12.0)` are Tailwind names with values in logical pixels.
+- `AppConfig::new("Counter")` sets the window title. Its size defaults to 800 by 600.
+
+## Cargo features
 
 | Feature | Default | What it adds |
 | --- | --- | --- |
-| `wayland` | yes | The Wayland platform |
-| `impeller` | yes | The Impeller renderer on Vulkan with a GLES fallback |
-| `tokio` | yes | Async tasks through `cx.spawn` |
-| `mcp` | yes | An in-app MCP server so AI agents can drive the app |
-| `accessibility` | yes | Screen reader support through AT-SPI |
-| `static` | no | Links libimpeller statically |
+| `wayland` | yes | The Wayland platform. |
+| `impeller` | yes | The Impeller renderer on Vulkan with a GLES fallback. |
+| `tokio` | yes | Async tasks through `cx.spawn`. |
+| `mcp` | yes | The in-app MCP server, so AI agents can drive the app. |
+| `accessibility` | yes | Screen reader support through AT-SPI. |
+| `static` | no | Links libimpeller statically. |
+| `audio` | no | Microphone capture over PipeWire, as `crownui::audio` and `kit::use_microphone`. |
+
+`crownui::run` and `crownui::run_windows` exist only with both `wayland` and `impeller` on.
+
+<Note>
+  The `mcp` feature compiles the server in, but each window starts it only when its config says
+  so. `AppConfig` defaults `mcp` to `false`. Call `.mcp(true)` to let agents connect.
+</Note>
+
+## Offline and static builds
+
+- Set `IMPELLER_CACHE_DIR` to a vendored copy of the Impeller SDK to build without network access.
+- Enable the `static` feature to link Impeller into your binary instead of loading the shared
+  library at runtime.
+
+```bash
+cargo add crownui --features static
+```
+
+## See the logs
+
+CrownUI logs through `tracing`. Errors carry a stable code such as `CUI0402`, listed on the
+[errors](/docs/crownui/errors) page. Add a subscriber to see them:
+
+```bash
+cargo add tracing-subscriber
+```
+
+```rust
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    tracing_subscriber::fmt::init();
+    crownui::run(app(), AppConfig::new("Counter"))
+}
+```
+
+## When it does not start
+
+| Symptom | Fix |
+| --- | --- |
+| `RunError::Platform` right away | No Wayland compositor is reachable. Run the app inside a Wayland session. |
+| `CUI0402`, the renderer was not created | Check the GPU driver, then try `CROWNUI_RENDERER=gles cargo run` to skip Vulkan. |
+| `CUI0408`, MCP did not start | Check the permissions of `$XDG_RUNTIME_DIR/crownui`. |
+
+## Run the examples
+
+The repository has five examples. Clone it next to the four sibling repositories it depends on by
+path:
+
+```bash
+mkdir crownos && cd crownos
+git clone https://github.com/Crown-OS/crownui.git
+git clone https://github.com/Crown-OS/crownos-config.git
+git clone https://github.com/Crown-OS/crownos-protocols.git
+git clone https://github.com/Crown-OS/crownos-ipc.git
+git clone https://github.com/Crown-OS/crownos-voice.git
+cd crownui
+cargo run -p crownui --example counter
+```
+
+| Example | What it shows |
+| --- | --- |
+| `counter` | Signals, buttons, and hover and press variants. |
+| `todo` | Keyed lists, per-row signals, text input and delete actions. |
+| `gallery` | Buttons, toggles and a text field in styled sections with dark mode variants. |
+| `glass_card` | A canvas gradient behind a backdrop blur card that expands with a spring. |
+| `kit_gallery` | The themed CrownOS widgets following the desktop theme. |
+
+`rust-toolchain.toml` pins the toolchain, so rustup installs Rust 1.97 on the first build.
 
 ## Next steps
 
-Learn how [signals drive updates](/docs/crownui/state), then [style your views](/docs/crownui/styling).
+<CardGroup cols={2}>
+  <Card title="Tutorial" icon="rocket" href="/docs/crownui/tutorial">
+    Build a todo app step by step.
+  </Card>
+  <Card title="Views" icon="layers" href="/docs/crownui/views">
+    Stacks, text, buttons and how views compose.
+  </Card>
+  <Card title="State" icon="zap" href="/docs/crownui/state">
+    Signals, memos and effects.
+  </Card>
+  <Card title="Styling" icon="pencil" href="/docs/crownui/styling">
+    Tailwind-named modifiers and variants.
+  </Card>
+</CardGroup>

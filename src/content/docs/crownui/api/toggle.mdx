@@ -1,0 +1,138 @@
+---
+title: toggle
+description: An on and off switch bound to a boolean signal, with a spring-animated knob.
+api: FN toggle
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn wifi_row() -> impl View {
+    component(|cx| {
+        let wifi = cx.signal(true);
+        hstack((
+            text("Wi-Fi").grow(1.0),
+            toggle(wifi).label("Wi-Fi"),
+        ))
+        .items_center()
+        .gap(12.0)
+        .p(12.0)
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn toggle(on: Signal<bool>) -> Element<ToggleKind>
+```
+</ResponseExample>
+</ApiExamples>
+
+`toggle` is an on and off switch bound to a `Signal<bool>`. Clicking it, or pressing Space or Enter while it has focus, flips the signal. The knob slides with a spring on the render thread.
+
+The switch reads and writes the signal you pass. Any other code that sets the signal moves the switch too, and the switch's change reaches everything bound to the signal.
+
+## Parameters
+
+<ParamField name="on" type="Signal<bool>" required>
+  The state of the switch. `true` is on. The toggle flips it on every activation and shows its value as the `checked` state in the semantic tree.
+</ParamField>
+
+## Returns
+
+<ResponseField name="toggle" type="Element<ToggleKind>">
+  The switch element, already carrying `.transition(Spring::snappy())`. Chain style, listener and semantic methods on it.
+</ResponseField>
+
+## Always give it a label
+
+A toggle has no visible text, so it has no accessible name until you give it one. Screen readers, tests and agents find it by that name.
+
+```rust
+let bluetooth = cx.signal(false);
+toggle(bluetooth).label("Bluetooth")
+```
+
+Use the same words as the text next to it. The row in the first example shows "Wi-Fi" and labels the switch "Wi-Fi".
+
+## Default look
+
+| Part | Default |
+|---|---|
+| Track size | 44 by 24 |
+| Track shape | capsule, radius 12 |
+| Track color when on | green, `Color::new(0.2, 0.78, 0.35, 1.0)` |
+| Track color when off | gray at 35% alpha |
+| Knob | a white circle 20 across, inset 2 from the edges |
+| Knob travel | 20 to the right when on |
+| Cursor | `CursorIcon::Pointer` |
+| Shrink | 0, so a crowded row never squeezes it |
+| Motion | `Spring::snappy()` on the knob and the track color |
+
+Change the motion with your own `.transition(..)`. A later transition replaces the default one.
+
+```rust
+let dark = cx.signal(false);
+toggle(dark).label("Dark mode").transition(Spring::bouncy())
+```
+
+## Reacting to changes
+
+The signal is the source of truth, so most code reads it with `bind` or in an effect. When you need to act at the moment the user flips it, add `.on_click(..)`. The toggle's own listener runs first, so the signal already holds the new value inside your handler.
+
+```rust
+let dark = cx.signal(false);
+toggle(dark).label("Dark mode").on_click(move |cx, _| {
+    let scheme = if dark.get(cx) { ColorScheme::Dark } else { ColorScheme::Light };
+    cx.color_scheme().set(cx, scheme);
+})
+```
+
+Set the signal from code to move the switch without a click.
+
+```rust
+let (wifi, bluetooth) = (cx.signal(true), cx.signal(true));
+button("Turn everything off").on_click(move |cx, _| {
+    wifi.set(cx, false);
+    bluetooth.set(cx, false);
+})
+```
+
+## Disabled toggles
+
+`.disabled(..)` blocks clicks, keyboard activation and focus. Pair it with `when_disabled` to show the state.
+
+```rust
+let (sync, offline) = (cx.signal(true), cx.signal(false));
+toggle(sync).label("Sync").disabled(offline).when_disabled(|style| style.opacity(0.4))
+```
+
+Here `offline` is a `Signal<bool>`, which `.disabled(..)` accepts like any `bool` property.
+
+## Testing
+
+Find the switch by its role and label. Its `checked` state reflects the signal.
+
+```rust
+let mut app = TestApp::new(component(|cx| {
+    let on = cx.signal(false);
+    hstack((text("Wi-Fi"), toggle(on).label("Wi-Fi")))
+}));
+app.click(role(Role::Switch).name("Wi-Fi"));
+assert_eq!(app.find(role(Role::Switch)).states.checked, Some(true));
+assert!(app.is_animating()); // the knob is mid-spring
+app.settle();
+```
+
+## The kit toggle
+
+`kit::toggle(on)` takes the same signal and draws the CrownOS switch with theme colors and an optional `.caption(..)`. Use it in CrownOS apps. See [kit controls](/docs/crownui/kit-controls).
+
+## Why toggle works this way
+
+A toggle takes a signal instead of a value and a callback. That makes the state shared by default. The settings row, a menu item and a keyboard shortcut can all point at the same `Signal<bool>` and stay in sync without glue code. The cost is that the toggle always writes the signal. To confirm before a change, bind the switch to its own signal and copy the value over after the user confirms.
+
+The knob position is a bound `translate`, and the track color is a bound background. Neither touches layout, so a flip costs no layout pass and the render thread animates both on its own clock.

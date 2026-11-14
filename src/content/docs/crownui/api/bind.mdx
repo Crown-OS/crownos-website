@@ -1,0 +1,155 @@
+---
+title: bind
+description: Turn any expression over signals into a property that updates itself, and accept literals or reactive values through IntoProp.
+api: FN bind
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="A reactive color"
+let on = cx.signal(false);
+
+hstack((
+    toggle(on),
+    text(bind(move |rt| if on.get(rt) { "On".to_owned() } else { "Off".to_owned() }))
+        .text_color(bind(move |rt| if on.get(rt) { rgb(0x16a34a) } else { rgb(0x64748b) })),
+))
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn bind<T, F>(compute: F) -> Bind<F>
+where
+    F: FnMut(&mut Runtime) -> T + 'static;
+
+pub trait IntoProp<T> {
+    fn into_prop(self) -> Prop<T>;
+}
+
+pub enum Prop<T> {
+    Static(T),
+    Dynamic(Box<dyn FnMut(&mut Runtime) -> T>),
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`bind` wraps a closure so it can stand in for a property value. When the element mounts, the closure runs once and its result becomes the initial value. Every signal and memo it read becomes a dependency. When one changes, the closure runs again and the view applies the new result to that one property. Nothing else on the element or in the tree is rebuilt.
+
+Every property in CrownUI takes `impl IntoProp<T>`. That one trait is why `.p(16.0)`, `.p(padding_signal)` and `.p(bind(..))` all compile.
+
+## Parameters
+
+<ParamField name="compute" type="impl FnMut(&mut Runtime) -> T + 'static" required>
+  Produces the property value. It receives `&mut Runtime`, not `&mut Cx`, so it reads signals, memos and stores but cannot build views. It runs once at mount and again whenever a value it read changes.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Bind<F>" type="IntoProp<T>">
+  An opaque wrapper. Its only use is to be passed where an `impl IntoProp<T>` is expected.
+</ResponseField>
+
+## What converts into a property
+
+`IntoProp<T>` has one method, `into_prop(self) -> Prop<T>`. These types implement it:
+
+| Source | Target `T` | Result |
+|---|---|---|
+| `f32`, `f64`, `i32`, `u32` | `f32` | `Prop::Static`, converted with `as f32` |
+| `String`, `&str`, `&String` | `String` | `Prop::Static`, an owned copy |
+| `Color` | `Color` | `Prop::Static` |
+| `bool` | `bool` | `Prop::Static` |
+| `Vector` | `Vector` | `Prop::Static` |
+| `Material` | `Material` | `Prop::Static` |
+| `Signal<T>` where `T: Clone` | `T` | `Prop::Dynamic`, calls `get` |
+| `Memo<T>` where `T: Clone` | `T` | `Prop::Dynamic`, calls `get` |
+| `Bind<F>` | what `F` returns | `Prop::Dynamic`, runs `F` |
+| `Prop<T>` | `T` | itself |
+
+A signal converts only to a property of its own type. `Signal<i32>` does not convert into `IntoProp<f32>`. Use `bind(move |rt| count.get(rt) as f32)` for that. The same rule applies to `bind`: a closure that returns `&str` does not fit a `String` property, so return an owned `String`.
+
+## Prop methods
+
+<ResponseField name="map" type="fn<U: 'static>(self, impl FnMut(T) -> U + 'static) -> Prop<U> where T: 'static">
+  Transforms the value. A static prop is mapped once, now. A dynamic prop applies the transform after every recompute.
+</ResponseField>
+
+`Prop` is in `crownui::ext`. You only need to name it when you match on it.
+
+## Examples
+
+### Pass a signal directly
+
+When a property shows a signal as it is, skip `bind`.
+
+```rust
+let name = cx.signal(String::from("Untitled"));
+let width = cx.signal(240.0_f32);
+
+text(name).w(width)
+```
+
+### Derive a string
+
+`bind` is the usual way to format a value for display.
+
+```rust
+text(bind(move |rt| format!("{} of {}", page.get(rt), total.get(rt))))
+```
+
+### Accept any value in your own component
+
+Take `impl IntoProp<T>` in your function, and callers can pass a literal, a signal, a memo or a `bind`. Call `into_prop()` when you need to change the value.
+
+```rust
+fn caption(label: impl IntoProp<String>) -> impl View {
+    let shouted = label.into_prop().map(|label| label.to_uppercase());
+    text(shouted).text_size(12.0)
+}
+
+caption("Settings");
+caption(title_signal);
+caption(bind(move |rt| format!("{} items", count.get(rt))));
+```
+
+### Share one computation between properties
+
+Each `bind` runs on its own. If several properties need the same derived value, compute it once in a [memo](/docs/crownui/api/memo) and pass the memo.
+
+```rust
+let overdue = cx.memo(move |rt| due.get(rt) < today.get(rt));
+
+text(title)
+    .text_color(bind(move |rt| if overdue.get(rt) { rgb(0xdc2626) } else { rgb(0x0f172a) }))
+    .label(bind(move |rt| String::from(if overdue.get(rt) { "Overdue task" } else { "Task" })))
+```
+
+### Read a style in a variant
+
+Variant styles take the same props, so a hover color follows the theme too. `use_theme` comes from `crownui::kit`.
+
+```rust
+use crownui::kit::use_theme;
+
+let theme = use_theme(cx);
+
+button("Save")
+    .bg(bind(move |rt| theme.with(rt, |theme| theme.surface.raised)))
+    .hover(|style| style.bg(bind(move |rt| theme.with(rt, |theme| theme.surface.hover))))
+```
+
+## Why it works this way
+
+CrownUI builds the view once and never diffs it. The only way for something on screen to change is for a property to be bound to signals. `bind` makes that binding explicit and local: you see which property depends on what, and only that property is touched when the inputs change.
+
+Each dynamic prop becomes a small effect. On mount it computes the first value, which the element uses directly. On later runs it pushes a command for that node into a queue, and the view applies the queue after the flush. A text update re-measures that one text node. A color update marks that one node for repaint.
+
+The costs:
+
+- Each `bind` is one observer with its own closure allocation. A list of 1000 rows with 3 bound properties each holds 3000 observers. For large lists, prefer `lazy_list` so only visible rows exist.
+- Closures must be `'static`, so they capture `Copy` handles by value with `move`. Capture data you need as owned values, or put it in a signal.
+- There is no equality check before a style command is applied. If a bound value often recomputes to the same result, put a `memo` in front of it.
+
+See [signal](/docs/crownui/api/signal), [memo](/docs/crownui/api/memo), [styled](/docs/crownui/api/styled) and [State](/docs/crownui/state).

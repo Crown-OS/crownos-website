@@ -1,0 +1,348 @@
+---
+title: DrawList
+description: "The list of draw commands a canvas records, with Paint, Brush, GradientStop, Path and Stroke."
+api: FN DrawList::new
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::ext::{DrawCommand, Paint, Path, Stroke};
+use crownui::prelude::*;
+
+canvas(|_rt, size, list| {
+    let card = Rect::from_xywh(8.0, 8.0, size.width - 16.0, size.height - 16.0);
+    let corners = CornerRadii::uniform(12.0);
+    list.shadow(card, corners, rgba(0x0000003a), 12.0, Vector::new(0.0, 4.0));
+    list.fill(card, corners, WHITE);
+
+    let tick = Path::new()
+        .move_to(Point::new(24.0, 32.0))
+        .line_to(Point::new(32.0, 40.0))
+        .line_to(Point::new(48.0, 24.0));
+    list.push(DrawCommand::StrokePath(tick, Stroke::rounded(3.0), Paint::solid(rgb(0x22c55e))));
+})
+.w(200.0)
+.h(120.0)
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub struct DrawList { /* private commands */ }
+
+impl DrawList {
+    pub fn new() -> Self;
+    pub fn commands(&self) -> &[DrawCommand];
+    pub fn is_empty(&self) -> bool;
+    pub fn clear(&mut self);
+    pub fn push(&mut self, command: DrawCommand);
+    pub fn extend_from(&mut self, other: &DrawList);
+    pub fn save(&mut self);
+    pub fn restore(&mut self);
+    pub fn translate(&mut self, offset: Vector);
+    pub fn transform(&mut self, transform: Transform);
+    pub fn clip(&mut self, rect: Rect, radii: CornerRadii);
+    pub fn fill(&mut self, rect: Rect, radii: CornerRadii, paint: impl Into<Paint>);
+    pub fn stroke(&mut self, rect: Rect, radii: CornerRadii, width: f32, paint: impl Into<Paint>);
+    pub fn shadow(&mut self, rect: Rect, radii: CornerRadii, color: Color, blur: f32, offset: Vector);
+    pub fn text(&mut self, layout: TextLayoutId, origin: Point);
+    pub fn image(&mut self, image: ImageId, dest: Rect);
+    pub fn text_layouts(&self) -> impl Iterator<Item = TextLayoutId> + '_;
+    pub fn images(&self) -> impl Iterator<Item = ImageId> + '_;
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+A `DrawList` is a flat list of drawing commands: rectangles, rounded rectangles, paths, shadows, text, images, clips, transforms and layers. A canvas painter records into one, and the renderer turns it into GPU work. Every command is plain data, so a list can be compared, printed and snapshotted. These types live in the `graphics` crate and are exported from `crownui::ext`.
+
+`DrawList` implements `Clone`, `Default`, `PartialEq`, `Debug` and `Display`.
+
+## Parameters
+
+The recording methods share these parameters.
+
+<ParamField name="rect" type="Rect" required>
+  The shape's bounds, in the list's current coordinates.
+</ParamField>
+
+<ParamField name="radii" type="CornerRadii" required>
+  Corner radii. `CornerRadii::ZERO` records a plain rectangle.
+</ParamField>
+
+<ParamField name="paint" type="impl Into<Paint>" required>
+  What fills the shape. A `Color` converts into a solid paint.
+</ParamField>
+
+<ParamField name="width" type="f32" required>
+  For `stroke`: line width in logical pixels.
+</ParamField>
+
+<ParamField name="color" type="Color" required>
+  For `shadow`: the shadow color, alpha included.
+</ParamField>
+
+<ParamField name="blur" type="f32" required>
+  For `shadow`: the blur radius.
+</ParamField>
+
+<ParamField name="offset" type="Vector" required>
+  For `shadow`: the shadow's offset from the shape. For `translate`: how far to move the origin.
+</ParamField>
+
+<ParamField name="transform" type="Transform" required>
+  For `transform`: the matrix to multiply into the current transform.
+</ParamField>
+
+<ParamField name="dest" type="Rect" required>
+  For `image`: where the whole image lands.
+</ParamField>
+
+## Returns
+
+<ResponseField name="DrawList" type="DrawList">
+  From `DrawList::new()`: an empty list. A canvas painter receives a fresh one on every run.
+</ResponseField>
+
+## Methods
+
+| Method | Records |
+|---|---|
+| `save()` | `Save`: stores the current transform and clip. |
+| `restore()` | `Restore`: brings back the last saved transform and clip, and composites a layer started with `SaveLayer`. |
+| `translate(offset)` | `Transform` with a translation. Records nothing for a zero offset. |
+| `transform(transform)` | `Transform`. Records nothing for the identity. |
+| `clip(rect, radii)` | `ClipRect` when the radii are zero, otherwise `ClipRoundedRect`. |
+| `fill(rect, radii, paint)` | `FillRect` when the radii are zero, otherwise `FillRoundedRect`. |
+| `stroke(rect, radii, width, paint)` | `StrokeRoundedRect` with `Stroke::new(width)`, centered on the edge. |
+| `shadow(rect, radii, color, blur, offset)` | `Shadow`. |
+| `text(layout, origin)` | `Text`: a shaped layout with its top-left corner at `origin`. |
+| `image(image, dest)` | `Image`: an uploaded image scaled into `dest`. |
+| `push(command)` | Any `DrawCommand`, for paths, layers and anything without a helper. |
+| `extend_from(other)` | Every command of another list, appended. |
+| `clear()` | Removes every command and keeps the allocation. |
+| `commands()` | The recorded commands, as a slice. |
+| `is_empty()` | Whether nothing was recorded. |
+| `text_layouts()` | The text layouts the list references. |
+| `images()` | The images the list draws, directly or as an image paint. |
+
+## DrawCommand
+
+Coordinates are those of the enclosing repaint boundary, after any recorded transforms. In a canvas, that is the canvas's local space.
+
+| Variant | Meaning |
+|---|---|
+| `Save` | Saves transform and clip. |
+| `Restore` | Restores the last save, and composites a layer if the save was a `SaveLayer`. |
+| `Transform(Transform)` | Multiplies the current transform. |
+| `ClipRect(Rect)` | Intersects the clip with a rectangle. |
+| `ClipRoundedRect(Rect, CornerRadii)` | Intersects the clip with a rounded rectangle. |
+| `FillRect(Rect, Paint)` | Fills a rectangle. |
+| `FillRoundedRect(Rect, CornerRadii, Paint)` | Fills a rounded rectangle. |
+| `StrokeRoundedRect(Rect, CornerRadii, Stroke, Paint)` | Outlines a rounded rectangle, centered on its edge. |
+| `FillPath(Path, Paint)` | Fills a path. |
+| `StrokePath(Path, Stroke, Paint)` | Outlines a path. |
+| `Shadow { rect, radii, color, blur, offset }` | A blurred drop shadow of a rounded rectangle, cut away under the shape itself so it never shows through a translucent fill, like CSS `box-shadow`. |
+| `Text(TextLayoutId, Point)` | A shaped text layout with its top-left corner at the point. |
+| `Image(ImageId, Rect)` | An image scaled into the rectangle. |
+| `SaveLayer { bounds, opacity, backdrop_blur }` | Starts a layer composited at `opacity`, optionally blurring what is behind it first. `bounds: Option<Rect>` limits the area, `None` is unbounded. Ends at the matching `Restore`. |
+
+## Paint
+
+```rust
+pub struct Paint {
+    pub brush: Brush,
+    pub blur: Option<f32>,
+}
+
+impl Paint {
+    pub fn solid(color: Color) -> Self;
+    pub fn image(image: ImageId, rect: Rect) -> Self;
+}
+
+impl From<Color> for Paint;
+```
+
+| Field or function | Description |
+|---|---|
+| `brush` | What fills the shape. |
+| `blur` | Gaussian blur of the shape's edges in logical pixels, like CSS `filter: blur` on the shape. `None` is sharp. |
+| `Paint::solid(color)` | A solid fill with no blur. |
+| `Paint::image(image, rect)` | A fill showing `image` scaled into `rect`, cropped by the shape. |
+| `From<Color>` | Lets every `impl Into<Paint>` parameter take a plain `Color`. |
+
+## Brush
+
+| Variant | Description |
+|---|---|
+| `Solid(Color)` | A single color. |
+| `LinearGradient { start: Point, end: Point, stops: SmallVec<[GradientStop; 4]> }` | A linear gradient between two points in the shape's coordinates. |
+| `Image { image: ImageId, rect: Rect }` | An uploaded image scaled into `rect`. The shape crops it, so a rounded rectangle filled this way is a rounded image with no clip. |
+
+`stops` is a `smallvec::SmallVec`. Build it from an array with `.into_iter().collect()`, which needs no extra dependency. Up to four stops stay inline without a heap allocation.
+
+## GradientStop
+
+```rust
+pub struct GradientStop {
+    pub offset: f32,
+    pub color: Color,
+}
+```
+
+`offset` is the position along the gradient, from 0 at `start` to 1 at `end`.
+
+```rust
+use crownui::ext::{Brush, GradientStop, Paint};
+
+let glow = Paint {
+    brush: Brush::LinearGradient {
+        start: Point::new(0.0, 0.0),
+        end: Point::new(0.0, size.height),
+        stops: [
+            GradientStop { offset: 0.0, color: rgba(0x6366f1ff) },
+            GradientStop { offset: 1.0, color: rgba(0x6366f100) },
+        ]
+        .into_iter()
+        .collect(),
+    },
+    blur: Some(8.0),
+};
+list.fill(Rect::new(Point::ZERO, size), CornerRadii::uniform(16.0), glow);
+```
+
+## Path
+
+```rust
+pub struct Path {
+    pub commands: Vec<PathCommand>,
+}
+
+impl Path {
+    pub fn new() -> Self;
+    pub fn move_to(self, point: Point) -> Self;
+    pub fn line_to(self, point: Point) -> Self;
+    pub fn quad_to(self, control: Point, point: Point) -> Self;
+    pub fn cubic_to(self, first: Point, second: Point, point: Point) -> Self;
+    pub fn close(self) -> Self;
+    pub fn bounds(&self) -> Rect;
+}
+```
+
+Coordinates are logical pixels. The builder methods take and return the path, so they chain. `bounds` is the box around every point, control points included. `Path` implements `Default`, `Clone` and `PartialEq`.
+
+| `PathCommand` | Description |
+|---|---|
+| `MoveTo(Point)` | Starts a new contour. |
+| `LineTo(Point)` | A straight line. |
+| `QuadTo(Point, Point)` | A quadratic Bezier curve: control point, then end point. |
+| `CubicTo(Point, Point, Point)` | A cubic Bezier curve: two control points, then end point. |
+| `Close` | Closes the current contour. |
+
+```rust
+use crownui::ext::{DrawCommand, Paint, Path};
+
+let heart = Path::new()
+    .move_to(Point::new(12.0, 21.0))
+    .cubic_to(Point::new(-4.0, 10.0), Point::new(6.0, -2.0), Point::new(12.0, 6.0))
+    .cubic_to(Point::new(18.0, -2.0), Point::new(28.0, 10.0), Point::new(12.0, 21.0))
+    .close();
+list.push(DrawCommand::FillPath(heart, Paint::solid(rgb(0xef4444))));
+```
+
+## Stroke
+
+```rust
+pub struct Stroke {
+    pub width: f32,
+    pub cap: StrokeCap,
+    pub join: StrokeJoin,
+}
+
+impl Stroke {
+    pub const fn new(width: f32) -> Self;
+    pub const fn rounded(width: f32) -> Self;
+}
+```
+
+| Item | Description |
+|---|---|
+| `width` | Line width in logical pixels. |
+| `cap` | How open ends finish: `StrokeCap::Butt` (default, flush with the end point), `Round` (a half circle past it) or `Square` (a half square past it). |
+| `join` | How segments meet: `StrokeJoin::Miter` (default, a sharp corner), `Round` or `Bevel`. |
+| `Stroke::new(width)` | Butt caps and miter joins. |
+| `Stroke::rounded(width)` | Round caps and round joins, as Lucide icons are drawn. |
+
+```rust
+use crownui::ext::{DrawCommand, Paint, Path, Stroke, StrokeCap, StrokeJoin};
+
+let square_ends = Stroke { width: 4.0, cap: StrokeCap::Square, join: StrokeJoin::Bevel };
+list.push(DrawCommand::StrokePath(zigzag, square_ends, Paint::solid(BLACK)));
+```
+
+## Layers and backdrop blur
+
+`SaveLayer` has no helper. Push it, draw, and `restore`:
+
+```rust
+use crownui::ext::DrawCommand;
+
+let panel = Rect::from_xywh(16.0, 16.0, size.width - 32.0, 120.0);
+
+list.push(DrawCommand::SaveLayer {
+    bounds: Some(panel),
+    opacity: 0.9,
+    backdrop_blur: Some(20.0),
+});
+list.fill(panel, CornerRadii::uniform(16.0), rgba(0xffffff99));
+list.restore();
+```
+
+For a frosted panel on an element, `.backdrop_blur(..)` and `.material(..)` on the element are simpler and let the compositor help. Use a layer when the blur belongs inside a drawing.
+
+## Ids
+
+| Type | Description |
+|---|---|
+| `ImageId(pub u64)` | An image uploaded to the renderer, from `cx.register_image`. |
+| `TextLayoutId(pub u64)` | A text layout handed to the renderer. Text views create these. A canvas painter has no way to shape text, so use text views on top of the canvas. |
+
+## Printing a list
+
+`Display` prints one command per line and indents everything between a save and its restore. This is what snapshots, devtools and agents read.
+
+```rust
+let mut list = DrawList::new();
+list.save();
+list.clip(Rect::from_xywh(0.0, 0.0, 10.0, 10.0), CornerRadii::uniform(2.0));
+list.fill(Rect::from_xywh(1.0, 2.0, 3.0, 4.0), CornerRadii::ZERO, rgb(0x3b82f6));
+list.restore();
+
+assert_eq!(
+    list.to_string(),
+    "save\n  clip 0,0 10x10 r2\n  fill 1,2 3x4 #3b82f6ff\nrestore\n"
+);
+```
+
+## Why it works this way
+
+Commands are plain data so they cross threads. The UI thread records, a channel carries the list, and the render thread translates it into an Impeller display list for that repaint boundary. No backend type appears in a command, which is why the recording backend runs tests without a GPU and why a second backend only translates commands.
+
+Helpers skip work that has no visible effect. A zero translation or an identity transform records nothing, and zero radii record the cheaper plain rectangle. Shadows are cut away under their shape, so a translucent card over a shadow does not look dirty.
+
+The cost of plain data is copying. A list is rebuilt from scratch on every painter run, and paths are owned vectors that are cloned when the list moves to the render thread. Keep painters that redraw often small, and draw static parts in a separate canvas.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="canvas" icon="code" href="/docs/crownui/api/canvas">
+    Where you get a `DrawList`.
+  </Card>
+  <Card title="image" icon="code" href="/docs/crownui/api/image">
+    Registering images for `image`, `Paint::image` and `Brush::Image`.
+  </Card>
+  <Card title="Drawing guide" icon="image" href="/docs/crownui/drawing">
+    Worked examples and tradeoffs.
+  </Card>
+</CardGroup>

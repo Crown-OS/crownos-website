@@ -1,72 +1,292 @@
 ---
 title: Styling
-description: Style views with Tailwind-named methods, state variants and spring transitions.
+description: Style views with Tailwind-named methods, colors, borders, shadows, materials, text styles and dark mode.
 ---
 
-Style methods use Tailwind class names with literal values in logical pixels.
+Style methods in CrownUI are Tailwind class names written as Rust methods. `p-4` becomes `.p(16.0)`, `rounded-lg` becomes `.rounded(8.0)` and `bg-blue-500` becomes `.bg(rgb(0x3b82f6))`. Every value is a literal in logical pixels, so the number you read is the number you get.
 
 ```rust
-text("Hello")
+use crownui::prelude::*;
+
+fn badge(label: &'static str) -> impl View {
+    text(label)
+        .px(10.0)
+        .py(4.0)
+        .rounded(999.0)
+        .bg(rgb(0x3b82f6))
+        .text_color(WHITE)
+        .text_size(12.0)
+        .font_semibold()
+}
+```
+
+All of these methods live on the `Styled` trait. Every widget returns an `Element<K>`, and `Element<K>` implements `Styled`, so the same methods work on `text`, `vstack`, `button` and your own kinds. The full list with types is on the [Styled reference](/docs/crownui/api/styled).
+
+## How style calls stack
+
+Each call appends one modifier to the element. Modifiers apply in order, so a later call wins over an earlier one for the same property.
+
+```rust
+text("Later wins").bg(rgb(0xef4444)).bg(rgb(0x22c55e)) // green
+```
+
+Widgets set their own defaults when they mount, and your modifiers apply after them. A `button` starts with `.px(12.0).py(6.0).rounded(8.0)` and a gray background. Calling `.bg(..)` or `.rounded(..)` on it replaces those defaults.
+
+## Colors
+
+Colors are `Color` values with straight alpha. The prelude gives you three ways to write them.
+
+```rust
+rgb(0x0f172a)        // CSS #0f172a, opaque
+rgba(0x3b82f61a)     // CSS #3b82f61a, the last byte is alpha
+Color::new(0.2, 0.78, 0.35, 1.0) // floats from 0.0 to 1.0
+```
+
+`WHITE`, `BLACK` and `TRANSPARENT` are constants. `Color::from_rgba8(r, g, b, a)` takes bytes. `color.with_alpha_factor(0.5)` scales the alpha of an existing color, and `color.lerp(other, 0.3)` blends two colors.
+
+Four methods take a color:
+
+| Method | Tailwind | Paints |
+|---|---|---|
+| `.bg(color)` | `bg-*` | The background of the box. |
+| `.text_color(color)` | `text-*` | Text in this node and in every text below it. |
+| `.border_color(color)` | `border-*` | The border, once `.border(width)` gives it a width. |
+| `.ring(width, color)` | `ring-*` | An outline drawn outside the border. |
+
+## Borders, corners and rings
+
+`.border(1.0)` sets the border width and `.border_color(..)` its color. The border follows the corner radius. It is a paint property, so it takes no layout space. Add padding when content sits close to the edge.
+
+```rust
+vstack((text("Plan"), text("Pro").font_bold()))
     .p(16.0)
-    .rounded(8.0)
-    .bg(rgb(0x3b82f6))
+    .rounded(12.0)
+    .border(1.0)
+    .border_color(rgba(0x0f172a1f))
+```
+
+`.rounded(r)` rounds every corner. Round one side or one corner with `rounded_t`, `rounded_r`, `rounded_b`, `rounded_l`, `rounded_tl`, `rounded_tr`, `rounded_br` and `rounded_bl`. A radius larger than half the box gives a capsule, so `.rounded(999.0)` is the usual pill.
+
+```rust
+hstack((text("Day").px(12.0).py(6.0), text("Week").px(12.0).py(6.0)))
+    .rounded_t(10.0)
+    .bg(rgb(0xf1f5f9))
+```
+
+`.ring(width, color)` draws an outline outside the border without changing the layout. It is the usual focus indicator. `.outline(width, color)` is the same ring under its CSS name.
+
+```rust
+button("Save").focus_visible(|style| style.ring(2.0, rgb(0x3b82f6)))
+```
+
+## Shadows
+
+`.shadow(..)` takes a `Shadow`. The four presets match Tailwind's `shadow-sm` to `shadow-xl`.
+
+| Preset | Color | Blur | Offset |
+|---|---|---|---|
+| `Shadow::sm()` | black at 5% | 2 | (0, 1) |
+| `Shadow::md()` | black at 10% | 6 | (0, 4) |
+| `Shadow::lg()` | black at 10% | 15 | (0, 10) |
+| `Shadow::xl()` | black at 10% | 25 | (0, 20) |
+
+`Shadow::new(color, blur, offset)` builds your own, and `.shadow_none()` removes one a widget set.
+
+```rust
+vstack(text("Floating"))
+    .p(20.0)
+    .rounded(16.0)
+    .bg(WHITE)
+    .shadow(Shadow::new(rgba(0x0f172a33), 30.0, Vector::new(0.0, 12.0)))
+```
+
+The renderer keeps a drop shadow out from under its shape. A translucent card does not show a dark smudge through its own background.
+
+## Opacity and blur
+
+`.opacity(0.5)` fades a node and everything inside it. The value is a fraction from 0.0 to 1.0 and is clamped to that range.
+
+`.backdrop_blur(24.0)` blurs whatever is drawn behind the node, inside its rounded shape. Combine it with a translucent background to get frosted glass inside your own window.
+
+```rust
+vstack(text("Now playing").text_color(WHITE))
+    .p(16.0)
+    .rounded(20.0)
+    .bg(rgba(0xffffff26))
+    .border(1.0)
+    .border_color(rgba(0xffffff4d))
+    .backdrop_blur(24.0)
+```
+
+`.text_blur(radius)` blurs only the glyphs of a text node. It is useful for a soft label behind a sharp one, or for hiding a value until the user reveals it.
+
+## Materials
+
+`.material(..)` asks the compositor to render glass behind a node. This is a CrownOS extension with no Tailwind name. `Material::thin()` is a 24 pixel blur under a dark tint at 25% alpha with a 16 pixel corner radius. `Material::thick()` doubles the blur to 48 and raises the tint to 55%.
+
+```rust
+vstack((text("Quick settings").font_semibold(), text("Wi-Fi is on")))
+    .p(16.0)
+    .rounded(16.0)
+    .material(Material::thin())
+```
+
+The difference from `backdrop_blur` is who does the work. `backdrop_blur` blurs pixels your app has drawn. A material blurs the desktop and the other windows behind your window, which only the compositor can see.
+
+<Note>
+  When the compositor does not offer materials, CrownUI draws the node with an in-app backdrop blur instead. The code stays the same on CrownOS and on other Wayland compositors.
+</Note>
+
+A material node snaps its window-space edges to the device pixel grid. The compositor cuts the glass on whole pixels, and snapping makes the body CrownUI paints cover exactly the same pixels.
+
+To put a material behind the whole window, use `AppConfig::new(title).material(Material::thin())`. That also clears the window to transparent.
+
+## Text styling
+
+Text properties set on any node apply to every text below it, the way CSS inheritance works. Set the font once on a container and override it where needed.
+
+```rust
+vstack((
+    text("Storage").text_size(20.0).font_bold(),
+    text("41.2 GB of 64 GB used").text_color(rgb(0x64748b)),
+))
+.text_color(rgb(0x0f172a))
+.font_family("Inter")
+```
+
+| Method | What it sets |
+|---|---|
+| `.text_size(14.0)` | Font size in logical pixels. The default is 14. |
+| `.font_weight(600)` | Weight on the 100 to 900 scale. |
+| `.font_medium()`, `.font_semibold()`, `.font_bold()` | Weights 500, 600 and 700. |
+| `.font_family("Inter")` | A family name or an alias registered with `AppConfig::font`. |
+| `.italic()` | Italic style. |
+| `.leading(1.4)` | Line height as a multiple of the font size. |
+| `.tracking(0.5)` | Letter spacing in logical pixels. |
+| `.text_left()`, `.text_center()`, `.text_right()`, `.text_justify()` | Alignment inside the text box. |
+| `.truncate()` | One line, cut with an ellipsis. |
+| `.line_clamp(3)` | At most three lines. |
+| `.text_color(color)` | Text color. The default is black. |
+
+`text_left` and `text_right` follow the reading direction. In a right-to-left layout, `text_left` aligns to the right edge.
+
+## Transforms
+
+Transforms move, scale and rotate the drawn node without changing its layout. Siblings do not move to make room. The `active` variant needs a click listener on the element, because a press goes to the innermost clickable element.
+
+```rust
+button("Play")
+    .on_click(|_cx, _| println!("play"))
+    .hover(|style| style.scale(1.05))
+    .active(|style| style.scale(0.96).translate_y(1.0))
+    .transition(Spring::crisp())
+```
+
+- `.translate_x(px)`, `.translate_y(px)` and `.translate(Vector::new(x, y))` move the node.
+- `.scale(factor)`, `.scale_x(factor)` and `.scale_y(factor)` scale it.
+- `.rotate(degrees)` rotates it clockwise.
+- `.origin(x, y)` sets the transform origin as a fraction of the size. `(0.5, 0.5)` is the center and `(0.0, 0.0)` is the top left corner.
+
+## Cursor and pointer events
+
+`.cursor(CursorIcon::Pointer)` picks the cursor shown while the pointer is over the node. The options are `Default`, `Pointer`, `Text`, `Crosshair`, `Move`, `Grab`, `Grabbing`, `NotAllowed`, `Wait`, `Progress`, `EwResize`, `NsResize`, `NeswResize`, `NwseResize`, `ColResize` and `RowResize`. Buttons and toggles already use `Pointer`, and text fields use `Text`.
+
+`.pointer_events_none()` lets the pointer pass through a node and its descendants. A child opts back in with `.pointer_events_auto()`. On a window's root it also shrinks the surface's input region to the opted-in boxes, which is how a transparent overlay lets clicks reach the windows below.
+
+## Dark mode
+
+CrownUI keeps the current `ColorScheme` in a signal. It is `ColorScheme::Light` unless you start the window with `AppConfig::color_scheme(ColorScheme::Dark)`. The `.dark(..)` variant applies its styles while the scheme is dark.
+
+```rust
+vstack(text("Inbox"))
+    .p(16.0)
+    .bg(WHITE)
+    .text_color(rgb(0x0f172a))
+    .dark(|style| style.bg(rgb(0x1e293b)).text_color(WHITE))
+```
+
+`cx.color_scheme()` returns that signal. Set it to switch every `dark` variant in the window at once.
+
+```rust
+component(|cx| {
+    let dark = cx.signal(false);
+    toggle(dark).label("Dark mode").on_click(move |cx, _| {
+        let scheme = if dark.get(cx) { ColorScheme::Dark } else { ColorScheme::Light };
+        cx.color_scheme().set(cx, scheme);
+    })
+})
+```
+
+Read the signal inside `bind` when a value depends on the scheme in a way a variant cannot express.
+
+```rust
+let scheme = cx.color_scheme();
+canvas(move |rt, size, list| {
+    let ink = if scheme.get(rt) == ColorScheme::Dark { WHITE } else { BLACK };
+    list.fill(Rect::new(Point::ZERO, size), CornerRadii::uniform(4.0), ink);
+})
+```
+
+<Tip>
+  Kit widgets do not read `ColorScheme`. They take every color from the kit theme, which `provide_configured_theme` keeps in step with the desktop's light or dark setting. See [the kit theme](/docs/crownui/api/kit-theme) for that path.
+</Tip>
+
+## Corner shapes
+
+Every rounded corner follows a circular arc by default. CrownOS draws its windows and panels with a continuous corner, a squircle whose curvature eases in from the edge. Pick it for a whole window with `AppConfig::corner_shape`.
+
+```rust
+crownui::run(
+    component(|_cx| text("Files")),
+    AppConfig::new("Files").corner_shape(CornerShape::Squircle),
+)
+```
+
+The setting applies to every rounded box in the window, kit widgets included. A squircle reaches one and a half times its radius along each edge, so the same `.rounded(12.0)` looks softer than the round version.
+
+## Bound values
+
+Most style methods take `impl IntoProp<T>`. A literal works, and so do a `Signal`, a `Memo` and a `bind` closure. A bound value updates only that one property when its inputs change. The component does not run again.
+
+```rust
+component(|cx| {
+    let selected = cx.signal(false);
+    text("Option")
+        .p(8.0)
+        .rounded(6.0)
+        .bg(bind(move |rt| if selected.get(rt) { rgb(0x3b82f6) } else { TRANSPARENT }))
+        .text_color(bind(move |rt| if selected.get(rt) { WHITE } else { BLACK }))
+        .on_click(move |cx, _| selected.update(cx, |on| *on = !*on))
+})
+```
+
+Numbers accept `f32`, `f64`, `i32` and `u32`, so `.p(16)` and `.p(16.0)` both work. A few methods take a plain value and cannot be bound: `ring` takes its width as `f32`, and `outline`, `shadow`, `size`, `w_frac`, `h_frac`, `origin`, `font_weight`, `font_family`, `line_clamp`, `z`, `cursor`, `col_span`, `row_span` and the grid methods take literals. For those, switch between two elements with `show`, or use a variant.
+
+## State variants
+
+`hover`, `active`, `focus`, `focus_visible`, `when_disabled` and `dark` take a closure that styles a `VariantStyle`. The styles apply while the state holds. Add `.transition(..)` and the change animates on the render thread.
+
+```rust
+button("Delete")
+    .on_click(|_cx, _| println!("delete"))
+    .bg(rgb(0xef4444))
     .text_color(WHITE)
-    .hover(|style| style.bg(rgb(0x2563eb)))
-    .dark(|style| style.bg(rgb(0x1e293b)))
+    .hover(|style| style.bg(rgb(0xdc2626)))
+    .active(|style| style.scale(0.97))
+    .focus_visible(|style| style.ring(2.0, rgb(0xfca5a5)))
     .transition(Spring::snappy())
 ```
 
-## From Tailwind to CrownUI
+<Warning>
+  Variants take paint, transform and text properties only. Padding, sizes and other layout properties are ignored with the warning CUI0201. The [variants reference](/docs/crownui/api/variants) lists what is allowed and why.
+</Warning>
 
-| Tailwind | Method |
-| --- | --- |
-| `p-4 px-4 py-2` | `.p(16.0) .px(16.0) .py(8.0)` |
-| `gap gap-x gap-y` | `.gap() .gap_x() .gap_y()` |
-| `bg-*` | `.bg(color)` |
-| `text-*` | `.text_color(color) .text_size(px)` |
-| `rounded` | `.rounded()` |
-| `shadow-md` | `.shadow(Shadow::md())` |
-| `opacity-* backdrop-blur-*` | `.opacity(0.5) .backdrop_blur(24.0)` |
-| `hover: dark:` | `.hover(\|s\| ..) .dark(\|s\| ..)` |
+## Why styling works this way
 
-## Variants
+Tailwind names with literal pixels make code easy to read and easy to write for people and agents. Nobody has to learn a new vocabulary, and nobody has to look up what `p-4` means in this project. The cost is that CrownUI does not enforce a spacing scale. Two developers can write `.p(15.0)` and `.p(16.0)` side by side. The kit solves that for CrownOS apps with its own metrics and theme colors. Your app keeps consistency through shared functions such as `badge` above.
 
-Variants such as `hover`, `active`, `focus`, `focus_visible`, `when_disabled` and `dark` take paint
-properties. `.transition(..)` animates every change in the subtree with a spring or a timing curve.
+Each property also knows what it invalidates. Padding and sizes are layout properties, so changing one runs layout for that part of the tree. Background, border, ring, shadow, opacity and transforms are paint properties, so changing one skips layout and re-records only the repaint boundary that holds the node. Opacity and transforms are cheaper still, because the render thread composes them without re-recording. Text properties reshape the text, which also reruns layout because the text size can change.
 
-<Tabs>
-  <Tab title="Spring">
-    ```rust
-    button("Save").hover(|style| style.scale(1.04)).transition(Spring::snappy())
-    ```
-  </Tab>
-  <Tab title="Curve">
-    ```rust
-    button("Save").hover(|style| style.opacity(0.8)).transition(Curve::ease_in_out(200))
-    ```
-  </Tab>
-</Tabs>
+That split is why variants only take paint and text properties. A hover that changed padding would move siblings and rerun layout on every pointer move. Keeping variants visual makes a hover cost one repaint at most, and it lets the render thread animate it. The price is that a hover cannot grow a box. When you need that, bind the size to a signal that a listener sets, and accept the layout pass.
 
-## Glass materials
-
-On CrownOS, `.material(Material::thin())` asks the compositor to render glass behind a view.
-
-<Info>
-  CrownUI still runs on other Wayland compositors. It only uses CrownOS protocols such as
-  compositor glass when the compositor offers them.
-</Info>
-
-## Themed widgets
-
-The `kit` module adds the themed CrownOS widgets. `provide_configured_theme` reads the desktop's
-light or dark mode and accent colour and follows edits while the app runs.
-
-```rust
-use crownui::{kit::{provide_configured_theme, section, setting_row, toggle}, prelude::*};
-
-component(|cx| {
-    provide_configured_theme(cx);
-    let wifi = cx.signal(true);
-    section("Network", (setting_row("Wi-Fi", toggle(wifi)),))
-})
-```
+Bound values have a cost too. Each `bind` is one observer in the reactive runtime with its own closure. That is cheap, but it is not free, so use a literal when the value never changes.

@@ -1,0 +1,198 @@
+---
+title: Animation
+description: Animate state changes with springs and timing curves that run on the render thread.
+---
+
+You do not write animation loops in CrownUI. You change state, and a `.transition(..)` on the element says how the drawn result moves to the new value. A dedicated render thread runs the motion on its own clock, so a slow handler on the UI thread never makes it stutter.
+
+```rust
+use crownui::prelude::*;
+
+fn like_button() -> impl View {
+    component(|cx| {
+        let liked = cx.signal(false);
+        button("Like")
+            .bg(bind(move |rt| if liked.get(rt) { rgb(0xef4444) } else { rgb(0xe2e8f0) }))
+            .hover(|style| style.scale(1.04))
+            .active(|style| style.scale(0.96))
+            .transition(Spring::snappy())
+            .on_click(move |cx, _| liked.update(cx, |on| *on = !*on))
+    })
+}
+```
+
+Every change on this button now animates: the background when `liked` flips, the scale on hover and on press.
+
+## Transitions
+
+`.transition(curve)` is CSS `transition`. It animates every change of the element and of everything inside it. A transition on a container covers all of its children, and a child's own transition takes precedence over the one it inherits.
+
+The curve is either a `Spring` or a `Curve`. Anything that is `Into<Curve>` works, and a `Spring` converts on its own.
+
+```rust
+.transition(Spring::snappy())        // physical spring, the usual choice
+.transition(Spring::new(0.3, 0.8))   // response in seconds, damping ratio
+.transition(Curve::ease_in_out(200)) // CSS ease-in-out over 200 ms
+.transition(Curve::linear(1000))     // constant speed over one second
+```
+
+| Spring | Response | Damping | Use it for |
+|---|---|---|---|
+| `Spring::snappy()` | 0.25 s | 0.86 | State changes. Quick with a hint of overshoot. |
+| `Spring::smooth()` | 0.4 s | 1.0 | Layout and theme changes. No overshoot. |
+| `Spring::crisp()` | 0.15 s | 1.0 | Press feedback. |
+| `Spring::bouncy()` | 0.5 s | 0.7 | Playful motion with visible bounce. |
+| `Spring::interactive()` | 0.15 s | 0.86 | Following a finger or a pointer during a drag. |
+
+Springs have no fixed duration. The motion ends when the spring settles, which depends on how far it travels and how fast it was already moving. Timing curves have a fixed duration and an easing. See [Spring and Curve](/docs/crownui/api/spring-curve) for every constructor.
+
+## What animates
+
+A transition animates every number the render thread draws with:
+
+- the frame of the node, which is its position and size from layout
+- background, border width and color, ring width and color
+- corner radii
+- shadow color, blur and offset
+- opacity
+- translate, scale and rotate
+- backdrop blur
+- the scroll offset of scroll containers
+
+Text properties such as `text_color` and `text_size` change at once. They reshape the text on the UI thread, and the render thread receives a new text layout rather than a number to interpolate. Animate `opacity` on a text node to fade it.
+
+Layout changes animate through the frame. Bind a width to a signal, add a transition, and the box grows smoothly.
+
+```rust
+component(|cx| {
+    let expanded = cx.signal(false);
+    vstack(text("Details"))
+        .p(16.0)
+        .w(bind(move |rt| if expanded.get(rt) { 420.0 } else { 280.0 }))
+        .rounded(16.0)
+        .bg(rgb(0xf1f5f9))
+        .transition(Spring::smooth())
+        .on_click(move |cx, _| expanded.update(cx, |open| *open = !*open))
+})
+```
+
+## Animating one change with cx.with_animation
+
+Sometimes a change should animate only when one action causes it. `cx.with_animation(curve, |cx| ..)` runs the closure and animates every property change that lands in the next frame with `curve`. It is SwiftUI's `withAnimation`.
+
+```rust
+button("Expand").on_click(move |cx, _| {
+    cx.with_animation(Spring::bouncy(), |cx| {
+        expanded.update(cx, |open| *open = !*open)
+    })
+})
+```
+
+The explicit curve wins over every `.transition(..)` for that frame, and it also animates nodes that have no transition at all. The same state change made from somewhere else, such as a sync from the network, jumps unless a `.transition(..)` covers the node.
+
+## Enter and exit
+
+`.enter(..)` gives the style a node starts from when it appears. It then animates to its real style. `.exit(..)` gives the style it animates to when it is removed. The node stays on screen until that animation ends.
+
+```rust
+let open = cx.signal(false);
+show(
+    open,
+    || vstack(text("Saved"))
+        .p(12.0)
+        .rounded(10.0)
+        .bg(rgb(0x0f172a))
+        .text_color(WHITE)
+        .enter(|style| style.opacity(0.0).translate_y(8.0).scale(0.96))
+        .exit(|style| style.opacity(0.0).scale(0.96))
+        .transition(Spring::snappy()),
+    || vstack(()),
+)
+```
+
+Enter and exit use the node's transition or the nearest one above it. Without either, they use `Spring::smooth()`. When a node exits, its whole subtree leaves with it, so put `.exit(..)` on the root of what disappears.
+
+Enter and exit take literal values only. A `bind` inside them is dropped with the warning CUI0202, because the start and end styles are captured once.
+
+## Repeating motion
+
+`Curve::repeating()` plays a timing curve over and over. It is for indicators that never arrive anywhere, such as a spinner. This is how the kit spinner turns:
+
+```rust
+canvas(|_rt, size, list| {
+    let tick = Rect::from_xywh(size.width / 2.0 - 1.5, 0.0, 3.0, size.height / 3.0);
+    list.fill(tick, CornerRadii::uniform(1.5), BLACK);
+})
+    .size(16.0)
+    .rotate(360.0)
+    .enter(|style| style.rotate(0.0))
+    .transition(Curve::linear(1000).repeating())
+```
+
+The node enters at 0 degrees and animates to 360, and the repeating curve starts over every second. A spring settles by nature, so `repeating()` returns a spring unchanged.
+
+## Interruptions keep their velocity
+
+When a value changes while it is still animating, the running animation is retargeted. The new segment starts from the current value, and a spring segment also starts from the current velocity. Nothing jumps, and a spring that was moving left curves smoothly toward a new target on the right.
+
+Hover in and out of a button quickly and the scale reverses mid-flight without a snap. Every transition retargets from the current value. Only springs carry the velocity over, because a timing curve has a fixed shape and runs its easing again from the start. Prefer springs for anything the user can interrupt.
+
+Springs make this exact. CrownUI evaluates a spring in closed form, so it computes position and velocity at any timestamp directly instead of stepping a simulation. Sampling at the frame's presentation time gives the same answer every time, with no drift.
+
+## UI-thread motion with request_animation_frame
+
+The render thread can only animate what it draws. When motion has to drive layout, logic or a value you compute, use `cx.request_animation_frame`. It is the DOM's `requestAnimationFrame`. The callback receives the frame time, and asking again from inside it runs every frame.
+
+```rust
+use std::time::Duration;
+
+fn grow(cx: &mut Cx, now: Duration, start: Duration, width: Signal<f32>) {
+    let progress = (now.saturating_sub(start).as_secs_f32() / 0.6).min(1.0);
+    width.set(cx, 320.0 * progress);
+    if progress < 1.0 {
+        cx.request_animation_frame(move |cx, now| grow(cx, now, start, width));
+    }
+}
+
+component(|cx| {
+    let width = cx.signal(0.0_f32);
+    cx.request_animation_frame(move |cx, now| grow(cx, now, now, width));
+    vstack(()).h(4.0).w(width).bg(rgb(0x3b82f6))
+})
+```
+
+Callbacks run once per display frame, in step with the render thread, so UI-thread motion lands one step per frame. The callback is dropped if its component unmounts first.
+
+<Warning>
+  Each frame of UI-thread motion runs signals and often layout on the UI thread. Use it only for motion the render thread cannot run. Everything else belongs in `.transition(..)`.
+</Warning>
+
+## Testing animations
+
+`crowntest` drives the same pipeline on a manual clock. `app.advance_ms(100)` moves time forward, `app.settle()` runs until every animation ends, and `app.is_animating()` tells you whether anything is still moving. See [testing](/docs/crownui/testing).
+
+```rust
+let mut app = TestApp::new(like_button());
+app.hover(role(Role::Button).name("Like"));
+assert!(app.is_animating());
+app.settle();
+assert!(!app.is_animating());
+```
+
+## One motion crate for apps and the compositor
+
+Springs, curves and retargeting live in the `motion` crate. It holds no state of its own and only computes values. The CrownOS compositor evaluates its animations with the same crate, so a CrownUI spring and a compositor spring with the same parameters move identically, sample for sample.
+
+## Why animation works this way
+
+The render thread owns the GPU renderer and steps every animation on its own clock. The UI thread sends it the new target values over a channel, attaches the curve, and goes back to handling events. A handler that blocks the UI thread delays the next state change, but it does not freeze a spring that is already running.
+
+Describing motion as a transition rather than a loop has a second benefit. The framework knows the start, the target and the curve, so it can retarget with the current velocity, test with a manual clock and skip frames when nothing moves. An idle CrownUI window draws no frames.
+
+The split has costs.
+
+- The render thread only animates what it draws. Layout jumps to its final value on the UI thread, and the drawn frame catches up. Hit testing and the semantic tree use the final rectangle during the animation.
+- Text properties do not interpolate. A color change on text is instant unless you cross-fade two nodes with opacity.
+- Anything the render thread cannot see, such as a value that feeds layout or a physics simulation, falls back to `request_animation_frame` on the UI thread, which costs UI-thread time every frame.
+
+The `motion` crate only models damped springs and CSS timing curves. It has no keyframes and no physics beyond springs. A sequence is a chain of state changes, each with its own transition.

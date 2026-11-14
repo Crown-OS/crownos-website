@@ -3,9 +3,10 @@ title: Introduction
 description: CrownUI is a declarative UI toolkit for Rust and the native toolkit of CrownOS.
 ---
 
-CrownUI lets you build views once in a SwiftUI style, drive them with fine-grained signals, style
-them with Tailwind names and handle DOM-named events. Impeller renders every frame on a dedicated
-thread, and one semantic tree serves screen readers, tests and AI agents.
+CrownUI is a Rust UI toolkit for Linux on Wayland. You describe views once in a SwiftUI style,
+drive them with fine-grained signals, style them with Tailwind names and handle DOM-named events.
+Impeller renders every frame on a dedicated thread. One semantic tree serves screen readers, tests
+and AI agents.
 
 ```rust title="main.rs"
 use crownui::prelude::*;
@@ -26,32 +27,80 @@ fn main() -> Result<(), crownui::RunError> {
 }
 ```
 
-## Why CrownUI
+The closure passed to `component` runs once and builds the window. When you click, the `count`
+signal changes and only the text that reads it updates. Nothing is rebuilt or diffed.
 
-<CardGroup cols={2}>
-  <Card title="Names you already know" icon="book">
-    SwiftUI nouns for views, Tailwind classes for styles, DOM names for events.
-  </Card>
-  <Card title="Fine-grained updates" icon="zap">
-    Views are built once. When a signal changes, only the properties that read it update.
-  </Card>
-  <Card title="Animations that never stutter" icon="sparkles">
-    A dedicated render thread runs every animation on its own clock.
-  </Card>
-  <Card title="Built for AI agents" icon="cpu">
-    An in-app MCP server lets agents read the UI tree, click and type.
-  </Card>
-</CardGroup>
+## The ideas in one page
 
-## No macros in the authoring API
+### Views are built once
 
-Every view, modifier and event is a plain Rust function or method. rust-analyzer can complete them,
-show their types and jump to their source, and agents see the same real types.
+`vstack`, `text` and `button` are plain functions that return elements. Modifiers such as `.p(24.0)`
+chain on them. A `component(|cx| ..)` creates state and returns a tree of elements. CrownUI mounts
+that tree and keeps it. Structure that changes with state goes through `show`, `for_each` and
+`keyed`, which mount and unmount branches. See [Views](/docs/crownui/views).
 
-## Rendering
+### State is signals
 
-CrownUI renders with Impeller, the engine behind Flutter. It runs on Vulkan with a GLES fallback,
-draws one-pixel analytic edges on rounded shapes at any scale and supports backdrop blur.
+`cx.signal(value)` returns a `Signal<T>`, a `Copy` handle into one runtime. A property that reads a
+signal inside `bind(move |rt| ..)` updates when that signal changes, and only that property updates.
+There is no `Rc`, `RefCell` or `Mutex` in the framework. See [State](/docs/crownui/state).
+
+### Names you already know
+
+Views are SwiftUI nouns (`vstack`, `button`). Styles are Tailwind classes (`.p(16.0)`,
+`.rounded(8.0)`, `.items_center()`). Events are DOM names (`on_click`, `on_key_down`). Test actions
+are Testing Library names (`click`, `type_text`). See [Naming](/docs/crownui/naming).
+
+### Two threads per window
+
+The UI thread runs your handlers, flushes signals, lays out with taffy and shapes text. A render
+thread owns the GPU, runs every animation on its own clock and draws with Impeller on Vulkan, or
+GLES when Vulkan fails. A slow handler does not freeze a running animation. See
+[Frame pipeline](/docs/crownui/frame-pipeline).
+
+### One semantic tree
+
+Every widget states what it is: a role, a name, a value and the actions it supports. Screen readers
+read that tree over AT-SPI. Tests query it. Agents read it and act on it over MCP. A button a
+screen reader can press is a button a test or an agent can click. See
+[Semantics](/docs/crownui/semantics).
+
+### No macros
+
+Every view, modifier and event is a real Rust function or method. rust-analyzer completes them and
+jumps to their source, and agents see the same types you do.
+
+## What is in the box
+
+- Primitives in the prelude: stacks, text, buttons, toggles, text fields, scroll views, lazy lists
+  and grids, canvas, images, SVG and popovers.
+- `crownui::kit`: the themed CrownOS widgets, such as menus, dialogs, sliders, segmented bars, toasts
+  and a sidebar layout, with Lucide icons in `kit::icons`. See [Kit](/docs/crownui/kit).
+- `crowntest`: a headless test harness that runs the real pipeline on a manual clock.
+- An in-app MCP server and the `crownmcp` broker, so agents such as Claude Code can drive a running
+  app. See [Agents](/docs/crownui/agents).
+- Layer surfaces for panels, docks and overlays. See [Windows](/docs/crownui/windows).
+
+## What it runs on
+
+CrownUI needs Rust 1.97 or newer and a Wayland compositor on Linux. It runs on any compositor and
+uses CrownOS protocols, such as compositor-drawn glass materials and launcher app icons, only when
+the compositor offers them. There is no Windows, macOS or X11 backend.
+
+## What it costs
+
+CrownUI makes tradeoffs, and they are worth knowing before you start.
+
+- Linux and Wayland only. The platform layer is a trait, but Wayland is the only windowing backend
+  that ships for real apps. The other one, `headless`, is for tests.
+- Startup is slower than some toolkits. In the paced run in `benchmarks/results/2026-11-07T07-43Z.md`,
+  the hello app started in 204 ms against 92 ms for GPUI and 111 ms for Qt. Creating Impeller's text
+  system alone takes about 160 ms, because it scans the system fonts.
+- Fine-grained updates ask for explicit wiring. A property that depends on state needs `bind`, and
+  reads and writes both go through `&mut Cx`, so you read into a local before you write.
+- It is pre-1.0. A minor release can change the API.
+
+[Why CrownUI](/docs/crownui/why-crownui) explains each choice and its cost in depth.
 
 ## Next steps
 
@@ -59,7 +108,13 @@ draws one-pixel analytic edges on rounded shapes at any scale and supports backd
   <Card title="Quickstart" icon="rocket" href="/docs/crownui/quickstart">
     Install the native libraries and run your first app.
   </Card>
+  <Card title="Tutorial" icon="book" href="/docs/crownui/tutorial">
+    Build a todo app step by step.
+  </Card>
+  <Card title="Why CrownUI" icon="lightbulb" href="/docs/crownui/why-crownui">
+    The design choices and what they cost.
+  </Card>
   <Card title="API reference" icon="code" href="/docs/crownui/api">
-    Every entry point and handle, with examples.
+    Every entry point, with signatures and examples.
   </Card>
 </CardGroup>

@@ -1,0 +1,152 @@
+---
+title: Accessibility
+description: "How CrownUI exposes your views to screen readers through AccessKit and AT-SPI, and how to label, focus and check them."
+---
+
+Every CrownUI app is visible to screen readers without extra setup. The framework builds a semantic tree from your views and sends it through [AccessKit](https://accesskit.dev) to AT-SPI, the accessibility bus that Orca and other Linux assistive tools read. The same tree drives `crowntest` queries and MCP agents, so a widget that a test can find is a widget a screen reader can announce.
+
+```rust
+use crownui::kit::{icon_button, icons};
+use crownui::prelude::*;
+
+fn toolbar() -> impl View {
+    component(|cx| {
+        let muted = cx.signal(false);
+        hstack((
+            icon_button(icons::TRASH, "Delete recording"),
+            text("Mute"),
+            toggle(muted).label("Mute microphone"),
+        ))
+        .gap(8.0)
+    })
+}
+```
+
+A screen reader reads that row as a button named "Delete recording", the text "Mute" and a switch named "Mute microphone" with its on or off state.
+
+## What you get without trying
+
+Built-in views set their role in their kind, so they need no extra work.
+
+| View | Role | Name comes from |
+|---|---|---|
+| `text(..)` | `Text` | The text itself |
+| `button(..)` | `Button` | The text inside it |
+| `toggle(on)` | `Switch` | A `.label(..)` you add |
+| `text_field(value, placeholder)` | `TextField` | A `.label(..)` you add |
+| `scroll_view(..)` | `ScrollView` | A `.label(..)` you add |
+| `image(..)`, `cover_image(..)`, `svg(..)`, `icon(..)` | `Image` | A `.label(..)` you add |
+| kit `icon_button(icon, label)` | `Button` | The `label` argument |
+
+Plain stacks are flattened away. A `vstack` with no label, no listener and no special role adds nothing to the tree, and its children appear under the nearest meaningful ancestor. A stack with a click listener becomes a `Button`. A stack with `.overflow_scroll()` stays in the tree as a group that supports scrolling.
+
+Buttons, links, menu items, tabs, headings, checkboxes, switches and radio buttons take their name from the text inside them when you give them no label. Buttons, links, menu items, tabs, text fields, search fields, switches and checkboxes are atomic: a screen reader sees one node, and their children only contribute the name.
+
+## Labels and roles
+
+Add accessibility properties with the `Semantic` modifiers. They are in the prelude and work on every element.
+
+```rust
+button("×").label("Close")
+
+vstack(rows).role(Role::List).label("Downloads")
+
+text(bind(move |rt| format!("{}%", progress.get(rt))))
+    .role(Role::ProgressBar)
+    .label("Upload progress")
+    .value(bind(move |rt| format!("{} percent", progress.get(rt))))
+    .description("Uploads continue in the background")
+```
+
+- `.label(..)` sets the accessible name. Give every control without visible text a label, and every toggle and text field one too.
+- `.role(..)` overrides the role. Use it when a generic element plays a specific part, such as a list or a progress bar.
+- `.value(..)` sets the value a screen reader reads after the name.
+- `.description(..)` adds a longer hint read after the value.
+- `.disabled(..)` blocks interaction. The node reports itself as disabled.
+- `.secure()` hides the value. A text field marked secure is announced as a password field, and its value never leaves the app.
+
+<Tip>
+  `label`, `value` and `disabled` accept a signal or a `bind(..)`, so they stay current as state changes. The full list is on the [Semantic](api/semantic.md) page.
+</Tip>
+
+## Focus and the keyboard
+
+Keyboard focus follows the same tree. An element can receive focus when it is enabled and has an interactive role (`Button`, `Link`, `TextField`, `SearchField`, `Checkbox`, `Switch` or `Slider`) or a click listener.
+
+- Tab and Shift+Tab walk the focusable elements in screen order, top to bottom and then left to right, and wrap around. Arrow keys move focus to the nearest focusable element in that direction.
+- Enter and Space click the focused element when it has a click listener.
+- `.shortcut(keybind)` clicks an element from anywhere in the window. See [Semantic](/docs/crownui/api/semantic#shortcut).
+- `.focusable(true)` makes any element focusable. `.focusable(false)` removes an element from the Tab order.
+
+Style the focus ring with the `focus_visible` variant, which applies only when focus arrived by keyboard. A mouse click still focuses the element but does not show the ring. The `on_focus` listener reports the same thing in `event.visible`.
+
+```rust
+button("Save").focus_visible(|style| style.ring(2.0, rgb(0x2563eb)))
+```
+
+A custom kind moves focus with `cx.request_focus(node)`. Call it in `mount` to focus the element when it appears, like the HTML `autofocus` attribute.
+
+## What screen readers see
+
+The bridge maps each CrownUI role to an AccessKit role.
+
+| CrownUI role | Screen reader role |
+|---|---|
+| `Text` | Label, with the text as its value |
+| `TextField`, `SearchField` | Text input, search input, or password input when secure |
+| `Checkbox`, `Switch`, `RadioButton` | Check box, switch, radio button, with `checked` sent as toggled |
+| `Slider`, `ProgressBar` | Slider, progress indicator |
+| `Separator` | Splitter |
+| Every other role | The AccessKit role of the same name |
+
+Each node also carries its bounds. CrownUI lays out in logical pixels, and the bridge scales them to the physical pixels AT-SPI expects. Nodes scrolled out of view stay in the tree and are marked offscreen.
+
+A screen reader can act on the app too. Click, focus, hover, typing and scrolling reach your listeners the same way user input does. Increment, decrement, expand, collapse, blur, context menu and scroll-into-view requests are not wired up yet. The bridge logs them at debug level and does nothing.
+
+## See the tree yourself
+
+Print the tree of a running app any time you want to know what a screen reader gets. The app needs `AppConfig::mcp(true)`, because `crowndev` reads the tree over the MCP socket.
+
+```sh
+crowndev tree counter
+```
+
+For a counter with a text and two buttons, after one click on "+1", it prints:
+
+```text
+window @0,0 800x600
+  text "Count: 1" @16,16 768x24
+  button "-1" @16,52 40.8x28.8
+  button "+1" [focused] @64.8,52 40.8x28.8
+```
+
+In a test, `app.semantics_snapshot()` returns the same text. See [Testing](/docs/crownui/testing).
+
+## Turning it off
+
+The bridge is on by default. `AppConfig::accessibility(false)` skips it for one app, which suits a desktop layer such as a wallpaper that has nothing to announce.
+
+```rust
+crownui::run(root, AppConfig::new("Wallpaper").accessibility(false))
+```
+
+To remove AccessKit from the build entirely, turn off the `accessibility` cargo feature. It is one of the default features, together with `wayland`, `impeller`, `tokio` and `mcp`.
+
+```toml
+crownui = { path = "../crownui/crownui", default-features = false, features = ["wayland", "impeller", "tokio", "mcp"] }
+```
+
+## Why it works this way, and what it costs
+
+CrownUI keeps one semantic tree and gives it three readers: screen readers, tests and agents.
+
+The tree comes from the views, not from a separate accessibility layer. A label you add for a test is the label a screen reader announces, and a button an agent can click is a button Orca can press. Teams that write tests through `role(..).name(..)` find accessibility gaps the moment a query fails, because a node with no name is a node the test cannot reach. Without the shared tree, accessibility work is a separate audit that falls behind the code.
+
+The bridge works in the background. AccessKit runs its own thread and calls back on it, while CrownUI keeps all state on the UI thread with no locks. The two meet through channels. The bridge registers the window with AT-SPI at start. Until a screen reader connects, it keeps only the newest full tree in a one-slot channel and sends no tree over D-Bus. After a screen reader connects, each frame that changed semantics sends a diff of the changed nodes. An app nobody listens to pays for building the tree, which tests and agents need anyway, and for one tree copy on frames where semantics changed.
+
+The design has these costs.
+
+- Coverage is a subset of ARIA. CrownUI sets `checked`, `disabled`, `focused`, `secure` and `offscreen`. It never sets `expanded` or `selected`, so a screen reader does not hear that a menu is open or that a list row is selected.
+- Screen reader actions beyond click, focus, hover, typing and scrolling are dropped, as described above. Sliders and disclosures need a pointer or the keyboard today.
+- Plain containers vanish from the tree. That keeps the tree short and the announcements clean, but a group you meant to announce needs a `.label(..)` or a `.role(..)` to stay.
+- AccessKit adds dependencies and a D-Bus connection per window. The feature flag removes them for apps that ship without it.

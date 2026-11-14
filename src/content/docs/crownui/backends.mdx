@@ -1,0 +1,311 @@
+---
+title: Backends
+description: How the runtime stays generic over the platform, the renderer and the layout engine, and how to add a backend of each kind.
+sidebarTitle: Backends
+---
+
+CrownUI talks to the outside world through three contracts: `windowing` for windows and input, `graphics` for drawing and text, and `layouting` for layout. The runtime is generic over all three. The defaults are Wayland, Impeller and taffy. Tests and previews swap in a headless platform and a recording renderer and run the same pipeline without a GPU.
+
+The examples on this page use workspace crate paths such as `runtime::Runner`. In the published crate the same items are `crownui::runtime::Runner`, and the most common ones are also in `crownui::ext`.
+
+## The runner
+
+`runtime::Runner<G, L>` is the app. It holds one `WindowRunner` per window and implements `ApplicationHandler<P>` for any platform `P`:
+
+```rust title="runtime/src/runner.rs"
+pub struct Runner<G: GraphicsBackend, L: LayoutEngine> { /* windows, epoch, failure */ }
+
+impl<P, G, L> ApplicationHandler<P> for Runner<G, L>
+where
+    P: Platform,
+    G: GraphicsBackend + CreateRenderer<P::Surface>,
+    L: LayoutEngine,
+{ /* resumed, window_event, platform_event, agent_access, proxy_wake_up, about_to_wait */ }
+```
+
+The platform is a type parameter of the trait impl, not of the struct, so one `Runner` runs on any platform its graphics backend can draw to. The `CreateRenderer<P::Surface>` bound is the only link between a platform and a renderer: the platform hands out a surface, and the backend knows how to build a renderer for it.
+
+`crownui::run` picks the defaults. Leaving out error mapping and the Vulkan driver selection, it does this:
+
+```rust
+let mut runner = Runner::<impeller::ImpellerBackend, taffy_layout::TaffyEngine>::new(
+    root,
+    taffy_layout::TaffyEngine::new(),
+    config,
+)?;
+let event_loop = windowing::wayland::EventLoop::new()?;
+event_loop.run_app(&mut runner)?;
+```
+
+`Runner::new(root, engine, config)` creates the first window's UI, and `with_window(root, engine, config)` adds more. Each window gets its own layout engine instance, UI and render thread.
+
+## The windowing contract
+
+A platform implements three traits.
+
+### `Platform`
+
+`Platform` creates and looks up windows, reports what it can do, and handles the app-wide services. It has four associated types:
+
+```rust
+pub trait Platform: Sized + 'static {
+    type Window: WindowControl;
+    type Surface: PlatformSurface;
+    type Event;
+    type Error: std::error::Error + Send + Sync + 'static;
+    // ..
+}
+```
+
+Required methods:
+
+| Method | Purpose |
+|---|---|
+| `create_window(&mut self, WindowAttributes) -> Result<WindowId, Self::Error>` | Opens a toplevel or a layer surface. |
+| `window(&self, WindowId)` and `window_mut(&mut self, WindowId)` | Look up a window. |
+| `close_window(&mut self, WindowId)` | Closes a window. Its surfaces stop presenting. |
+| `surface(&mut self, WindowId) -> Option<Self::Surface>` | Hands out the surface the render thread presents to. |
+| `capabilities(&self) -> Capabilities` | Reports what the platform supports. |
+| `set_control_flow(&mut self, ControlFlow)` | Sets when the loop wakes next: `Wait`, `Poll` or `WaitUntil(Instant)`. |
+| `exit(&mut self)` | Asks the event loop to return. |
+| `waker(&self) -> Waker` | A thread-safe callback that wakes the loop. |
+| `set_clipboard_text`, `request_clipboard_text`, `set_clipboard`, `read_clipboard` | Clipboard text and MIME data. |
+
+Methods with a default that does nothing: `request_agent_access` (returns `false`), `start_drag`, `accept_drag`, `set_app_icon`, `remove_app_icon` and `activate_app_icon`. A backend overrides them when it supports the feature.
+
+`Capabilities` is how a backend says what it lacks. The runtime reads it and picks fallbacks instead of failing. Without `materials`, nodes with `.material(..)` get in-app backdrop blur. Without `layer_shell`, the Wayland backend opens a layer config as a normal toplevel window. Components read the same flags through `cx.platform_capabilities()`.
+
+### `WindowControl`
+
+Per-window operations: `id`, `logical_size`, `inner_size`, `scale_factor`, `is_configured`, `request_redraw`, `set_title`, `set_cursor`, `set_material`, `begin_move`, `begin_resize`, `minimize`, `toggle_maximize`, `is_floating`, `set_text_input`, `set_idle_inhibited` and `set_layer_height`. `output_size` has a default that returns `None`.
+
+`is_configured` carries an invariant: nothing may be presented to a window before the platform's first configuration is acknowledged. The runtime holds back the render thread's viewport until then, so no buffer is attached early.
+
+### `PlatformSurface`
+
+The surface is the one platform object that crosses to the render thread, so it must be `Send`:
+
+```rust title="windowing/src/surface.rs"
+pub trait PlatformSurface: Send + 'static {
+    fn pre_present_notify(&mut self);
+    fn wait_for_frame(&mut self) -> Result<FrameTiming, SurfaceError>;
+    fn poll_frame(&mut self) -> Result<FrameTiming, SurfaceError> {
+        Ok(FrameTiming::default())
+    }
+    fn apply(&mut self, state: &SurfaceState);
+}
+```
+
+- `pre_present_notify` runs right before presenting, so the next `wait_for_frame` returns when the platform wants the next frame.
+- `wait_for_frame` blocks until the frame callback fires and returns at once when none is pending. It reports a `FrameTiming`.
+- `poll_frame` handles platform messages without blocking, for `FramePacing::Unpaced`.
+- `apply` queues a `SurfaceState` to be committed with the next presented frame.
+
+### `ApplicationHandler`
+
+The backend's event loop drives the app through `ApplicationHandler<P>`: `resumed` once windows can be created, `window_event` for each `WindowEvent`, `platform_event` for backend-specific events, `agent_access` for the answer to an agent access request, `proxy_wake_up` when another thread called the waker, and `about_to_wait` before the loop sleeps. Only `resumed` and `window_event` are required.
+
+## The headless platform
+
+`windowing::headless` is an in-memory platform behind the `headless` feature. Windows never reach a screen, time moves only when you advance it, and input arrives when you inject it.
+
+| Method | Purpose |
+|---|---|
+| `HeadlessPlatform::new(Capabilities)` | A platform that claims the given capabilities, to exercise fallbacks. `default()` claims most of them, including materials and layer shell, but not composited materials, visibility hints, surface animation or app icons. |
+| `start(&mut app)` | Calls `resumed` and runs until idle. |
+| `inject(window, event)` | Queues a `WindowEvent` as if a user caused it. |
+| `run_until_idle(&mut app)` | Delivers queued events and redraws until nothing is left. |
+| `advance(elapsed)` and `now()` | Move and read the `ManualClock`. |
+| `set_scale_factor(window, scale)` | Changes a window's scale and queues the events a real platform sends. |
+| `exiting()` | Whether the app asked to exit. |
+
+Its `HeadlessSurface` counts presented frames and keeps the last committed `SurfaceState`. The runtime's own tests drive a full `Runner` this way:
+
+```rust title="runtime/tests/close_requests.rs"
+use graphics::RecordingBackend;
+use runtime::{AppConfig, Runner};
+use taffy_layout::TaffyEngine;
+use view::{View, component};
+use widgets::text;
+use windowing::{WindowEvent, WindowId, headless::HeadlessPlatform};
+
+const FIRST_WINDOW: WindowId = WindowId::from_raw(1);
+
+fn close_first_window(root: impl View) -> HeadlessPlatform {
+    let mut runner = match Runner::<RecordingBackend, TaffyEngine>::new(
+        root,
+        TaffyEngine::new(),
+        AppConfig::new("Close"),
+    ) {
+        Ok(runner) => runner,
+        Err(error) => panic!("the recording backend cannot fail to start: {error}"),
+    };
+    let mut platform = HeadlessPlatform::default();
+    platform.start(&mut runner);
+    platform.inject(FIRST_WINDOW, WindowEvent::CloseRequested);
+    platform.run_until_idle(&mut runner);
+    platform
+}
+
+#[test]
+fn a_prevented_close_keeps_the_app_running() {
+    let busy = component(|cx| {
+        cx.on_close_requested(|_, event| event.prevent_default());
+        text("Writing image")
+    });
+    assert!(!close_first_window(busy).exiting());
+}
+```
+
+## The recording backend
+
+`graphics::RecordingBackend` is a `GraphicsBackend` with no dependencies. Its renderer keeps the last frame as text, and its text system approximates text with a deterministic monospace font, so results never depend on installed fonts. It implements `CreateRenderer<S>` for every surface type `S`, so it works with the headless platform, with `InlineApp`, or with any other platform.
+
+`RecordingRenderer` adds `last_frame()`, `frames_rendered()`, `viewport()` and `image_count()` for assertions.
+
+## InlineApp
+
+`runtime::InlineApp<G, L>` runs the whole pipeline on the calling thread with a manual clock. There is no platform and no render thread. It applies render ops to its own `RenderTree` and renders directly.
+
+```rust
+use geometry::Size;
+use graphics::RecordingBackend;
+use runtime::InlineApp;
+use taffy_layout::TaffyEngine;
+
+let mut app = InlineApp::<RecordingBackend, TaffyEngine>::new(
+    counter(),
+    TaffyEngine::new(),
+    Size::new(480.0, 320.0),
+)?;
+app.settle()?;
+let tree = app.ui().semantic_tree().to_string();
+```
+
+| Method | Purpose |
+|---|---|
+| `new(root, engine, viewport)` | Builds the app in a window of `viewport` size and renders the first frame. Needs `G: CreateRenderer<()>`. |
+| `with_surface(root, engine, viewport, scale, &surface)` | The same, rendering into a surface such as `impeller::Offscreen`. |
+| `frame()` and `frame_at(now)` | Renders one frame now or at a time that never runs backwards. |
+| `advance(elapsed)` | Steps the clock in 16.667 ms frames, rendering each one. |
+| `settle()` | Advances until nothing animates, for at most ten simulated seconds. |
+| `handle(&event)` | Delivers a `WindowEvent` and renders a frame. |
+| `perform(id, &action)` | Performs a semantic action and renders a frame. |
+| `resize(viewport, scale)` and `set_corner_shape(shape)` | Change the window. |
+| `ui()`, `renderer()`, `renderer_mut()`, `render_tree()`, `text_cache()` | Reach the parts. |
+| `needs_frame()`, `last_stats()`, `last_surface()`, `now()` | Inspect state. |
+
+`crowntest::TestApp` wraps `InlineApp` with `RecordingBackend` and taffy. Previews and the frame benchmarks use it too. `frame_at` lets a host that owns the timeline, such as a compositor drawing CrownUI content, drive animations from its own presentation clock.
+
+## Adding a windowing backend
+
+1. Add a feature to `windowing/Cargo.toml` and a module `windowing/src/<backend>/`, gated by that feature.
+2. Implement `Platform`, `WindowControl` and `PlatformSurface` for your types.
+3. Write an event loop that owns the platform and calls `ApplicationHandler<P>`: `resumed` once, `window_event` for each event, `about_to_wait` before sleeping, `proxy_wake_up` when the waker fires. Honor `set_control_flow`.
+4. Report honest `Capabilities`. Anything you set to `false` gets a fallback above you.
+5. Make sure your surface type works with a renderer. Impeller's `CreateRenderer<S>` needs `S: HasWindowHandle + HasDisplayHandle` with Wayland handles today, so a new kind of surface also needs a graphics change.
+
+A minimal surface for a backend that presents on its own schedule looks like this:
+
+```rust
+use windowing::{FrameTiming, PlatformSurface, SurfaceError, SurfaceState};
+
+pub struct BlockSurface {
+    committed: SurfaceState,
+}
+
+impl PlatformSurface for BlockSurface {
+    fn pre_present_notify(&mut self) {}
+
+    fn wait_for_frame(&mut self) -> Result<FrameTiming, SurfaceError> {
+        Ok(FrameTiming::default())
+    }
+
+    fn apply(&mut self, state: &SurfaceState) {
+        self.committed.clone_from(state);
+    }
+}
+```
+
+Nothing above `windowing` changes. Backend-specific features that have no neutral form yet go on your platform type and arrive as `Platform::Event`, the way `WaylandEvent` does for CrownOS protocols.
+
+## Adding a graphics backend
+
+A graphics backend is a text system and a renderer that agree on one layout type:
+
+```rust title="graphics/src/backend.rs"
+pub trait GraphicsBackend: 'static {
+    type TextLayout: TextLayout + Send + 'static;
+    type TextSystem: TextSystem<Layout = Self::TextLayout>;
+    type Renderer: Renderer<TextLayout = Self::TextLayout>;
+
+    fn create_text_system() -> Result<Self::TextSystem, GraphicsError>;
+}
+
+pub trait CreateRenderer<S>: GraphicsBackend {
+    fn create_renderer(surface: &S) -> Result<Self::Renderer, GraphicsError>;
+}
+```
+
+The text system runs on the UI thread. `layout(text, style, max_width)` shapes text, and `register_font(bytes, alias)` adds fonts. The layout type reports `size`, `min_intrinsic_width`, `max_intrinsic_width`, `line_count`, `first_baseline` and `memory_bytes`, and it must be `Clone + Send` because it moves to the render thread.
+
+The renderer runs on the render thread and implements `Renderer`:
+
+| Method | Purpose |
+|---|---|
+| `set_viewport(width, height, scale)` | Drawable size in device pixels and the logical-to-device scale. |
+| `set_corner_shape(shape)` | Optional. Round or squircle corners from now on. |
+| `upload_text(id, layout)` and `release_text(id)` | Keep shaped text drawable by id. |
+| `upload_image(id, width, height, rgba)` and `release_image(id)` | Straight-alpha RGBA8 images. |
+| `record_boundary(id, &DrawList)` and `release_boundary(id)` | Cache one recorded list per repaint boundary. |
+| `render(&Composition)` | Compose the cached boundaries and present. |
+
+Translate every `DrawCommand` in `record_boundary` and every `CompositeOp` in `render`. The `impeller` crate is the reference. Then implement `CreateRenderer<S>` for each surface type you can draw to.
+
+## Adding a layout engine
+
+```rust title="layouting/src/engine.rs"
+pub trait LayoutEngine {
+    type Node: Copy + Eq + Hash + Debug;
+
+    fn create_node(&mut self, style: &LayoutStyle, measured: bool) -> Self::Node;
+    fn set_style(&mut self, node: Self::Node, style: &LayoutStyle);
+    fn set_children(&mut self, node: Self::Node, children: &[Self::Node]);
+    fn remove_node(&mut self, node: Self::Node);
+    fn mark_dirty(&mut self, node: Self::Node);
+    fn compute_layout<M>(&mut self, root: Self::Node, available: Size, measure: M)
+    where
+        M: FnMut(Self::Node, MeasureInput) -> Size;
+    fn layout(&self, node: Self::Node) -> NodeLayout;
+}
+```
+
+`LayoutStyle` speaks CSS flexbox and grid. Measured leaves, created with `measured: true`, get their size from the `measure` closure, which is how text and images report their size. Results are parent-relative `NodeLayout`s in logical pixels with a `content_size` for scroll containers.
+
+Follow the conventions of `taffy-layout` so widgets behave the same: `Dimension::Percent` is a fraction from 0 to 1, results stay fractional so the framework can snap to device pixels itself, and a scroll container's automatic minimum size is zero.
+
+## Why it works this way
+
+Generic backends make tests real. `crowntest` does not mock the view layer: it runs the same `Ui`, layout engine and render tree as an app, with only the last step swapped. A test that clicks a button exercises event routing, signals, layout and render-op collection.
+
+Static generics instead of trait objects keep the hot paths free of dynamic dispatch. The runtime calls the renderer and the layout engine per node and per frame, and the compiler inlines those calls for the one pair an app uses.
+
+The associated types tie the pieces together at compile time. A renderer cannot receive text shaped by a different text system, because `Renderer<TextLayout = ..>` must match the backend's `TextSystem<Layout = ..>`.
+
+## What it costs
+
+- Each backend pair is compiled separately. Tests that use `RecordingBackend` and the app that uses `ImpellerBackend` build the generic code twice.
+- Recorded text is not real text. The recording backend's monospace approximation keeps snapshots stable but does not match Impeller's shaping. The `capture` crate and `cargo xtask preview --png` render with Impeller offscreen when real metrics matter.
+- Surfaces are coupled to renderers. A new windowing backend with a new kind of surface needs a matching `CreateRenderer` impl before Impeller can draw to it.
+- The contract moves slowly. A platform feature becomes a trait method or a `WindowEvent` that every backend has to consider, so new features land on `WaylandPlatform` first and become neutral later.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="layers" href="/docs/crownui/architecture">
+    The crate layers and what may depend on what.
+  </Card>
+  <Card title="Testing" icon="check-circle" href="/docs/crownui/testing">
+    Drive the headless pipeline with crowntest.
+  </Card>
+</CardGroup>

@@ -1,0 +1,189 @@
+---
+title: text_field
+description: A single-line editable field bound to a String signal, with input, change and submit events.
+api: FN text_field
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn greeting() -> impl View {
+    component(|cx| {
+        let name = cx.signal(String::new());
+        vstack((
+            text_field(name, "Your name").label("Name"),
+            text(bind(move |rt| {
+                let name = name.get(rt);
+                if name.is_empty() { "Hello!".to_string() } else { format!("Hello, {name}!") }
+            })),
+        ))
+        .gap(8.0)
+        .p(16.0)
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn text_field(value: Signal<String>, placeholder: impl Into<String>) -> Element<TextFieldKind>
+```
+</ResponseExample>
+</ApiExamples>
+
+`text_field` is a single-line editable field bound to a `Signal<String>`. Typing and input method commits insert at the caret, the arrow keys move it, and Enter submits.
+
+Both arguments are required. The field writes every edit into `value`, and anything that sets `value` from code updates the field.
+
+## Parameters
+
+<ParamField name="value" type="Signal<String>" required>
+  The text in the field. The field reads it to draw and writes it on every edit. It is also the field's value in the semantic tree.
+</ParamField>
+
+<ParamField name="placeholder" type="impl Into<String>" required>
+  Gray text shown while `value` is empty. Pass `""` for no placeholder. The placeholder is fixed when the field mounts.
+</ParamField>
+
+## Returns
+
+<ResponseField name="text_field" type="Element<TextFieldKind>">
+  The field element. Chain style, listener and semantic methods on it.
+</ResponseField>
+
+## Events
+
+The field fires three DOM-named events. Each handler receives `&mut Event<InputEvent>`, and `event.value` holds the full text.
+
+| Listener | Fires when |
+|---|---|
+| `.on_input(..)` | The text changed: a typed character, a paste, Backspace, Delete, Ctrl+X or an input method commit. |
+| `.on_change(..)` | The user commits the text: on Enter and when the field loses focus. |
+| `.on_submit(..)` | The user presses Enter. |
+
+```rust
+let query = cx.signal(String::new());
+let results = cx.signal(Vec::<String>::new());
+text_field(query, "Search")
+    .label("Search")
+    .on_input(move |cx, event| {
+        let needle = event.value.to_lowercase();
+        results.set(cx, vec![format!("Results for {needle}")]);
+    })
+    .on_submit(move |cx, _| query.set(cx, String::new()))
+```
+
+Most code does not need `on_input`. Read the signal with `bind` or a memo, and the UI follows every keystroke.
+
+## Keyboard
+
+| Key | Action |
+|---|---|
+| Any character or Space | Inserts it at the caret. |
+| Left and Right arrows | Move the caret by one character. |
+| Home and End | Move the caret to the start or the end. |
+| Backspace and Delete | Remove the character before or after the caret. |
+| Enter | Fires `change` and `submit`. |
+| Ctrl+C or Meta+C | Copies the whole text. |
+| Ctrl+X or Meta+X | Copies the whole text and clears the field. |
+| Ctrl+V or Meta+V | Pastes text from the clipboard at the caret. |
+
+Clicking the field focuses it. The caret is a 2 pixel blue bar that shows only while the field has focus. Input methods for languages such as Chinese and Japanese commit their text through the same path as typing.
+
+## Default style
+
+| Property | Default | Override with |
+|---|---|---|
+| Direction | row | not usually changed |
+| Cross axis alignment | center | `.items_*()` |
+| Horizontal padding | 10 | `.px(..)` |
+| Vertical padding | 6 | `.py(..)` |
+| Corner radius | 8 | `.rounded(..)` |
+| Background | gray at 12% alpha | `.bg(..)` |
+| Cursor | `CursorIcon::Text` | `.cursor(..)` |
+| Placeholder color | gray at 80% alpha | fixed |
+
+```rust
+let email = cx.signal(String::new());
+text_field(email, "you@example.com")
+    .label("Email")
+    .w_full()
+    .px(12.0)
+    .py(8.0)
+    .rounded(10.0)
+    .bg(WHITE)
+    .border(1.0)
+    .border_color(rgba(0x0f172a26))
+    .focus(|style| style.ring(2.0, rgb(0x93c5fd)).border_color(rgb(0x3b82f6)))
+    .transition(Spring::snappy())
+```
+
+Text properties set on the field, such as `.text_size(..)` and `.text_color(..)`, reach the typed text.
+
+## Labels and testing
+
+A field's placeholder is not its name. Give every field a `.label(..)` so screen readers, tests and agents find it.
+
+```rust
+let mut app = TestApp::new(component(|cx| {
+    let draft = cx.signal(String::new());
+    let saved = cx.signal(String::new());
+    vstack((
+        text_field(draft, "What needs doing?")
+            .label("New todo")
+            .on_submit(move |cx, event| saved.set(cx, event.value.clone())),
+        text(bind(move |rt| format!("Saved: {}", saved.get(rt)))),
+    ))
+}));
+app.click(role(Role::TextField).name("New todo"))
+    .type_text("eggs")
+    .press_key("Enter");
+assert_eq!(app.text_of(role(Role::Text).text("Saved")), "Saved: eggs");
+```
+
+`type_text` needs a focused field, so click or focus it first.
+
+## Focusing a field when it appears
+
+Call `cx.request_focus(node)` on the field's node. Build the field yourself in a small `View` to get the node.
+
+```rust
+use crownui::ext::NodeId;
+use crownui::prelude::*;
+
+struct Autofocus<V>(V);
+
+impl<V: View> View for Autofocus<V> {
+    fn build(self, cx: &mut Cx) -> NodeId {
+        let node = self.0.build(cx);
+        cx.request_focus(node);
+        node
+    }
+}
+
+let password = cx.signal(String::new());
+Autofocus(text_field(password, "Password").label("Password"))
+```
+
+## Secure fields
+
+`.secure()` marks the field as secure in the semantic tree. Agents cannot read its value or type into it, and they get the error CUI0105 if they try. The primitive field still draws the text as typed. For a password field that hides the characters, use the kit's `text_input(value).secret()`. See [kit inputs](/docs/crownui/kit-inputs).
+
+## Limits
+
+The primitive field is deliberately small.
+
+- It is one line. Enter submits instead of adding a line break.
+- There is no selection. Copy and cut act on the whole text.
+- It shows no preedit text while an input method is composing. Only the committed text appears.
+- The placeholder is fixed at mount.
+
+The kit's `text_input(value)` covers more: selection, a `.secret()` mode, `.read_only()`, a clear button, a leading icon, pill shapes and theme colors. Reach for it in CrownOS apps.
+
+## Why text_field works this way
+
+The field stores its text in the signal you pass, not in a private buffer. That makes the signal the single source of truth. Clearing a search box is `query.set(cx, String::new())`, and a field restored from settings is a signal created with the saved string. The cost is that every keystroke writes the signal and runs every binding that reads it. For a field that drives an expensive search, read the value in `on_change` or `on_submit` instead of binding to every keystroke.
+
+Edits count characters, not bytes, so the caret moves over multibyte characters such as `é` correctly. The caret itself is a plain child box that `show` mounts while the field has focus, so the field needs no custom painting.

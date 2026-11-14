@@ -1,0 +1,339 @@
+---
+title: TestApp
+description: "Run a view headlessly in a test, query it by role, name and text, act on it and snapshot it as text."
+api: FN TestApp::new
+---
+
+`TestApp` runs a view headlessly in a test. It drives the real pipeline (reactive runtime, taffy layout, semantic tree and render tree) with a recording renderer and a manual clock. You find nodes the way a user does, by role, name and text, and act on them with Testing Library verbs.
+
+<ApiExamples>
+<RequestExample>
+```rust title="counter_test.rs"
+use crownui::prelude::*;
+use crowntest::{Role, TestApp, role, text as text_query};
+
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        vstack((
+            text(bind(move |rt| format!("Count: {}", count.get(rt)))),
+            button("+1").on_click(move |cx, _| count.update(cx, |value| *value += 1)),
+        ))
+    })
+}
+
+#[test]
+fn clicking_plus_one_counts_up() {
+    let mut app = TestApp::new(counter());
+    app.click(role(Role::Button).name("+1"));
+    assert_eq!(app.text_of(text_query("Count")), "Count: 1");
+    insta::assert_snapshot!(app.snapshot());
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub struct TestApp<G: GraphicsBackend = RecordingBackend> { /* private */ }
+
+pub use semantics::{Query, Role, name, role, text};
+```
+</ResponseExample>
+</ApiExamples>
+
+## Signature
+
+Add `crowntest` as a dev-dependency. In the published `crownui` crate it is `crownui::crowntest`. Most methods return `&mut Self`, so actions chain. Every helper panics with a readable message when it fails, because a test should stop at the first wrong step. The constructors `new` and `with_size` and the methods `frame_snapshot` and `snapshot` exist only on the default `RecordingBackend`. Everything else works with any backend.
+
+## Queries
+
+```rust
+pub fn role(role: Role) -> Query
+pub fn name(name: impl Into<String>) -> Query
+pub fn text(text: impl Into<String>) -> Query
+
+impl Query {
+    pub fn role(self, role: Role) -> Self;
+    pub fn name(self, name: impl Into<String>) -> Self;
+    pub fn text(self, text: impl Into<String>) -> Self;
+}
+```
+
+| Part | Matches |
+|---|---|
+| `role(Role::Button)` | Nodes with exactly this role. |
+| `name("Save")` | Nodes whose accessible name equals the string. |
+| `text("Save")` | Nodes whose name or exposed value contains the string. A secure node's value never matches. |
+
+Chain parts to narrow a query: `role(Role::Button).name("Remove milk")`. A query that must find one node panics with `CUI0101` when nothing matches and `CUI0102` when several do. Both messages list the nearby nodes with their component paths.
+
+`crowntest::text` has the same name as the `text` view in the prelude. Import it as `text as text_query`, or call `crowntest::text(..)`.
+
+## Constructors
+
+| Method | Signature |
+|---|---|
+| `new` | `pub fn new(root: impl View) -> Self` |
+| `with_size` | `pub fn with_size(root: impl View, width: f32, height: f32) -> Self` |
+| `with_surface` | `pub fn with_surface<S>(root: impl View, width: f32, height: f32, scale: f32, surface: &S) -> Result<Self, GraphicsError> where G: CreateRenderer<S>` |
+
+<ParamField name="root" type="impl View" required>
+  The view under test, usually a `component(|cx| ..)` or a function that returns one.
+</ParamField>
+<ParamField name="width" type="f32">
+  Window width in logical pixels. `new` uses 800.
+</ParamField>
+<ParamField name="height" type="f32">
+  Window height in logical pixels. `new` uses 600.
+</ParamField>
+<ParamField name="scale" type="f32">
+  `with_surface` only. The scale factor to render at.
+</ParamField>
+<ParamField name="surface" type="&S">
+  `with_surface` only. The surface the backend `G` renders into.
+</ParamField>
+
+`new` mounts the view in an 800 by 600 window. `with_size` picks the size, which matters for scroll views and lazy lists.
+
+```rust
+let mut app = TestApp::with_size(list_view(), 300.0, 200.0);
+```
+
+`with_surface` renders with a real graphics backend into a surface, such as an offscreen GPU target for screenshots. Pick the backend with the type parameter.
+
+## Finding nodes
+
+| Method | Signature | Returns |
+|---|---|---|
+| `find` | `pub fn find(&mut self, query: Query) -> SemanticNode` | The one matching node. Panics on zero or several matches. |
+| `exists` | `pub fn exists(&mut self, query: Query) -> bool` | `true` when exactly one node matches. Several matches return `false`. |
+| `count` | `pub fn count(&mut self, query: Query) -> usize` | How many nodes match. |
+| `text_of` | `pub fn text_of(&mut self, query: Query) -> String` | The accessible name of the one matching node. |
+
+`SemanticNode` has public fields: `id`, `role`, `name`, `value`, `description`, `states`, `actions`, `bounds`, `children` and `path`. Call `exposed_value()` to read the value with `None` for secure nodes.
+
+<ResponseField name="id" type="SemanticId">
+  A stable id, derived from the component path and keys.
+</ResponseField>
+<ResponseField name="role" type="Role">
+  The node's role.
+</ResponseField>
+<ResponseField name="name" type="Option<String>">
+  The accessible name.
+</ResponseField>
+<ResponseField name="value" type="Option<String>">
+  The accessible value. `exposed_value()` returns `None` for secure nodes.
+</ResponseField>
+<ResponseField name="description" type="Option<String>">
+  The longer description, if any.
+</ResponseField>
+<ResponseField name="states" type="States">
+  `focused`, `focusable`, `disabled`, `checked`, `expanded`, `selected`, `secure` and `offscreen`.
+</ResponseField>
+<ResponseField name="actions" type="Vec<ActionKind>">
+  The actions the node supports.
+</ResponseField>
+<ResponseField name="bounds" type="Rect">
+  Window coordinates in logical pixels.
+</ResponseField>
+<ResponseField name="children" type="Vec<SemanticId>">
+  Child nodes in reading order.
+</ResponseField>
+<ResponseField name="path" type="String">
+  The component path, such as `stack > stack[1] > button`.
+</ResponseField>
+
+```rust
+let switch = app.find(role(Role::Switch).name("Wi-Fi"));
+assert_eq!(switch.states.checked, Some(true));
+
+assert!(!app.exists(role(Role::Text).name("milk")));
+assert_eq!(app.count(role(Role::ListItem)), 3);
+```
+
+## Actions
+
+| Method | Signature |
+|---|---|
+| `click` | `pub fn click(&mut self, query: Query) -> &mut Self` |
+| `double_click` | `pub fn double_click(&mut self, query: Query) -> &mut Self` |
+| `hover` | `pub fn hover(&mut self, query: Query) -> &mut Self` |
+| `focus` | `pub fn focus(&mut self, query: Query) -> &mut Self` |
+| `type_text` | `pub fn type_text(&mut self, text: &str) -> &mut Self` |
+| `press_key` | `pub fn press_key(&mut self, shortcut: &str) -> &mut Self` |
+| `hold_modifiers` | `pub fn hold_modifiers(&mut self, modifiers: Modifiers) -> &mut Self` |
+| `scroll` | `pub fn scroll(&mut self, query: Query, dy: f32) -> &mut Self` |
+| `drag` | `pub fn drag(&mut self, query: Query, x: f32, y: f32) -> &mut Self` |
+
+Each action finds its target, performs a semantic action and renders a frame. An action on a disabled node panics with `CUI0106`.
+
+- `click` also moves focus to the node when it is focusable.
+- `type_text` types into the focused node, so click or focus a field first. It panics with `CUI0105` on a secure field. Send each character with `press_key` instead.
+- `press_key` parses a shortcut such as `"Enter"`, `"Space"`, `"a"` or `"Ctrl+S"` and sends it to the focused node, or to the root when nothing has focus. Shortcuts registered with `.shortcut(..)` fire first.
+- `hold_modifiers` keeps modifiers held until the next call, so the next `click` is a Ctrl-click or a Shift-click.
+- `scroll` scrolls the scroll container around the node by `dy` logical pixels. The offset clamps to the content.
+- `drag` drags the node to `(x, y)` in window coordinates.
+
+```rust
+use crownui::ext::Modifiers;
+
+app.click(role(Role::TextField).name("New todo"))
+    .type_text("milk")
+    .press_key("Enter");
+
+app.hold_modifiers(Modifiers { ctrl_key: true, ..Modifiers::NONE })
+    .click(role(Role::ListItem).name("report.pdf"))
+    .hold_modifiers(Modifiers::NONE);
+```
+
+## Raw pointer events
+
+| Method | Signature |
+|---|---|
+| `pointer_down` | `pub fn pointer_down(&mut self, x: f32, y: f32) -> &mut Self` |
+| `pointer_move` | `pub fn pointer_move(&mut self, x: f32, y: f32) -> &mut Self` |
+| `pointer_up` | `pub fn pointer_up(&mut self, x: f32, y: f32) -> &mut Self` |
+
+These send primary-button mouse events through hit testing and the gesture arena, for tests of gestures, drags and long presses. The semantic actions above skip the arena.
+
+```rust
+let center = app.find(role(Role::Button).name("+1")).bounds.center();
+app.pointer_down(center.x, center.y)
+    .advance_ms(50)
+    .pointer_up(center.x, center.y);
+```
+
+## Clock and animation
+
+| Method | Signature |
+|---|---|
+| `advance_ms` | `pub fn advance_ms(&mut self, millis: u64) -> &mut Self` |
+| `settle` | `pub fn settle(&mut self) -> &mut Self` |
+| `is_animating` | `pub fn is_animating(&self) -> bool` |
+
+The clock only moves when you move it. `advance_ms` steps it forward and renders every frame on the way, so springs, delays and long presses progress exactly as far as you say. `settle` advances until every animation has stopped. `is_animating` reports whether the render tree still has motion in flight.
+
+```rust
+app.click(role(Role::Switch).name("Wi-Fi"));
+assert!(app.is_animating());
+app.settle();
+assert!(!app.is_animating());
+```
+
+## Window
+
+| Method | Signature |
+|---|---|
+| `resize` | `pub fn resize(&mut self, width: u32, height: u32) -> &mut Self` |
+| `set_color_scheme` | `pub fn set_color_scheme(&mut self, scheme: ColorScheme) -> &mut Self` |
+| `request_close` | `pub fn request_close(&mut self) -> bool` |
+| `take_close_request` | `pub fn take_close_request(&mut self) -> bool` |
+| `deliver` | `pub fn deliver(&mut self, event: WindowEvent) -> &mut Self` |
+
+`request_close` acts like the compositor's close button. It returns `false` while a `cx.on_close_requested` handler prevents the close. `take_close_request` returns whether the app called `cx.close_window()` since the last call. `deliver` sends any raw `windowing::WindowEvent`, such as `KeyDown` or `Focused(false)`, and renders a frame.
+
+```rust
+assert!(!app.request_close());
+app.click(role(Role::Button).name("Quit anyway"));
+assert!(app.take_close_request());
+
+app.set_color_scheme(ColorScheme::Dark).settle();
+```
+
+## Snapshots
+
+| Method | Signature |
+|---|---|
+| `snapshot` | `pub fn snapshot(&mut self) -> String` |
+| `semantics_snapshot` | `pub fn semantics_snapshot(&mut self) -> String` |
+| `layout_snapshot` | `pub fn layout_snapshot(&mut self) -> String` |
+| `frame_snapshot` | `pub fn frame_snapshot(&self) -> String` |
+
+`snapshot` joins the other three under `## semantics`, `## layout` and `## frame` headings. Pass it to `insta::assert_snapshot!`.
+
+- The semantics part prints one node per line: role, name, value, states in brackets and bounds.
+- The layout part prints each element's component path, rectangle and resolved Tailwind-style classes.
+- The frame part prints the recorded draw commands: layers, fills with radius and color, and text runs.
+
+Text is measured with a deterministic monospace approximation, so snapshots do not depend on installed fonts. Search one part with `contains` for a focused assertion.
+
+```rust
+assert!(app.frame_snapshot().contains("text \"Count: 1\""));
+assert!(app.layout_snapshot().contains("kit_badge @24,24"));
+```
+
+## Clipboard
+
+| Method | Signature |
+|---|---|
+| `set_clipboard` | `pub fn set_clipboard(&mut self, items: &[(&str, &[u8])]) -> &mut Self` |
+| `clipboard` | `pub fn clipboard(&mut self) -> &[(String, Vec<u8>)]` |
+| `serve_clipboard` | `pub fn serve_clipboard(&mut self) -> &mut Self` |
+
+The test app keeps a fake system clipboard. `set_clipboard` fills it as another app copying would. The app's own copies, pastes and reads wait until you call `serve_clipboard`, which answers them the way the platform does. `clipboard` serves pending requests first, then returns what the clipboard holds as `(mime type, bytes)` pairs.
+
+```rust
+app.set_clipboard(&[("text/uri-list", b"file:///b")]);
+app.click(role(Role::Button).name("Paste")).serve_clipboard();
+
+app.click(role(Role::Button).name("Copy"));
+assert_eq!(app.clipboard().len(), 3);
+```
+
+## Drag and drop
+
+| Method | Signature |
+|---|---|
+| `drag_enter` | `pub fn drag_enter(&mut self, x: f32, y: f32, mime_types: &[&str], actions: DndActions) -> &mut Self` |
+| `drag_over` | `pub fn drag_over(&mut self, x: f32, y: f32) -> &mut Self` |
+| `drag_leave` | `pub fn drag_leave(&mut self) -> &mut Self` |
+| `drop_data` | `pub fn drop_data(&mut self, x: f32, y: f32, mime_type: &str, data: &[u8], action: DndAction) -> &mut Self` |
+| `drag_acceptance` | `pub fn drag_acceptance(&mut self) -> Option<Option<DropAcceptance>>` |
+| `end_drag` | `pub fn end_drag(&mut self, outcome: DragOutcome) -> &mut Self` |
+
+The first four play a drag from another app over the window. `drag_acceptance` reports how the window answered, as `Some(..)` only when the answer changed since the last call. `end_drag` finishes a drag the app itself started with `cx.start_drag`.
+
+```rust
+app.drag_enter(20.0, 20.0, &["text/uri-list"], DndActions::COPY_MOVE);
+assert!(matches!(app.drag_acceptance(), Some(Some(_))));
+app.drop_data(20.0, 20.0, "text/uri-list", b"file:///a", DndAction::Copy);
+
+app.click(role(Role::Button).name("drag"))
+    .end_drag(DragOutcome::Dropped(DndAction::Move));
+```
+
+## Launcher events
+
+| Method | Signature |
+|---|---|
+| `app_windows` | `pub fn app_windows(&mut self, windows: AppWindows) -> &mut Self` |
+| `lift_app_icon` | `pub fn lift_app_icon(&mut self, app_id: &str) -> &mut Self` |
+| `land_app_icon` | `pub fn land_app_icon(&mut self, app_id: &str) -> &mut Self` |
+| `launch_app` | `pub fn launch_app(&mut self, app_id: &str) -> &mut Self` |
+
+These play what the CrownOS compositor tells a dock or launcher. They reach `cx.on_app_windows`, `cx.on_app_icon_lifted` and `cx.on_launch_app`.
+
+```rust
+app.app_windows(AppWindows { app_id: "files".into(), count: 2, focused: true });
+app.launch_app("files");
+```
+
+## Escape hatches
+
+| Method | Signature |
+|---|---|
+| `ui` | `pub fn ui(&mut self) -> &mut Ui` |
+| `inline` | `pub fn inline(&mut self) -> &mut InlineApp<G, TaffyEngine>` |
+
+`ui()` reaches the `Ui` for anything the helpers do not cover, such as `node_count()`, `tools()` and `call_tool(..)`. `inline()` reaches the runtime's `InlineApp`, which owns the clock and the renderer.
+
+```rust
+let result = app.ui().call_tool("add", r#"{"amount":5}"#);
+assert_eq!(result, Ok("{\"count\":5}".to_string()));
+```
+
+## Related
+
+- [Testing](/docs/crownui/testing) walks through a full test suite.
+- [Errors](/docs/crownui/errors) lists `CUI0101` to `CUI0106`.
+- [Semantic](/docs/crownui/api/semantic) sets the names and roles queries match.

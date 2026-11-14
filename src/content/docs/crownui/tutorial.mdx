@@ -1,0 +1,471 @@
+---
+title: Tutorial
+description: Build a todo app step by step and learn signals, keyed lists, text input, effects and tests along the way.
+---
+
+This tutorial builds the todo app from `crownui/examples/todo.rs`. You type a task, press Enter or
+click Add, tick tasks off and delete them. A counter shows how many are left. Each step adds one
+idea, and the full program is at the end.
+
+If you have not set up a project yet, follow the [quickstart](/docs/crownui/quickstart) first. You
+can also run the finished app from a checkout of the CrownUI repository:
+
+```bash
+cargo run -p crownui --example todo
+```
+
+## Step 1: an empty window
+
+Start with a window that shows a heading.
+
+```rust title="src/main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|_cx| {
+            vstack(text("Todos").text_size(28.0).font_bold())
+                .p(24.0)
+                .gap(16.0)
+                .bg(rgb(0xf1f5f9))
+        }),
+        AppConfig::new("Todos").size(480, 640),
+    )
+}
+```
+
+- `component(|cx| ..)` runs its closure once. The closure creates state and returns the view tree.
+  It never runs again. Updates happen later, property by property.
+- `vstack` stacks its children top to bottom. A single child is passed as is. Several children go
+  in a tuple.
+- `.p(24.0)`, `.gap(16.0)` and `.bg(..)` are Tailwind names with values in logical pixels.
+
+## Step 2: the data model
+
+A todo has an id, a title and a done flag.
+
+```rust
+#[derive(Clone, PartialEq)]
+struct Todo {
+    id: u32,
+    title: String,
+    done: bool,
+}
+```
+
+The list will be a `Signal<Vec<Todo>>`. `for_each`, which renders it in step 5, needs `Clone` to
+copy items into rows and `PartialEq` to tell which rows changed.
+
+## Step 3: state
+
+Create three signals inside the component: the list, the text being typed and the next id.
+
+```rust
+component(|cx| {
+    let todos = cx.signal(Vec::<Todo>::new());
+    let draft = cx.signal(String::new());
+    let next_id = cx.signal(1_u32);
+    // the view comes next
+})
+```
+
+A `Signal<T>` is a small `Copy` handle into the runtime. Closures capture it by value with `move`,
+and nothing is reference counted. Reads and writes go through `cx`: `get` returns a clone, `with`
+borrows, `set` replaces and `update` edits in place.
+
+## Step 4: the input row
+
+The add action reads the draft, ignores blank input, pushes a new todo and clears the field.
+
+```rust
+let add = move |cx: &mut Cx| {
+    let title = draft.get(cx);
+    if title.trim().is_empty() {
+        return;
+    }
+    let id = next_id.get(cx);
+    next_id.set(cx, id + 1);
+    todos.update(cx, |list| {
+        list.push(Todo {
+            id,
+            title,
+            done: false,
+        })
+    });
+    draft.set(cx, String::new());
+};
+```
+
+`add` captures only signals, which are `Copy`, so the closure is `Copy` too. Both the text field and
+the button can use it.
+
+```rust
+hstack((
+    text_field(draft, "What needs doing?")
+        .grow(1.0)
+        .label("New todo")
+        .on_submit(move |cx, _| add(cx)),
+    button("Add")
+        .bg(rgb(0x3b82f6))
+        .text_color(WHITE)
+        .on_click(move |cx, _| add(cx)),
+))
+.gap(8.0)
+```
+
+- `text_field(value, placeholder)` takes two arguments. The first is a `Signal<String>`. Typing
+  writes to it, and setting it from code changes the field.
+- `.label("New todo")` is the accessible name. Screen readers, tests and agents find the field by it.
+- `.on_submit` fires when the user presses Enter in the field.
+- Event handlers get `(&mut Cx, &mut Event<T>)`. This one ignores the event.
+
+Note the order inside `add`: it reads `next_id` into a local, then writes it. `Cx` derefs to the
+runtime, so a read and a write both borrow it mutably. Read first, then write.
+
+## Step 5: the list
+
+`for_each` renders one row per item and keeps each row keyed by id.
+
+```rust
+scroll_view(
+    for_each(
+        todos,
+        |todo: &Todo| todo.id,
+        move |_cx, todo| todo_row(todos, todo),
+    )
+    .gap(8.0),
+)
+.grow(1.0)
+.label("Todo list")
+```
+
+- The first argument is the `Signal<Vec<Todo>>`.
+- The second is the key. It is a plain `fn` pointer, so it cannot capture anything. Use a closure
+  with no captures, as here.
+- The third builds a row. It receives a `Signal<Todo>` for that one item. When the list changes,
+  CrownUI matches rows by key, keeps the rows whose key survived, sets their signal only if their
+  item changed, builds new rows and drops removed ones.
+- `scroll_view` makes the list scroll when it outgrows the window. `.grow(1.0)` gives it the space
+  left over.
+
+## Step 6: a row
+
+A row shows the title and a delete button.
+
+```rust
+fn todo_row(todos: Signal<Vec<Todo>>, todo: Signal<Todo>) -> impl View {
+    hstack((
+        text(bind(move |rt| todo.with(rt, |todo| todo.title.clone())))
+            .grow(1.0),
+        button("✕")
+            .label(bind(move |rt| {
+                todo.with(rt, |todo| format!("Delete {}", todo.title))
+            }))
+            .bg(TRANSPARENT)
+            .hover(|style| style.bg(rgba(0xef444420)))
+            .on_click(move |cx, _| {
+                let id = todo.with(cx, |todo| todo.id);
+                todos.update(cx, |list| list.retain(|item| item.id != id));
+            }),
+    ))
+    .gap(10.0)
+    .items_center()
+    .px(12.0)
+    .py(8.0)
+    .rounded(10.0)
+    .bg(WHITE)
+}
+```
+
+- `bind(move |rt| ..)` turns an expression into a reactive property. The text reads `todo`, so it
+  updates when that one todo changes, and nothing else in the window does.
+- The delete button's visible text is `✕`, which says nothing to a screen reader. Its label,
+  "Delete Buy milk", is what assistive tools and tests see.
+- `.hover(|style| ..)` is a variant. It applies while the pointer is over the button.
+- The click handler reads the id first, then updates the list. Same rule as before.
+
+## Step 7: ticking a todo off
+
+`toggle` takes a `Signal<bool>` and writes to it when clicked. The done flag lives inside a `Todo`,
+so the row makes its own `bool` signal and copies changes back into the list with an effect.
+
+```rust
+fn toggle_done(todos: Signal<Vec<Todo>>, todo: Signal<Todo>) -> impl View {
+    component(move |cx| {
+        let initially_done = todo.with(cx, |todo| todo.done);
+        let done = cx.signal(initially_done);
+        cx.effect(move |rt| {
+            let checked = done.get(rt);
+            let id = todo.with_untracked(rt, |todo| todo.id);
+            todos.update(rt, |list| {
+                if let Some(item) = list.iter_mut().find(|item| item.id == id) {
+                    item.done = checked;
+                }
+            });
+        });
+        toggle(done).label(bind(move |rt| {
+            todo.with(rt, |todo| format!("Done: {}", todo.title))
+        }))
+    })
+}
+```
+
+- `component` again, because the toggle needs a place to create its signal. Each row gets its own.
+- The first line reads the todo into a local before `cx.signal` writes. Writing
+  `cx.signal(todo.with(cx, ..))` in one expression borrows `cx` twice and does not compile.
+- `cx.effect` runs its closure now and again whenever a signal it read changes.
+- The effect reads `done` with `get`, so it re-runs when the toggle flips. It reads the id with
+  `with_untracked`, so it does not subscribe to `todo`. Without that, the effect's own write to the
+  list would update the row's `todo` signal and run the effect again.
+
+Put it first in the row, and dim the title when the todo is done:
+
+```rust
+hstack((
+    toggle_done(todos, todo),
+    text(bind(move |rt| todo.with(rt, |todo| todo.title.clone())))
+        .grow(1.0)
+        .text_color(bind(move |rt| {
+            if todo.with(rt, |todo| todo.done) {
+                rgb(0x94a3b8)
+            } else {
+                rgb(0x0f172a)
+            }
+        })),
+    // delete button from step 6
+))
+```
+
+## Step 8: the counter
+
+```rust
+text(bind(move |rt| {
+    let left = todos.with(rt, |list| list.iter().filter(|todo| !todo.done).count());
+    format!("{left} left")
+}))
+.text_color(rgb(0x64748b))
+```
+
+The text reads `todos`, so it updates whenever the list changes, including a toggle.
+
+## Step 9: depth and motion
+
+Give each row a shadow, and let new rows slide in.
+
+```rust
+.shadow(Shadow::sm())
+.enter(|style| style.opacity(0.0).translate_y(-8.0))
+.transition(Spring::smooth())
+```
+
+- `.enter(..)` is the style a node starts from when it mounts. With a `.transition(..)`, it animates
+  from there to its normal style.
+- `Spring::smooth()` is one of the spring presets, next to `Spring::snappy()` and `Spring::bouncy()`.
+- The animation runs on the render thread, so a slow handler on the UI thread does not stall it.
+
+## Step 10: let agents drive it
+
+The example turns on the in-app MCP server, so an agent such as Claude Code can read the todo list
+and add items through the same semantic tree a screen reader uses.
+
+```rust
+AppConfig::new("Todos").size(480, 640).mcp(true)
+```
+
+The `mcp` cargo feature is on by default, but the config field is off by default. See
+[Agents](/docs/crownui/agents) for how to connect.
+
+## Step 11: test it
+
+`crowntest` runs the app headless and acts on it the way a user does. The published `crownui` crate
+ships it as `crownui::crowntest`, so add `use crownui::crowntest;` at the top of the test module
+below. Inside the CrownUI workspace, add `crowntest` as a path dev-dependency instead. Then move the component out of `main` into a
+`fn todo_app() -> impl View`, so both `main` and a test can build it, and add a test module at the
+bottom of `src/main.rs`. The prelude's `text` and `crowntest::text` share a name, so call the query
+by its path.
+
+```rust title="src/main.rs"
+#[cfg(test)]
+mod tests {
+    use crowntest::{Role, TestApp, role};
+
+    use super::todo_app;
+
+    #[test]
+    fn adds_and_deletes_todos() {
+        let mut app = TestApp::new(todo_app());
+        app.click(role(Role::TextField).name("New todo"))
+            .type_text("Buy milk")
+            .press_key("Enter");
+        assert_eq!(app.text_of(crowntest::text("left")), "1 left");
+        app.click(role(Role::Switch).name("Done: Buy milk"));
+        assert_eq!(app.text_of(crowntest::text("left")), "0 left");
+        app.click(role(Role::Button).name("Delete Buy milk"));
+        assert!(!app.exists(role(Role::Text).name("Buy milk")));
+    }
+}
+```
+
+The test lives in the same file because integration tests in `tests/` cannot call functions of a
+binary crate. See [Testing](/docs/crownui/testing) for snapshots and more actions.
+
+## The full program
+
+```rust title="src/main.rs"
+use crownui::prelude::*;
+
+#[derive(Clone, PartialEq)]
+struct Todo {
+    id: u32,
+    title: String,
+    done: bool,
+}
+
+fn todo_row(todos: Signal<Vec<Todo>>, todo: Signal<Todo>) -> impl View {
+    hstack((
+        toggle_done(todos, todo),
+        text(bind(move |rt| todo.with(rt, |todo| todo.title.clone())))
+            .grow(1.0)
+            .text_color(bind(move |rt| {
+                if todo.with(rt, |todo| todo.done) {
+                    rgb(0x94a3b8)
+                } else {
+                    rgb(0x0f172a)
+                }
+            })),
+        button("✕")
+            .label(bind(move |rt| {
+                todo.with(rt, |todo| format!("Delete {}", todo.title))
+            }))
+            .bg(TRANSPARENT)
+            .hover(|style| style.bg(rgba(0xef444420)))
+            .on_click(move |cx, _| {
+                let id = todo.with(cx, |todo| todo.id);
+                todos.update(cx, |list| list.retain(|item| item.id != id));
+            }),
+    ))
+    .gap(10.0)
+    .items_center()
+    .px(12.0)
+    .py(8.0)
+    .rounded(10.0)
+    .bg(WHITE)
+    .shadow(Shadow::sm())
+    .enter(|style| style.opacity(0.0).translate_y(-8.0))
+    .transition(Spring::smooth())
+}
+
+fn toggle_done(todos: Signal<Vec<Todo>>, todo: Signal<Todo>) -> impl View {
+    component(move |cx| {
+        let initially_done = todo.with(cx, |todo| todo.done);
+        let done = cx.signal(initially_done);
+        cx.effect(move |rt| {
+            let checked = done.get(rt);
+            let id = todo.with_untracked(rt, |todo| todo.id);
+            todos.update(rt, |list| {
+                if let Some(item) = list.iter_mut().find(|item| item.id == id) {
+                    item.done = checked;
+                }
+            });
+        });
+        toggle(done).label(bind(move |rt| {
+            todo.with(rt, |todo| format!("Done: {}", todo.title))
+        }))
+    })
+}
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let todos = cx.signal(Vec::<Todo>::new());
+            let draft = cx.signal(String::new());
+            let next_id = cx.signal(1_u32);
+            let add = move |cx: &mut Cx| {
+                let title = draft.get(cx);
+                if title.trim().is_empty() {
+                    return;
+                }
+                let id = next_id.get(cx);
+                next_id.set(cx, id + 1);
+                todos.update(cx, |list| {
+                    list.push(Todo {
+                        id,
+                        title,
+                        done: false,
+                    })
+                });
+                draft.set(cx, String::new());
+            };
+            vstack((
+                text("Todos").text_size(28.0).font_bold(),
+                hstack((
+                    text_field(draft, "What needs doing?")
+                        .grow(1.0)
+                        .label("New todo")
+                        .on_submit(move |cx, _| add(cx)),
+                    button("Add")
+                        .bg(rgb(0x3b82f6))
+                        .text_color(WHITE)
+                        .on_click(move |cx, _| add(cx)),
+                ))
+                .gap(8.0),
+                scroll_view(
+                    for_each(
+                        todos,
+                        |todo: &Todo| todo.id,
+                        move |_cx, todo| todo_row(todos, todo),
+                    )
+                    .gap(8.0),
+                )
+                .grow(1.0)
+                .label("Todo list"),
+                text(bind(move |rt| {
+                    let left = todos.with(rt, |list| list.iter().filter(|todo| !todo.done).count());
+                    format!("{left} left")
+                }))
+                .text_color(rgb(0x64748b)),
+            ))
+            .p(24.0)
+            .gap(16.0)
+            .bg(rgb(0xf1f5f9))
+        }),
+        AppConfig::new("Todos").size(480, 640).mcp(true),
+    )
+}
+```
+
+## Why it is built this way, and what it costs
+
+The component closure runs once. When you add a todo, CrownUI does not call it again and does not
+diff a virtual tree. The `todos` signal changes, `for_each` builds one new row, and the counter text
+updates. Nothing else runs. That keeps the work of an update in proportion to what changed.
+
+That model has costs, and this app shows each of them:
+
+- You write `bind(move |rt| ..)` wherever a property depends on state. A plain `format!` in the
+  builder runs once and never updates. The upside is that every dependency is explicit.
+- Reads and writes both need `&mut Cx`, so you read into a local before you write. Step 4 and step 7
+  both do this. In return, there is no `Rc`, `RefCell` or lock anywhere in the app.
+- Widgets bind to a `Signal` of their own type. `toggle` wants a `Signal<bool>`, not a field inside a
+  `Vec<Todo>`, so step 7 needs a row signal and an effect to copy it back. That is a second copy of
+  the done flag, kept in sync by hand.
+- Every change to the list makes `for_each` clone the `Vec` and compare each item with its row's
+  last value. That is cheap for a todo list. For thousands of rows, use
+  [lazy_list](/docs/crownui/api/lazy-list), which mounts only the visible rows.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="State" icon="zap" href="/docs/crownui/state">
+    Signals, memos, effects and stores in depth.
+  </Card>
+  <Card title="Lists" icon="layers" href="/docs/crownui/lists">
+    Keyed lists, lazy lists and grids.
+  </Card>
+  <Card title="Styling" icon="pencil" href="/docs/crownui/styling">
+    Every Tailwind-named modifier and variant.
+  </Card>
+  <Card title="Testing" icon="check-circle" href="/docs/crownui/testing">
+    Headless tests, queries and snapshots.
+  </Card>
+</CardGroup>

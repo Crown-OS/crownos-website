@@ -1,0 +1,195 @@
+---
+title: Agents
+description: "Let AI agents read and drive a CrownUI app through its in-app MCP server, crownmcp and app tools."
+---
+
+A CrownUI app can run a small MCP server inside itself. AI agents such as Claude Code connect to it, read the app's semantic tree, click buttons, type text and call tools the app registers. It is the same tree screen readers and `crowntest` use, so an app that works with a screen reader and with tests already works with agents.
+
+```rust
+use crownui::ext::AppTool;
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let notes = cx.signal(Vec::<String>::new());
+            cx.register_tool(AppTool::new(
+                "note_count",
+                "How many notes the user has",
+                r#"{"type":"object","properties":{}}"#,
+                move |cx, _arguments| Ok(format!("{{\"count\":{}}}", notes.with(cx, Vec::len))),
+            ));
+            text(bind(move |rt| format!("{} notes", notes.with(rt, Vec::len))))
+        }),
+        AppConfig::new("Notes").mcp(true),
+    )
+}
+```
+
+## Turn the server on
+
+The `mcp` cargo feature is on by default, but each app opts in at run time with `AppConfig::mcp(true)`. `AppConfig` defaults `mcp` to `false`, so an app nobody configured exposes nothing.
+
+```rust
+AppConfig::new("Notes").app_id("org.crownos.Notes").mcp(true)
+```
+
+What happens next depends on the compositor.
+
+- On a compositor with the CrownOS agent access protocol, the app asks the compositor first, with the reason "Let AI agents read and operate this app's UI over MCP". The compositor asks the user. The server starts when the user grants access and stops when the grant is revoked. A denial leaves it off.
+- On any other compositor there is no one to ask, and the server starts right away.
+
+The server listens on a Unix socket at `$XDG_RUNTIME_DIR/crownui/<name>-<pid>.sock`. The name is the window title in lowercase with every character other than a letter or digit replaced by `-`, so "My Notes" becomes `my-notes`. The log line `MCP server listening` shows the full path. If the server fails to start, the app logs `CUI0408` and keeps running without it.
+
+## Connect Claude Code
+
+`crownmcp` is a stdio MCP server that agents launch. It finds the sockets of running CrownUI apps and forwards one of them.
+
+```sh
+cargo install --path crownmcp
+claude mcp add crownui -- crownmcp
+```
+
+The agent then has two tools of its own.
+
+- `list_apps` lists the running apps with `app` (the `name-pid`), `name`, `pid`, `socket` and `selected`. Sockets of dead processes are removed.
+- `select_app` connects to an app by name or by `name-pid`. With exactly one app running, `crownmcp` selects it on its own.
+
+Everything the selected app offers is forwarded: its tools, its resources and its app tools.
+
+## The built-in tools
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `ui_tree` | none | The semantic tree as indented text, plus the current `revision`. |
+| `ui_query` | `role`, `name` and `text`, all optional | The matching nodes as `id`, `role`, `name` and `path`, plus the `revision`. |
+| `ui_act` | `id`, `revision` and `action` | `ok` and the new `revision` after the frame the action caused. |
+| `ui_screenshot` | none | Not available yet. It returns an error until the compositor offers screenshots through the agent access protocol. |
+| `inspect_snapshot` | none | The semantic tree, every element's layout, the live signals and recent frame timings, as JSON. |
+
+The same data is also available as resources: `ui://tree` (text), `ui://tree.json` and `inspect://snapshot`.
+
+`role` in `ui_query` uses `snake_case`, like the tree output: `button`, `text_field`, `checkbox`, `menu_item`. `name` must match exactly. `text` matches a substring of the name or the value.
+
+A `ui_act` action is a JSON object tagged by `action`. The names match `crowntest` and Testing Library.
+
+```json
+{"action": "click"}
+{"action": "double_click"}
+{"action": "hover"}
+{"action": "focus"}
+{"action": "type_text", "text": "hello"}
+{"action": "press_key", "keybind": "Ctrl+A"}
+{"action": "scroll", "delta": {"x": 0, "y": 120}}
+{"action": "drag", "to": {"x": 40, "y": 300}}
+```
+
+A typical exchange reads the tree, finds a node and acts on it at the revision it read.
+
+```json
+{"tool": "ui_query", "arguments": {"role": "button", "name": "Save"}}
+{"tool": "ui_act", "arguments": {"id": 42, "revision": 17, "action": {"action": "click"}}}
+```
+
+Every change to the tree bumps the revision. An action sent with an older revision fails with `stale revision: the tree is now at revision 18; read ui_tree again and retry`. That stops an agent from clicking a node that moved or changed meaning since it last looked.
+
+## Register app tools
+
+Clicking through the UI works for anything a person can do, but it is slow for an agent and breaks when the layout changes. Give agents direct verbs with `cx.register_tool`.
+
+```rust
+use crownui::ext::AppTool;
+
+cx.register_tool(AppTool::new(
+    "add_note",
+    "Adds a note with the given title",
+    r#"{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]}"#,
+    move |cx, arguments| {
+        let title = parse_title(arguments).ok_or("expected a title")?;
+        notes.update(cx, |list| list.push(title));
+        Ok(format!("{{\"count\":{}}}", notes.with(cx, Vec::len)))
+    },
+));
+```
+
+```rust
+pub fn new(
+    name: impl Into<String>,
+    description: impl Into<String>,
+    input_schema: impl Into<String>,
+    handler: impl FnMut(&mut Cx, &str) -> Result<String, String> + 'static,
+) -> AppTool
+
+pub fn destructive(self) -> AppTool
+```
+
+- `name` is the tool name agents call. Registering the same name again replaces the earlier tool.
+- `description` tells the agent what the tool does. Write it for a reader who sees nothing else.
+- `input_schema` is the JSON Schema of the arguments object, as text.
+- `handler` runs on the UI thread with full access to `Cx`. It receives the arguments as JSON text and returns JSON text. A result that is not valid JSON goes back to the agent as a string. An `Err` reaches the agent as a tool error.
+
+A tool lives as long as the component that registered it. When the component unmounts, the tool disappears from the agent's list. A settings page registers its tools while it is open, and a list registers row tools only for rows that exist.
+
+Mark a tool that deletes or overwrites user data with `.destructive()`.
+
+```rust
+cx.register_tool(
+    AppTool::new("delete_note", "Deletes a note by title", schema, delete_handler).destructive(),
+);
+```
+
+A destructive tool advertises `destructiveHint` to the agent and gets a required `confirm` argument. A call without `"confirm": true` fails with a message that tells the agent to ask the user for approval and call again. Clients that honor the hint ask the user before they call the tool.
+
+<Tip>
+  Test tools without an agent through `app.ui().tools()` and `app.ui().call_tool(name, arguments)`. See [Testing](testing.md).
+</Tip>
+
+## Security
+
+An MCP server inside a desktop app is a door into the user's data. CrownUI closes it in layers.
+
+- The socket directory is created with mode 0700 and each socket with mode 0600. Only the user who runs the app can open them. The socket is removed when the app exits.
+- Each connection's peer credentials are read with `SO_PEERCRED` and checked by an access gate. The runtime uses `SameUserGate`, which accepts only processes of the same user.
+- A client can send a token line, `TOKEN <token>`, before the MCP stream. `crownmcp` sends `CROWNMCP_TOKEN` when it is set. The `mcp` crate's `TokenGate` checks it, for embedders that start `McpServer` themselves. `AppConfig` has no token option and always uses `SameUserGate`.
+- On CrownOS, the compositor asks the user before the server starts at all, and can revoke access later.
+- Nodes marked `.secure()` never expose their value. Agents may not type into them or press keys on them. The tool returns an error that says the node holds a secret.
+- Disabled nodes refuse every action with the error `the node is disabled`.
+- `ui_act` and app tool calls share one token bucket of 20 actions per second. An agent stuck in a loop gets a `rate limit exceeded` error instead of flooding the app.
+- Results that carry app text are wrapped as `{"untrusted_app_content": .., "note": ..}`. The note tells the agent that the content comes from the UI and may contain instructions, and that it is data. This guards against prompt injection through text the app shows, such as a web page or a file name someone else chose.
+
+## crowndev
+
+`crowndev` is a command line client for the same sockets. Use it to look at a running app while you develop.
+
+```text
+crowndev apps                          list running CrownUI apps
+crowndev tree [app]                    print the semantic tree
+crowndev inspect [app]                 print the inspect snapshot as JSON
+crowndev act <app> <query> <action>    find one node, then act on it at the current revision
+crowndev watch [app]                   print the tree again whenever it changes
+```
+
+- `app` is a name such as `counter` or a `name-pid`. Leave it out while exactly one app runs.
+- `query` is `role=..,name=..,text=..` with any subset of the keys, for example `role=button,name=+1`. It must match exactly one node.
+- `action` is `click`, `double_click`, `hover`, `focus`, `type_text=hello`, `press_key=Ctrl+A`, `scroll=0,120`, `drag=40,300`, or a raw `ui_act` action object.
+- `--socket-dir <dir>` before the command reads sockets from another directory. `CROWNMCP_TOKEN` is sent when set.
+
+```sh
+crowndev act counter 'role=button,name=+1' click
+crowndev tree counter
+```
+
+## Why it works this way, and what it costs
+
+Agents act on the semantic tree, not on pixels. A screenshot-driven agent guesses where a button is and clicks coordinates, which fails on a different scale factor, a different theme or a moved panel. A tree-driven agent asks for `role=button, name=Save` and gets one node with a stable id. The tree is already there for screen readers and tests, so agent support costs the app almost nothing to build.
+
+The server runs inside the app because the app holds the truth. An outside tool would read the tree through AT-SPI and lose app tools, the reactive graph and frame timings. Inside, the server runs on its own thread with a small tokio runtime and talks to the UI thread through channels, so a slow agent never blocks a frame. The UI thread answers requests between frames. A request nobody answers times out after 5 seconds.
+
+The revision check, the rate limit and the untrusted-content wrapping follow from one assumption: the agent is capable but fallible, and the app content is not trusted. Each guard turns a class of mistakes into an error message the agent can read and recover from.
+
+The costs:
+
+- Agents see what the tree shows. A custom widget without a role or a label is invisible to them, exactly as it is to a screen reader.
+- Screenshots are not available yet. An agent that needs to judge visual layout has only the layout section of `inspect_snapshot` to go on.
+- Clicking through the UI is slow for multi-step jobs. Register app tools for the work agents do often.
+- Every running app with `mcp(true)` holds a socket and a server thread. That is why the server is opt-in per app even though the feature is compiled in by default.

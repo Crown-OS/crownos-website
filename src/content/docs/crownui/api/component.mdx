@@ -1,0 +1,173 @@
+---
+title: component
+description: Declare a view with its own scope for state, built once by a closure.
+api: FN component
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Counter"
+use crownui::prelude::*;
+
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        hstack((
+            button("-1").on_click(move |cx, _| count.update(cx, |value| *value -= 1)),
+            text(bind(move |rt| format!("Count: {}", count.get(rt)))),
+            button("+1").on_click(move |cx, _| count.update(cx, |value| *value += 1)),
+        ))
+        .gap(8.0)
+        .items_center()
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn component<V: View, F: FnOnce(&mut Cx) -> V + 'static>(build: F) -> Component<F>
+```
+</ResponseExample>
+</ApiExamples>
+
+`component` declares a view with its own scope for state. Its closure runs once, when the view is built.
+
+## Parameters
+
+<ParamField name="build" type="F: FnOnce(&mut Cx) -> V + 'static" required>
+  Creates state with `cx.signal`, `cx.memo`, `cx.effect` or `cx.spawn` and returns the view to show.
+  It runs exactly once.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Component<F>" type="impl View">
+  A view. It implements `View` and nothing else.
+
+  <Expandable title="methods">
+    <ResponseField name="build" type="fn(self, &mut Cx) -> NodeId">
+      Mounts the component and returns the root node of the view the closure returned.
+    </ResponseField>
+    <ResponseField name="boxed" type="fn(self) -> AnyView">
+      Erases the type.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+`Component` has no style, event or semantic methods. Style the view you return inside the closure.
+
+```rust
+// Does not compile: Component has no style methods.
+// component(|_cx| text("Hi")).p(8.0)
+
+component(|_cx| text("Hi").p(8.0))
+```
+
+## What the scope owns
+
+`build` creates a scope and makes it current while the closure runs and while the returned view
+mounts. Everything created in that time belongs to the scope:
+
+- signals, memos and stores from `cx.signal`, `cx.memo` and `cx.store`
+- effects from `cx.effect`
+- async tasks from `cx.spawn`
+- listeners added by the views inside
+
+The scope lives as long as the component stays mounted. When a `show` branch, a `keyed` branch or a
+`for_each` row that contains the component unmounts, CrownUI disposes the scope. Effects stop, tasks
+are dropped and signals are freed.
+
+## Pass arguments with a move closure
+
+A component is usually the body of a function. Capture the function's arguments with `move`.
+
+```rust title="stepper.rs"
+fn stepper(title: &'static str, start: i32) -> impl View {
+    component(move |cx| {
+        let value = cx.signal(start);
+        hstack((
+            text(title).grow(1.0),
+            button("-").on_click(move |cx, _| value.update(cx, |value| *value -= 1)),
+            text(bind(move |rt| value.get(rt).to_string())).w(32.0).text_center(),
+            button("+").on_click(move |cx, _| value.update(cx, |value| *value += 1)),
+        ))
+        .gap(8.0)
+        .items_center()
+    })
+}
+```
+
+Signal handles are `Copy`, so a component can also receive a parent's signal and share it.
+
+```rust title="volume_row.rs"
+fn volume_row(volume: Signal<i32>) -> impl View {
+    component(move |cx| {
+        let muted = cx.signal(false);
+        hstack((
+            toggle(muted).label("Mute"),
+            text(bind(move |rt| {
+                if muted.get(rt) { "Muted".to_string() } else { format!("{}%", volume.get(rt)) }
+            })),
+        ))
+        .gap(8.0)
+    })
+}
+```
+
+## Read first, then write
+
+`Cx` derefs to the reactive runtime, so a read and a write both borrow `cx` mutably. Read into a
+local first, then create or write.
+
+```rust
+#[derive(Clone)]
+struct Settings {
+    dark_mode: bool,
+}
+
+fn dark_mode_row(settings: Signal<Settings>) -> impl View {
+    component(move |cx| {
+        let initial = settings.with(cx, |settings| settings.dark_mode);
+        let dark = cx.signal(initial);
+        toggle(dark).label("Dark mode")
+    })
+}
+```
+
+## Why it runs once
+
+The closure is not a render function. CrownUI does not call it again when state changes, and it
+does not diff its output. Each `bind`, `Signal` or `Memo` you pass to a property becomes one small
+observer that updates one property in place. An update costs work in proportion to the properties
+that read the changed signal, not to the size of the component.
+
+<Warning>
+  A plain `if`, `match` or loop inside the closure runs once, at build time. Use `show`, `keyed` or
+  `for_each` for structure that changes.
+</Warning>
+
+Each binding also keeps a closure and an observer slot alive for as long as the component is
+mounted, so memory grows with the number of bindings.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Views" icon="layers" href="/docs/crownui/views">
+    How views, elements and children fit together.
+  </Card>
+  <Card title="State" icon="refresh" href="/docs/crownui/state">
+    Signals, memos and bindings.
+  </Card>
+  <Card title="show" icon="code" href="/docs/crownui/api/show">
+    Switch between two branches.
+  </Card>  <Card title="keyed" icon="code" href="/docs/crownui/api/keyed">
+    Rebuild a branch when a value changes.
+  </Card>
+  <Card title="for_each" icon="code" href="/docs/crownui/api/for-each">
+    Keyed lists with a signal per row.
+  </Card>
+  <Card title="signal" icon="refresh" href="/docs/crownui/api/signal">
+    Create and update state.
+  </Card>
+</CardGroup>

@@ -1,0 +1,165 @@
+---
+title: keyed
+description: Build a branch from a derived value and rebuild it only when that value changes.
+api: FN keyed
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Pages"
+use crownui::prelude::*;
+
+#[derive(Clone, Copy, PartialEq)]
+enum Page {
+    General,
+    Network,
+    About,
+}
+
+fn page_view(page: Signal<Page>) -> impl View {
+    keyed(
+        move |rt| page.get(rt),
+        |_cx, page| match page {
+            Page::General => text("General settings").boxed(),
+            Page::Network => vstack((text("Network"), divider())).boxed(),
+            Page::About => text("CrownOS").font_bold().boxed(),
+        },
+    )
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn keyed<T, V, C, B>(key: C, build: B) -> Element<KeyedKind<C, B>>
+where
+    T: Clone + PartialEq + 'static,
+    C: FnMut(&mut Runtime) -> T + 'static,
+    B: FnMut(&mut Cx, T) -> V + 'static,
+    V: View,
+```
+</ResponseExample>
+</ApiExamples>
+
+`keyed` builds a branch from a derived value and rebuilds it only when that value changes. It is
+`show` for any number of branches.
+
+## Parameters
+
+<ParamField name="key" type="C: FnMut(&mut Runtime) -> T + 'static" required>
+  Derives the value that decides the structure. `keyed` wraps it in a memo, so the closure re-runs
+  when the signals it reads change, and the branch rebuilds only when the result is not equal to the
+  last one. `T` must be `Clone + PartialEq`.
+</ParamField>
+
+<ParamField name="build" type="B: FnMut(&mut Cx, T) -> V + 'static" required>
+  Builds the branch for a key value. It runs once on mount and once per key change.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Element<KeyedKind<C, B>>" type="Element">
+  A wrapper node that holds the current branch. It defaults to a column and takes every style,
+  event and semantic method.
+</ResponseField>
+
+## Behavior
+
+- The old branch unmounts before the new one builds. Its scope is disposed, so state created inside the branch is lost.
+- `build` reads the key value untracked, so the branch subscribes only to what its own bindings read.
+- When the branch root is styled `display_none`, the wrapper collapses and takes no space or gap among its siblings.
+
+## Return different types with boxed
+
+Each arm of a `match` has its own type. Call `.boxed()` on every arm to turn them into one `AnyView`.
+
+```rust
+#[derive(Clone, PartialEq)]
+enum Load {
+    Loading,
+    Empty,
+    Ready(Vec<String>),
+}
+
+keyed(
+    move |rt| state.get(rt),
+    |_cx, load| match load {
+        Load::Loading => text("Loading…").boxed(),
+        Load::Empty => text("Nothing here").text_color(rgb(0x64748b)).boxed(),
+        Load::Ready(names) => vstack(names.into_iter().map(|name| text(name)).collect::<Vec<_>>())
+            .gap(4.0)
+            .boxed(),
+    },
+)
+```
+
+## Name only what changes the structure
+
+The key decides when the whole branch is rebuilt. Make it as coarse as you can, and let bindings
+inside the branch handle finer changes.
+
+<CodeGroup>
+```rust title="Too fine"
+// Rebuilds the branch on every count change.
+keyed(move |rt| count.get(rt), |_cx, count| text(format!("{count} items")))
+```
+
+```rust title="Coarse"
+// Rebuilds only when the count crosses zero. The label updates in place.
+keyed(
+    move |rt| count.get(rt) > 0,
+    move |_cx, any| {
+        if any {
+            text(bind(move |rt| format!("{} items", count.get(rt)))).boxed()
+        } else {
+            text("No items").boxed()
+        }
+    },
+)
+```
+</CodeGroup>
+
+## Use cx in the branch
+
+`build` receives `&mut Cx`, so a branch can create state, read signals or register effects.
+Everything it creates belongs to the branch scope and is freed on the next rebuild.
+
+```rust
+keyed(
+    move |rt| selected.get(rt),
+    |cx, id: u32| {
+        let draft = cx.signal(String::new());
+        vstack((
+            text(format!("Item {id}")).font_semibold(),
+            text_field(draft, "Add a note"),
+        ))
+        .gap(8.0)
+    },
+)
+```
+
+The note field starts empty every time `selected` changes, because the branch and its `draft` signal
+are rebuilt.
+
+## Why it works this way
+
+`keyed` turns a value into structure. The rebuild is limited to one branch, and it runs only when a value you chose changes. Everything outside the branch keeps its nodes and state.
+
+<Warning>
+  The whole branch is rebuilt, including its local state, on each change of the key. A fine-grained
+  key, such as a counter, rebuilds far more than a `bind` would.
+</Warning>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="show" icon="code" href="/docs/crownui/api/show">
+    Two branches from a `bool`.
+  </Card>
+  <Card title="Lists" icon="layers" href="/docs/crownui/lists">
+    Conditional content and lists.
+  </Card>
+  <Card title="component" icon="code" href="/docs/crownui/api/component">
+    Views with their own scope.
+  </Card>
+</CardGroup>

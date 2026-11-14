@@ -1,0 +1,285 @@
+---
+title: Views
+description: How views, elements, children and components fit together, and why each view is built once.
+---
+
+A view describes a piece of UI. CrownUI builds each view once into an element tree. After that,
+signals change single properties in place, and your view functions never run again.
+
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let count = cx.signal(0);
+            vstack((
+                text(bind(move |rt| format!("Clicked {} times", count.get(rt)))),
+                button("Click me").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+            ))
+            .gap(8.0)
+            .p(24.0)
+        }),
+        AppConfig::new("Views").size(320, 160),
+    )
+}
+```
+
+## The View trait
+
+Everything you can put on screen implements `View`.
+
+```rust
+pub trait View: 'static {
+    fn build(self, cx: &mut Cx) -> NodeId;
+    fn boxed(self) -> AnyView where Self: Sized;
+}
+```
+
+- `build` consumes the view, mounts it into the tree and returns its root node. Containers call it for you.
+- `boxed` erases the view's type into an `AnyView`.
+
+Three kinds of types implement `View`:
+
+- `Element<K>` is what every builder returns. `text("Hi")` is an `Element<TextKind>` and `vstack(..)` is an `Element<StackKind<C>>`.
+- `Component<F>` is what `component(|cx| ..)` returns. It gives its content a scope for state.
+- `AnyView` is a view with its type erased, made by `.boxed()`.
+
+## Elements and modifiers
+
+An `Element<K>` pairs a kind with a list of modifiers. The kind, a type that implements `Kind`, knows
+how to mount one widget. Each method you chain adds a modifier. CrownUI applies them in order when
+the element is built.
+
+```rust
+text("Inbox")
+    .text_size(20.0)
+    .font_semibold()
+    .p(12.0)
+    .rounded(8.0)
+    .hover(|style| style.bg(rgb(0xf1f5f9)))
+    .on_click(move |cx, _| page.set(cx, Page::Inbox))
+    .label("Open inbox")
+```
+
+The methods come from three traits in the prelude:
+
+- `Styled` has the Tailwind-named style methods, such as `.p(..)`, `.bg(..)` and `.rounded(..)`.
+- `Listeners` has the DOM-named events, such as `.on_click(..)` and `.on_key_down(..)`.
+- `Semantic` has the accessibility methods, such as `.label(..)`, `.role(..)` and `.disabled(..)`.
+
+`Element` also has `.hover`, `.active`, `.focus`, `.focus_visible`, `.when_disabled` and `.dark` for
+state variants, `.enter`, `.exit` and `.transition` for animation, and `.key` for identity.
+
+## Children
+
+Containers such as `vstack` take their children as a `ViewSeq`. A `ViewSeq` is an ordered group of
+views. Five shapes implement it:
+
+- one view: `vstack(text("One"))`
+- a tuple of up to 16 members: `vstack((title, body, footer))`
+- a `Vec<V>`: `vstack(rows)`
+- an `Option<V>`: `None` builds nothing
+- `()`: no children, so `vstack(())` is an empty box
+
+Each tuple member is itself a `ViewSeq`, so tuples nest and can hold a `Vec`, an `Option` or another
+tuple. Nesting is also how you pass more than 16 children.
+
+```rust
+fn team(names: Vec<&'static str>, unread: Option<u32>) -> impl View {
+    vstack((
+        text("Team").font_bold(),
+        names.into_iter().map(|name| text(name)).collect::<Vec<_>>(),
+        unread.map(|count| text(format!("{count} unread"))),
+        (divider(), text("End of list")),
+    ))
+    .gap(8.0)
+}
+```
+
+<Note>
+  The `Vec` and the `Option` here are read once, when the view is built. They do not update later.
+  For a list that changes, use `for_each`. For content that comes and goes, use `show`. See
+  [Lists](/docs/crownui/lists).
+</Note>
+
+A `Vec` holds one type. To mix types, box them.
+
+```rust
+let parts: Vec<AnyView> = vec![
+    text("Title").font_bold().boxed(),
+    divider().boxed(),
+    button("OK").boxed(),
+];
+vstack(parts).gap(8.0)
+```
+
+## Reusable views are functions
+
+A function that returns `impl View` is the unit of reuse. Its arguments are plain Rust values or
+signal handles.
+
+```rust title="summary.rs"
+fn stat(label: &'static str, value: Signal<u32>) -> impl View {
+    vstack((
+        text(label).text_size(12.0).text_color(rgb(0x64748b)),
+        text(bind(move |rt| value.get(rt).to_string())).text_size(24.0).font_bold(),
+    ))
+    .gap(2.0)
+}
+
+fn summary(files: Signal<u32>, folders: Signal<u32>) -> impl View {
+    hstack((stat("Files", files), stat("Folders", folders))).gap(24.0)
+}
+```
+
+Signal handles are `Copy`, so pass them by value. A child that receives a parent's signal reads and
+writes the same state.
+
+When the function needs local state, wrap its body in `component`. The closure gets `cx` to create
+signals, and the function stays free of `&mut Cx`.
+
+<CodeGroup>
+```rust title="With component"
+fn search_box() -> impl View {
+    component(|cx| {
+        let query = cx.signal(String::new());
+        vstack((
+            text_field(query, "Search").label("Search"),
+            text(bind(move |rt| format!("Searching for {}", query.get(rt)))),
+        ))
+        .gap(4.0)
+    })
+}
+```
+
+```rust title="With &mut Cx"
+fn search_box(cx: &mut Cx) -> impl View + use<> {
+    let query = cx.signal(String::new());
+    text_field(query, "Search").label("Search")
+}
+```
+</CodeGroup>
+
+A function can also take `&mut Cx` directly. Under the 2024 edition, its `impl View` return type
+captures the borrow of `cx` unless you opt out with `use<>`. Its signals belong to the caller's
+scope, not to a scope of their own.
+
+## Components build once
+
+`component(|cx| ..)` runs its closure exactly once, when the view is built. The closure creates
+state and returns a view. It never runs again.
+
+```rust
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        hstack((
+            button("-").on_click(move |cx, _| count.update(cx, |count| *count -= 1)),
+            text(bind(move |rt| count.get(rt).to_string())),
+            button("+").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+        ))
+        .gap(8.0)
+    })
+}
+```
+
+When `count` changes, only the text's content updates. The buttons, the stack and the closure are
+left alone.
+
+That also means a plain `if` in the closure is evaluated once. Use `show` or `keyed` for structure
+that follows state.
+
+<CodeGroup>
+```rust title="Wrong"
+// Evaluated once. Never switches.
+let greeting = if signed_in.get(cx) { text("Welcome").boxed() } else { button("Sign in").boxed() };
+```
+
+```rust title="Right"
+// Switches whenever signed_in changes.
+let greeting = show(signed_in, || text("Welcome"), || button("Sign in"));
+```
+</CodeGroup>
+
+The component also owns a scope. Signals, effects, tasks and listeners created while it builds live
+as long as it stays mounted. When a `show` branch or a `for_each` row that contains it unmounts, the
+scope is disposed and all of that is freed.
+
+## Erase types with boxed
+
+Every builder returns its own type, so two branches of a `match` do not have the same type.
+`.boxed()` turns any view into an `AnyView`.
+
+```rust
+enum Status {
+    Online,
+    Away,
+    Offline,
+}
+
+fn status_badge(status: Status) -> AnyView {
+    match status {
+        Status::Online => text("Online").text_color(rgb(0x16a34a)).boxed(),
+        Status::Away => hstack((text("Away"), text("since 10:00").text_size(11.0))).gap(4.0).boxed(),
+        Status::Offline => vstack(()).display_none().boxed(),
+    }
+}
+```
+
+`boxed` costs one heap allocation and one dynamic call, both at build time. Nothing is boxed per
+frame.
+
+## Keys
+
+`.key(value)` gives an element a stable identity among its siblings. The value is anything that
+implements `Hash`.
+
+```rust
+hstack((avatar(user), text(name))).key(user_id)
+```
+
+CrownUI uses the key in two places. It hashes it into the element's semantic id, which
+accessibility tools, MCP agents and `crowntest` use to find the same node again after the tree
+changes. It also shows it in the component path in logs, as `[#hash]` in place of the position.
+
+Without a key, the semantic id comes from the element's position among its siblings. A static tree
+never moves its children, so most elements need no key. `for_each` sets the item's key on each row,
+and `lazy_list` sets the index. `lazy_vstack` sets nothing, so give its row roots a `.key(id)`.
+
+<Info>
+  Keys do not decide whether a node is reused. CrownUI does not diff trees. `for_each` reuses rows
+  through the key function you pass to it, not through `.key`.
+</Info>
+
+## Why views build once
+
+React re-runs a component function on each state change and diffs the result against the last one.
+SwiftUI re-evaluates `body`. CrownUI runs the build closure once. Each property that reads a signal
+gets its own small observer, and that observer updates the one property in place. An update costs
+work in proportion to the properties that read the changed signal, not to the size of the tree.
+There is no diff and no allocation of a new tree.
+
+This design has costs:
+
+- Structure must be declared with `show`, `keyed`, `for_each` or the lazy lists. A plain `if`, `match` or loop in a component runs once.
+- Each binding is a closure plus an observer slot. A screen with thousands of `bind` calls holds thousands of observers for as long as it is mounted. Memory grows with the number of bindings.
+- Reads need the runtime. Inside `bind` you read with `rt`. In handlers you read with `cx`. A plain function that wants a signal's value needs one of them passed in.
+- Swapping a branch with `show` or `keyed` rebuilds the whole branch, and its local state is lost. Keep state that must survive in a signal above the branch.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="State" icon="refresh" href="/docs/crownui/state">
+    Signals, memos and bindings.
+  </Card>
+  <Card title="Lists" icon="layers" href="/docs/crownui/lists">
+    Structure that changes: show, keyed, for_each and lazy lists.
+  </Card>
+  <Card title="Layout" icon="layers" href="/docs/crownui/layout">
+    Stacks, flexbox and grid.
+  </Card>
+  <Card title="Custom components" icon="puzzle" href="/docs/crownui/custom-components">
+    Write your own `Kind`.
+  </Card>
+</CardGroup>

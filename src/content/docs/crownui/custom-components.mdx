@@ -1,0 +1,327 @@
+---
+title: Custom components
+description: "Write your own Kind with a role, children, listeners, reactive styles, options and custom painting, then test it."
+---
+
+Most screens need nothing beyond `component`, stacks and the built-in views. Write your own `Kind` when an element needs something composition cannot give it: its own role, its own input handling, its own painting, or option methods. This guide builds a selectable filter chip from scratch, then tests it.
+
+```rust
+let wifi = cx.signal(true);
+hstack((
+    chip("Wi-Fi", wifi),
+    chip("Bluetooth", bluetooth).leading_icon(icons::BLUETOOTH),
+))
+.gap(8.0)
+```
+
+## Component or kind
+
+A `component(|cx| ..)` is a function that builds views once. It is the right tool for a screen, a form or a row: anything made of existing views.
+
+A `Kind` decides what one node is. Every built-in view is a kind: `ButtonKind`, `ToggleKind`, `ScrollViewKind`. Reach for a kind when the element itself needs to:
+
+- report a role a screen reader understands, such as a checkbox or a slider,
+- add listeners as part of what it is, such as a toggle that flips on click,
+- paint with a `DrawList`,
+- take option methods such as `.leading_icon(..)` that change how it builds.
+
+## 1. Declare the kind and its builder
+
+A kind is a struct that implements `Kind`. Its builder is a lowercase function that wraps it in an `Element`. Put fixed sizes, padding and radii on the builder as modifiers, because the app can override them later with its own modifiers.
+
+```rust
+use crownui::ext::{Kind, Listener, NodeId, StyleProp};
+use crownui::prelude::*;
+
+pub struct ChipKind {
+    label: String,
+    selected: Signal<bool>,
+    icon: Option<&'static str>,
+}
+
+pub fn chip(label: impl Into<String>, selected: Signal<bool>) -> Element<ChipKind> {
+    Element::new(ChipKind { label: label.into(), selected, icon: None })
+        .flex_row()
+        .items_center()
+        .gap(6.0)
+        .px(12.0)
+        .py(6.0)
+        .rounded(16.0)
+}
+```
+
+`Kind` requires `'static`, so the struct holds owned data and `Copy` handles like `Signal<bool>`, never borrows.
+
+## 2. Mount it
+
+`mount` runs once, after the node exists and before the element's modifiers apply. Start with a name and a role.
+
+```rust
+impl Kind for ChipKind {
+    const NAME: &'static str = "chip";
+
+    fn mount(self, cx: &mut Cx, node: NodeId) {
+        cx.set_role(node, Role::Checkbox);
+        cx.set_default_style(node, StyleProp::Cursor(CursorIcon::Pointer));
+        cx.set_default_style(node, StyleProp::Shrink(0.0));
+    }
+}
+```
+
+`NAME` shows up in component paths and layout snapshots, such as `stack > chip`. `set_role` tells screen readers, tests and agents what the node is. `Role::Checkbox` also makes the node atomic and names it from its text, so the chip's label becomes its accessible name.
+
+`set_default_style` sets a style property that the app's modifiers can override. A `chip(..).cursor(CursorIcon::Default)` wins over the default cursor.
+
+## 3. Add children
+
+`set_children` mounts any view or tuple of views inside the node.
+
+```rust
+let icon = self.icon.map(|body| crownui::kit::icon(body).size(14.0));
+cx.set_children(node, (icon, text(self.label)));
+```
+
+An `Option` of a view is a view, so the icon appears only when it is set. To keep a child's node id, for example to style it or observe its size, build it first with `cx.build(view)` and attach it with `cx.adopt_children(node, vec![child])`.
+
+## 4. Handle input
+
+`add_listener` adds a listener that belongs to the kind. The app can still add its own `.on_click`, and both run.
+
+```rust
+let selected = self.selected;
+cx.add_listener(
+    node,
+    Listener::Click(Box::new(move |cx, _event| {
+        selected.update(cx, |on| *on = !*on);
+    })),
+);
+```
+
+A click listener does more than handle clicks. It makes the node focusable, Enter and Space click it while it has focus, and tests and agents see a `click` action on it.
+
+## 5. React to state
+
+`bind_style` recomputes one style property when the signals it reads change. `bind_checked` reports the checked state to screen readers and tests.
+
+```rust
+const IDLE: Color = rgb(0xe5e7eb);
+const SELECTED: Color = rgb(0x2563eb);
+
+cx.bind_style(node, move |rt| {
+    StyleProp::Background(Some(if selected.get(rt) { SELECTED } else { IDLE }))
+});
+cx.bind_style(node, move |rt| {
+    StyleProp::TextColor(if selected.get(rt) { WHITE } else { BLACK })
+});
+cx.bind_checked(node, move |rt| selected.get(rt));
+```
+
+Only the background and the text color change when `selected` flips. Nothing rebuilds. If the app sets `.bg(..)` on a chip, the binding writes its own value again on the next flip, so bind only the properties the kind owns.
+
+Add `.transition(Spring::snappy())` in the builder and the color change animates on the render thread.
+
+## 6. Add options
+
+Option methods change the kind before it mounts. Declare a trait and implement it for your element with `Element::configure`.
+
+```rust
+pub trait ChipOptions: Sized {
+    fn leading_icon(self, body: &'static str) -> Self;
+}
+
+impl ChipOptions for Element<ChipKind> {
+    fn leading_icon(self, body: &'static str) -> Self {
+        self.configure(|kind| kind.icon = Some(body))
+    }
+}
+```
+
+The trait keeps the option on `Element<ChipKind>` only, so `button("x").leading_icon(..)` from your trait does not exist and the compiler says so. Users import the trait, as they import `ButtonOptions` for the kit button.
+
+Chain options before listeners and modifiers.
+
+```rust
+chip("Bluetooth", bluetooth)
+    .leading_icon(icons::BLUETOOTH)
+    .on_click(move |cx, _| refresh(cx))
+    .mt(4.0)
+```
+
+Both orders compile, because every method returns the same `Element<ChipKind>`. The convention keeps a call readable: first what the widget is, then what it does and how it looks.
+
+## The whole component
+
+```rust
+use crownui::ext::{Kind, Listener, NodeId, StyleProp};
+use crownui::prelude::*;
+
+const IDLE: Color = rgb(0xe5e7eb);
+const SELECTED: Color = rgb(0x2563eb);
+
+pub struct ChipKind {
+    label: String,
+    selected: Signal<bool>,
+    icon: Option<&'static str>,
+}
+
+impl Kind for ChipKind {
+    const NAME: &'static str = "chip";
+
+    fn mount(self, cx: &mut Cx, node: NodeId) {
+        let selected = self.selected;
+        cx.set_role(node, Role::Checkbox);
+        cx.set_default_style(node, StyleProp::Cursor(CursorIcon::Pointer));
+        cx.set_default_style(node, StyleProp::Shrink(0.0));
+        let icon = self.icon.map(|body| crownui::kit::icon(body).size(14.0));
+        cx.set_children(node, (icon, text(self.label)));
+        cx.add_listener(
+            node,
+            Listener::Click(Box::new(move |cx, _event| {
+                selected.update(cx, |on| *on = !*on);
+            })),
+        );
+        cx.bind_style(node, move |rt| {
+            StyleProp::Background(Some(if selected.get(rt) { SELECTED } else { IDLE }))
+        });
+        cx.bind_style(node, move |rt| {
+            StyleProp::TextColor(if selected.get(rt) { WHITE } else { BLACK })
+        });
+        cx.bind_checked(node, move |rt| selected.get(rt));
+    }
+}
+
+pub trait ChipOptions: Sized {
+    fn leading_icon(self, body: &'static str) -> Self;
+}
+
+impl ChipOptions for Element<ChipKind> {
+    fn leading_icon(self, body: &'static str) -> Self {
+        self.configure(|kind| kind.icon = Some(body))
+    }
+}
+
+pub fn chip(label: impl Into<String>, selected: Signal<bool>) -> Element<ChipKind> {
+    Element::new(ChipKind { label: label.into(), selected, icon: None })
+        .flex_row()
+        .items_center()
+        .gap(6.0)
+        .px(12.0)
+        .py(6.0)
+        .rounded(16.0)
+        .transition(Spring::snappy())
+}
+```
+
+## Custom painting
+
+For an element that draws itself, there are two ways in.
+
+`canvas(|rt, size, list| ..)` is a ready-made kind. Use it when you only need pixels.
+
+```rust
+canvas(move |rt, size, list| {
+    let filled = Rect::from_xywh(0.0, 0.0, size.width * progress.get(rt), size.height);
+    list.fill(filled, CornerRadii::uniform(size.height / 2.0), rgb(0x2563eb));
+})
+.h(8.0)
+.w_full()
+.role(Role::ProgressBar)
+.label("Upload progress")
+```
+
+`cx.set_canvas(node, painter)` paints inside your own kind, so the element keeps its role, listeners and options.
+
+```rust
+fn mount(self, cx: &mut Cx, node: NodeId) {
+    let progress = self.progress;
+    cx.set_role(node, Role::ProgressBar);
+    cx.bind_value(node, move |rt| format!("{:.0}%", progress.get(rt) * 100.0));
+    cx.set_canvas(node, move |rt, size, list| {
+        let filled = Rect::from_xywh(0.0, 0.0, size.width * progress.get(rt), size.height);
+        list.fill(filled, CornerRadii::uniform(size.height / 2.0), rgb(0x2563eb));
+    });
+}
+```
+
+The painter runs again when the node's size changes or when a signal it reads changes, and at no other time. `DrawList` offers `fill`, `stroke`, `shadow`, `clip`, `image`, `text`, `translate`, `transform`, `save` and `restore`.
+
+## The ext module
+
+`crownui::prelude` holds what apps use. `crownui::ext` holds what component authors need on top.
+
+| Group | Items |
+|---|---|
+| Kinds | `Kind`, `NodeId`, `Listener`, `ListenerKind`, `Modifier`, `Prop`, `StyleProp`, `Variant`, `VariantStyle`, `ItemLayout`, `LazyIndexKind`, `lazy_index` |
+| Events | `ClickEvent`, `DragEvent`, `DragOverEvent`, `DragLeaveEvent`, `DropEvent`, `FocusEvent`, `InputEvent`, `KeyboardEvent`, `PointerEvent`, `WheelEvent` |
+| Keys | `Key`, `NamedKey`, `Keybind`, `Modifiers` |
+| Painting | `DrawList`, `DrawCommand`, `Paint`, `Brush`, `GradientStop`, `Path`, `PathCommand`, `Stroke`, `StrokeCap`, `StrokeJoin`, `Transform`, `ImageId`, `TextLayout`, `TextStyle`, `TextSystem` |
+| Agents | `AppTool`, `ToolInfo` |
+| Platform data | `AppIconPlacement`, `AppIconRequest`, `AppWindows`, `ClipboardReadId`, `DropAcceptance` |
+| Backends | `GraphicsBackend`, `Renderer`, `CreateRenderer`, `LayoutEngine`, `Platform`, `PlatformSurface`, `ApplicationHandler`, `Runner`, `InlineApp`, `Ui` |
+
+A few `StyleProp` variants need types that `ext` does not export, such as `Edges`, `Corners` and `Dimension` for padding, radius and size. Set those through modifiers on the builder, as `chip` does. In the published crate they are reachable as `crownui::view::..` and `crownui::layouting::..` when you need them.
+
+## Test it
+
+Test the chip like a user would. Its role and label make it easy to find.
+
+```rust
+use crowntest::{Role, TestApp, role};
+
+#[test]
+fn clicking_a_chip_selects_it() {
+    let mut app = TestApp::new(component(|cx| {
+        let wifi = cx.signal(false);
+        hstack(chip("Wi-Fi", wifi)).p(16.0)
+    }));
+    let wifi = || role(Role::Checkbox).name("Wi-Fi");
+    assert_eq!(app.find(wifi()).states.checked, Some(false));
+
+    app.click(wifi());
+    assert_eq!(app.find(wifi()).states.checked, Some(true));
+
+    app.press_key("Space");
+    assert_eq!(app.find(wifi()).states.checked, Some(false));
+
+    app.settle();
+    assert!(app.layout_snapshot().contains("chip @16,16"));
+}
+```
+
+That test checks the role, the accessible name, the click, the keyboard path and the layout in one place. See [Testing](/docs/crownui/testing) for snapshots.
+
+## Contribute it to CrownUI
+
+The workspace has a fixed recipe for new primitives, written in `AGENTS.md`.
+
+1. Put the kind and its builder in `widgets/src/<name>.rs`: a `pub struct <Name>Kind` and `pub fn <name>(..) -> Element<<Name>Kind>`.
+2. In `mount`, use `cx.set_role`, `cx.set_default_style`, `cx.set_children`, `cx.add_listener` and `cx.bind_style`.
+3. Re-export it in `widgets/src/lib.rs`, add a row to `widgets/README.md` and add it to `crownui::prelude`.
+4. Test it with `crowntest`: `TestApp::new(..)`, `click(role(..).name(..))` and `insta::assert_snapshot!(app.snapshot())`.
+
+A themed CrownOS widget goes in `widgets/src/kit/<name>/` instead, with a few more rules.
+
+- Build it from the `widgets` primitives and `canvas`.
+- Read every color from `use_theme(cx)`, never from a literal. The theme follows the user's appearance settings.
+- Animate it with the springs in `widgets/src/util/spring.rs`, matching the original CrownOS widget.
+- Add a `previews/<name>.rs` entry, so `cargo xtask preview <name>` renders it, and a `widgets/tests/kit_<name>.rs` test.
+
+```rust
+let theme = use_theme(cx);
+cx.bind_style(node, move |rt| {
+    StyleProp::Background(Some(theme.with(rt, |theme| theme.popover.trigger_bg)))
+});
+```
+
+## Why it works this way, and what it costs
+
+A kind mounts once. There is no render function that runs again on every change, and no virtual DOM to diff. Each reactive property is its own small subscription: `bind_style` for the background and the text color, `bind_checked` for the state. When `selected` flips, those three closures run and nothing else. A click on one chip in a list of a thousand runs the bindings of that one chip only.
+
+Kinds are plain Rust. There are no macros in the authoring API, so rust-analyzer completes `cx.set_role`, shows the type of `Listener::Click` and jumps to the source of `Element::configure`. An agent writing a widget sees the same types you do.
+
+The costs:
+
+- A kind takes more code than a `component`. Building the chip from a `component` with an `hstack` and an `.on_click` takes fewer lines. The kind earns its lines when it needs a role, keyboard access, options or painting.
+- `mount` gets one chance. Anything that changes later must be wired up as a binding inside `mount`. To rebuild the structure when data changes, put a `show`, `keyed` or `for_each` among the children.
+- A `bind_style` binding writes its value again each time its signals change, over any modifier the app set for that property. Document which properties your kind owns.
+- Not every `StyleProp` payload type is in `crownui::ext`. Layout defaults go on the builder as modifiers.

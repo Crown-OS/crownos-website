@@ -1,0 +1,218 @@
+---
+title: Spring and Curve
+description: Springs and CSS timing curves that describe how a value moves to its target.
+api: FN Spring::snappy
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+button("Spring").hover(|style| style.scale(1.05)).transition(Spring::snappy());
+button("Timed").hover(|style| style.opacity(0.8)).transition(Curve::ease_in_out(200));
+button("Custom").transition(Spring::new(0.35, 0.75));
+
+// a spinner arm: turn once per second, forever
+vstack(()).w(2.0).h(8.0).bg(BLACK)
+    .rotate(360.0)
+    .enter(|style| style.rotate(0.0))
+    .transition(Curve::linear(1000).repeating());
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Spring { /* private */ }
+
+impl Spring {
+    pub fn new(response: f32, damping_ratio: f32) -> Self
+    pub fn snappy() -> Self
+    pub fn smooth() -> Self
+    pub fn crisp() -> Self
+    pub fn bouncy() -> Self
+    pub fn interactive() -> Self
+    pub fn stiffness(self) -> f32
+    pub fn damping(self) -> f32
+    pub fn damping_ratio(self) -> f32
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Curve {
+    Spring(Spring),
+    Timing(TimingCurve),
+}
+
+impl Curve {
+    pub fn linear(millis: u64) -> Self
+    pub fn ease(millis: u64) -> Self
+    pub fn ease_in(millis: u64) -> Self
+    pub fn ease_out(millis: u64) -> Self
+    pub fn ease_in_out(millis: u64) -> Self
+    pub fn repeating(self) -> Self
+}
+
+impl From<Spring> for Curve
+```
+</ResponseExample>
+</ApiExamples>
+
+`Spring` and `Curve` describe how a value moves to a new target. A `Spring` is a damped spring described by how fast it responds and how much it bounces. A `Curve` is either a spring or a CSS timing curve with a fixed duration. Both come from the `motion` crate and are in `crownui::prelude`.
+
+Every API that animates takes `impl Into<Curve>`, so a `Spring` and a `Curve` work in the same places:
+
+- `Element::transition(curve)` animates every change of an element and its subtree. See [variants](/docs/crownui/api/variants#transition).
+- `cx.with_animation(curve, |cx| ..)` animates the changes made in one closure. See [animation](/docs/crownui/animation).
+
+All of these types are `Copy`, so closures capture them by value and helpers return them without allocation.
+
+## Spring::new
+
+Creates a spring the SwiftUI way, from a response and a damping ratio.
+
+<ParamField name="response" type="f32" required>
+  The period of the undamped oscillation in seconds. Smaller is faster. Values below 0.001 are raised to 0.001.
+</ParamField>
+
+<ParamField name="damping_ratio" type="f32" required>
+  1.0 is critically damped and arrives without overshoot. Below 1.0 the spring overshoots and bounces, and the lower the value the more it bounces. Above 1.0 it creeps in slowly. Negative values are raised to 0.
+</ParamField>
+
+```rust
+let gentle = Spring::new(0.6, 1.0);   // slow, no overshoot
+let playful = Spring::new(0.45, 0.6); // medium speed, clear bounce
+```
+
+A spring has no duration. It ends when it is within a tiny distance of the target and nearly still, and then it lands exactly on the target value.
+
+## Spring presets
+
+| Preset | Response | Damping ratio | Use it for |
+|---|---|---|---|
+| `Spring::snappy()` | 0.25 | 0.86 | State changes. Quick with a hint of overshoot. The default choice. |
+| `Spring::smooth()` | 0.4 | 1.0 | Layout and theme changes. Calm, no overshoot. |
+| `Spring::crisp()` | 0.15 | 1.0 | Press feedback. Very fast, no overshoot. |
+| `Spring::bouncy()` | 0.5 | 0.7 | Motion that should visibly bounce. |
+| `Spring::interactive()` | 0.15 | 0.86 | Following a finger or a pointer during a drag. |
+
+`Spring::smooth()` is also what `enter` and `exit` use when no transition covers the node.
+
+```rust
+vstack(text("Card"))
+    .hover(|style| style.translate_y(-2.0).shadow(Shadow::lg()))
+    .active(|style| style.scale(0.98))
+    .transition(Spring::snappy())
+```
+
+## Spring accessors
+
+The accessors convert a spring to the physics form, for unit mass. Use them to match a spring in another tool or to check a custom spring.
+
+<ParamField name="stiffness" type="fn stiffness(self) -> f32">
+  The spring constant `k`. It equals the square of the natural frequency, which is `2π / response`.
+</ParamField>
+
+<ParamField name="damping" type="fn damping(self) -> f32">
+  The damping coefficient `c`, equal to `2 × damping_ratio × natural frequency`.
+</ParamField>
+
+<ParamField name="damping_ratio" type="fn damping_ratio(self) -> f32">
+  The damping ratio you passed in, after clamping.
+</ParamField>
+
+```rust
+let spring = Spring::snappy();
+println!("k = {}, c = {}", spring.stiffness(), spring.damping());
+```
+
+## Curve constructors
+
+Each constructor is a CSS timing function over a duration in milliseconds.
+
+| Constructor | CSS | Cubic bezier |
+|---|---|---|
+| `Curve::linear(millis)` | `linear` | (0, 0, 1, 1) |
+| `Curve::ease(millis)` | `ease` | (0.25, 0.1, 0.25, 1) |
+| `Curve::ease_in(millis)` | `ease-in` | (0.42, 0, 1, 1) |
+| `Curve::ease_out(millis)` | `ease-out` | (0, 0, 0.58, 1) |
+| `Curve::ease_in_out(millis)` | `ease-in-out` | (0.42, 0, 0.58, 1) |
+
+<ParamField name="millis" type="u64" required>
+  The duration in milliseconds.
+</ParamField>
+
+```rust
+let shown = cx.signal(true);
+text("Fades").opacity(bind(move |rt| if shown.get(rt) { 1.0 } else { 0.0 }))
+    .transition(Curve::ease_out(150))
+```
+
+## Curve::repeating
+
+Returns the same timing curve set to start over from its first value every time it ends, forever. Use it for indicators that never arrive anywhere, such as spinners and shimmer. A spring settles by nature, so `repeating` returns a spring unchanged.
+
+```rust
+canvas(|_rt, size, list| {
+    list.fill(Rect::from_xywh(size.width / 2.0 - 1.0, 0.0, 2.0, 6.0), CornerRadii::uniform(1.0), BLACK)
+})
+.size(16.0)
+.rotate(360.0)
+.enter(|style| style.rotate(0.0))
+.transition(Curve::linear(1000).repeating())
+```
+
+The `enter` style starts the node at 0 degrees and the transition carries it to 360. Because the curve repeats, the node keeps turning until it unmounts. Mount a repeating animation only while it is needed, because it keeps the render thread drawing frames.
+
+## Custom cubic bezier curves
+
+`Curve::Timing` holds a `TimingCurve` with three public fields. Build one directly for an easing that has no constructor. `TimingCurve` and `CubicBezier` live in the `motion` crate, which the published `crownui` crate exposes as `crownui::motion`.
+
+```rust
+use std::time::Duration;
+use crownui::motion::{CubicBezier, TimingCurve};
+
+let emphasized = Curve::Timing(TimingCurve {
+    duration: Duration::from_millis(350),
+    easing: CubicBezier::new(0.2, 0.0, 0.0, 1.0),
+    repeats: false,
+});
+vstack(text("Panel")).transition(emphasized)
+```
+
+<ParamField name="duration" type="Duration" required>
+  The total time of one run.
+</ParamField>
+
+<ParamField name="easing" type="CubicBezier" required>
+  The CSS `cubic-bezier(x1, y1, x2, y2)` function. `CubicBezier::new` clamps `x1` and `x2` to the range 0 to 1, like CSS. The constants `CubicBezier::LINEAR`, `EASE`, `EASE_IN`, `EASE_OUT` and `EASE_IN_OUT` hold the CSS presets.
+</ParamField>
+
+<ParamField name="repeats" type="bool" required>
+  Whether the run starts over forever.
+</ParamField>
+
+## Into Curve
+
+`impl From<Spring> for Curve` is the only conversion. It wraps the spring in `Curve::Spring`. Write your own helpers against `impl Into<Curve>` to accept both.
+
+```rust
+fn fade_in(view: impl View, curve: impl Into<Curve>) -> impl View {
+    vstack(view).enter(|style| style.opacity(0.0)).transition(curve)
+}
+
+fade_in(text("Hi"), Spring::smooth());
+fade_in(text("Hi"), Curve::ease(250));
+```
+
+## Choosing between a spring and a timing curve
+
+Springs are the default in CrownUI for three reasons.
+
+- They are interruptible. A retargeted spring keeps its current velocity, so a hover that reverses halfway curves back smoothly. A timing curve restarts its easing from the current value and loses the velocity, which shows as a small kink.
+- Their duration follows the distance. A short move ends quickly and a long move takes longer, which feels natural without tuning.
+- They are evaluated in closed form. The `motion` crate computes position and velocity at any timestamp directly, so sampling at the frame's presentation time gives identical results on the render thread and in the CrownOS compositor, which uses the same crate.
+
+Timing curves win when the duration matters more than the feel. A spinner needs a fixed period, a progress shimmer needs a steady speed, and a fade that has to finish before something else starts needs a known end. Use `Curve` for those.
+
+The cost of springs is that you cannot read a duration off them. If two animations have to end together, give them the same spring and the same distance, or use the same timing curve for both. The `motion` crate also has no keyframes and no physics beyond springs. A multi-step motion is a chain of state changes, each with its own curve.

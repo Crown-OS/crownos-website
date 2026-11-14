@@ -1,0 +1,264 @@
+---
+title: Kind
+description: "The trait behind every element, Element::new and configure, and the Cx methods a kind calls in mount."
+api: FN Kind::mount
+---
+
+`Kind` is the trait behind every element. A kind decides what a node is: its role, its default style, its content, its children and the listeners it adds on its own. `Element<K>` wraps a kind with the modifiers you chain on it. Implement `Kind` when `component` and the built-in views are not enough, for example for a new control with its own input handling or painting.
+
+<ApiExamples>
+<RequestExample>
+```rust title="chip.rs"
+use crownui::ext::{Kind, Listener, NodeId, StyleProp};
+use crownui::prelude::*;
+
+const IDLE: Color = rgb(0xe5e7eb);
+const SELECTED: Color = rgb(0x2563eb);
+
+pub struct ChipKind {
+    label: String,
+    selected: Signal<bool>,
+}
+
+impl Kind for ChipKind {
+    const NAME: &'static str = "chip";
+
+    fn mount(self, cx: &mut Cx, node: NodeId) {
+        let selected = self.selected;
+        cx.set_role(node, Role::Checkbox);
+        cx.set_default_style(node, StyleProp::Cursor(CursorIcon::Pointer));
+        cx.set_children(node, text(self.label));
+        cx.add_listener(
+            node,
+            Listener::Click(Box::new(move |cx, _event| {
+                selected.update(cx, |on| *on = !*on);
+            })),
+        );
+        cx.bind_style(node, move |rt| {
+            StyleProp::Background(Some(if selected.get(rt) { SELECTED } else { IDLE }))
+        });
+        cx.bind_checked(node, move |rt| selected.get(rt));
+    }
+}
+
+pub fn chip(label: impl Into<String>, selected: Signal<bool>) -> Element<ChipKind> {
+    Element::new(ChipKind { label: label.into(), selected })
+        .px(12.0)
+        .py(6.0)
+        .rounded(16.0)
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub trait Kind: 'static {
+    const NAME: &'static str;
+    fn mount(self, cx: &mut Cx, node: NodeId);
+}
+
+pub struct Element<K: Kind> { /* private */ }
+
+impl<K: Kind> Element<K> {
+    pub fn new(kind: K) -> Self;
+    pub fn configure(self, change: impl FnOnce(&mut K)) -> Self;
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+## Signature
+
+`Kind`, `NodeId`, `Listener`, `StyleProp`, `Prop` and `ClickEvent` are in `crownui::ext`. `Element`, `Cx` and `Role` are in `crownui::prelude`.
+
+## Parameters
+
+<ParamField name="NAME" type="&'static str" required>
+  The name used in component paths, layout snapshots and diagnostics.
+</ParamField>
+<ParamField name="cx" type="&mut Cx" required>
+  The context `mount` receives. It derefs to the reactive runtime and holds every method below.
+</ParamField>
+<ParamField name="node" type="NodeId" required>
+  The node this element owns. Pass it to the `cx` methods.
+</ParamField>
+
+## The trait
+
+### NAME
+
+```rust
+const NAME: &'static str;
+```
+
+The name used in component paths, layout snapshots and diagnostics, such as `stack > chip`. Use `snake_case`. Kit widgets prefix theirs with `kit_`.
+
+### mount
+
+```rust
+fn mount(self, cx: &mut Cx, node: NodeId);
+```
+
+Runs once, right after the node exists and before the element's modifiers are applied. It takes `self` by value, so the kind moves its fields into the node: signals into listeners, closures into painters, views into children. A kind must be `'static`, so it holds owned data and `Copy` handles, never borrows.
+
+Because modifiers come after `mount`, they win over a default set with `cx.set_default_style`. So `chip("Wi-Fi", on).px(20.0)` overrides the builder's padding. A property bound with `cx.bind_style` behaves differently. A modifier wins at first, but the binding writes its value again each time its signals change. Bind only the properties the kind owns, such as the chip's background.
+
+## Element
+
+### Element::new
+
+```rust
+pub fn new(kind: K) -> Self
+```
+
+Wraps a kind with no modifiers. Your builder function calls it and returns the `Element<K>`. Every `Styled`, `Listeners` and `Semantic` method then works on the result, along with `hover`, `active`, `focus`, `focus_visible`, `when_disabled`, `dark`, `enter`, `exit`, `transition` and `key`.
+
+Put fixed sizes, padding and corner radii on the builder as modifiers. The types those `StyleProp` variants need, such as `Edges`, `Corners` and `Dimension`, are not in `crownui::ext`, while the modifier methods are always available.
+
+### Element::configure
+
+```rust
+pub fn configure(self, change: impl FnOnce(&mut K)) -> Self
+```
+
+Changes the kind before it mounts. Component libraries build their option methods on it. Declare a trait for the options and implement it for `Element<YourKind>`, so the options only appear on your element. This example assumes `ChipKind` has an `icon: Option<&'static str>` field that `chip(..)` sets to `None`.
+
+```rust
+pub trait ChipOptions: Sized {
+    fn leading_icon(self, body: &'static str) -> Self;
+}
+
+impl ChipOptions for Element<ChipKind> {
+    fn leading_icon(self, body: &'static str) -> Self {
+        self.configure(|kind| kind.icon = Some(body))
+    }
+}
+```
+
+By convention, options go before listeners and modifiers: `chip("Wi-Fi", on).leading_icon(icons::WIFI).on_click(..)`. Options describe what the widget is. Modifiers and listeners describe how it looks and what it does. Both orders compile, because every method returns the same `Element<K>`.
+
+## Cx methods for mount
+
+Every method takes the `node` that `mount` received, or a child node built from it.
+
+### Semantics
+
+| Method | Signature |
+|---|---|
+| `set_role` | `pub fn set_role(&mut self, node: NodeId, role: Role)` |
+| `bind_value` | `pub fn bind_value(&mut self, node: NodeId, compute: impl FnMut(&mut Runtime) -> String + 'static)` |
+| `set_checked` | `pub fn set_checked(&mut self, node: NodeId, checked: Option<bool>)` |
+| `bind_checked` | `pub fn bind_checked(&mut self, node: NodeId, compute: impl FnMut(&mut Runtime) -> bool + 'static)` |
+
+`set_role` sets the role the kind implies. A `.role(..)` modifier still overrides it. `bind_value` keeps the accessible value in step with signals, as a text field does with its contents. `set_checked` and `bind_checked` report the checked state of a checkbox, switch or radio button. Screen readers announce it, tests read it from `states.checked`, and the snapshot prints `[checked]`.
+
+```rust
+cx.set_role(node, Role::Slider);
+cx.bind_value(node, move |rt| format!("{:.0}%", value.get(rt) * 100.0));
+```
+
+### Style
+
+| Method | Signature |
+|---|---|
+| `set_default_style` | `pub fn set_default_style(&mut self, node: NodeId, prop: StyleProp)` |
+| `bind_style` | `pub fn bind_style(&mut self, node: NodeId, compute: impl FnMut(&mut Runtime) -> StyleProp + 'static)` |
+
+`set_default_style` applies one style property as a default that the element's modifiers override. `bind_style` recomputes one property whenever the signals it reads change and applies it again, even over a modifier for the same property.
+
+```rust
+cx.set_default_style(node, StyleProp::Shrink(0.0));
+cx.bind_style(node, move |rt| StyleProp::Opacity(if busy.get(rt) { 0.5 } else { 1.0 }));
+```
+
+### Content and children
+
+| Method | Signature |
+|---|---|
+| `set_text` | `pub fn set_text(&mut self, node: NodeId, text: impl IntoProp<String>)` |
+| `set_children` | `pub fn set_children(&mut self, node: NodeId, children: impl ViewSeq)` |
+| `build` | `pub fn build(&mut self, view: impl View) -> NodeId` |
+| `adopt_children` | `pub fn adopt_children(&mut self, node: NodeId, children: Vec<NodeId>)` |
+| `set_canvas` | `pub fn set_canvas(&mut self, node: NodeId, painter: impl FnMut(&mut Runtime, Size, &mut DrawList) + 'static)` |
+| `set_image` | `pub fn set_image(&mut self, node: NodeId, image: ImageId, natural_size: Size)` |
+
+- `set_text` makes the node show text. A literal, a signal, a memo or a `bind(..)` all work, and the text updates when its signals change.
+- `set_children` mounts a view or a tuple of views as the node's children and replaces any earlier ones.
+- `build` mounts a view with no parent and returns its node, so you can style it or keep its id before attaching it with `adopt_children`.
+- `set_canvas` makes the node paint with a closure into a `DrawList`. The painter runs again when the node's size changes or when a signal it reads changes.
+- `set_image` draws an image registered with `cx.register_image(width, height, rgba)` at its natural size, unless the element is styled otherwise. Pair it with `cx.release_image_on_cleanup(id)` so the pixels are freed when the component unmounts.
+
+```rust
+fn mount(self, cx: &mut Cx, node: NodeId) {
+    cx.set_role(node, Role::ScrollView);
+    let content = cx.build(self.content);
+    cx.set_default_style(content, StyleProp::Shrink(0.0));
+    cx.adopt_children(node, vec![content]);
+}
+```
+
+```rust
+fn mount(self, cx: &mut Cx, node: NodeId) {
+    let progress = self.progress;
+    cx.set_role(node, Role::ProgressBar);
+    cx.set_canvas(node, move |rt, size, list| {
+        let filled = Rect::from_xywh(0.0, 0.0, size.width * progress.get(rt), size.height);
+        list.fill(filled, CornerRadii::uniform(size.height / 2.0), rgb(0x2563eb));
+    });
+}
+```
+
+### Listeners and events
+
+| Method | Signature |
+|---|---|
+| `add_listener` | `pub fn add_listener(&mut self, node: NodeId, listener: Listener)` |
+| `emit_input` | `pub fn emit_input(&mut self, node: NodeId, value: impl Into<String>)` |
+| `emit_change` | `pub fn emit_change(&mut self, node: NodeId, value: impl Into<String>)` |
+| `emit_submit` | `pub fn emit_submit(&mut self, node: NodeId, value: impl Into<String>)` |
+| `request_focus` | `pub fn request_focus(&mut self, node: NodeId)` |
+
+`add_listener` adds a listener on behalf of the kind, in addition to any `.on_*` listener the app adds. `Listener` has one variant per DOM event, each holding a `Box<dyn FnMut(&mut Cx, &mut Event<T>)>`: `Click`, `DoubleClick`, `ContextMenu`, `PointerDown`, `PointerUp`, `PointerMove`, `PointerEnter`, `PointerLeave`, `PointerCancel`, `Wheel`, `Scroll`, `KeyDown`, `KeyUp`, `TextInput`, `Input`, `Change`, `Submit`, `Focus`, `Blur`, `DragStart`, `Drag`, `DragEnd`, `DragOver`, `DragLeave`, `Drop`, `LongPress` and `Pinch`.
+
+A click listener does three more things. It makes the node focusable, it makes Enter and Space click the node while it has focus, and it advertises the `click` action to tests and agents.
+
+`emit_input`, `emit_change` and `emit_submit` fire the DOM `input`, `change` and `submit` events on a node after the current handler returns. App code then reacts with `.on_input`, `.on_change` and `.on_submit`, and reads the text from `event.value`.
+
+`request_focus` moves keyboard focus to the node after the current event. Called from `mount`, it focuses the node by the end of the frame, like the HTML `autofocus` attribute.
+
+`Key` and `NamedKey` are in `crownui::ext`.
+
+```rust
+cx.add_listener(
+    node,
+    Listener::KeyDown(Box::new(move |cx, event| {
+        if event.key == Key::Named(NamedKey::ArrowUp) {
+            value.update(cx, |value| *value += 1);
+            let shown = value.get(cx).to_string();
+            cx.emit_change(node, shown);
+            event.prevent_default();
+        }
+    })),
+);
+```
+
+### Observing layout
+
+| Method | Signature |
+|---|---|
+| `observe_size` | `pub fn observe_size(&mut self, node: NodeId) -> Signal<Size>` |
+| `observe_rect` | `pub fn observe_rect(&mut self, node: NodeId) -> Signal<Rect>` |
+| `observe_disabled` | `pub fn observe_disabled(&mut self, node: NodeId) -> Signal<bool>` |
+
+These return signals that follow the node's laid-out size, its rectangle in the window and its `disabled` state. Read them in a `bind_style` or a painter to react to layout without polling. `observe_disabled` follows the `.disabled(..)` modifier the app sets on your element.
+
+```rust
+let disabled = cx.observe_disabled(node);
+cx.bind_style(node, move |rt| StyleProp::Opacity(if disabled.get(rt) { 0.4 } else { 1.0 }));
+```
+
+## Related
+
+- [Custom components](/docs/crownui/custom-components) builds a complete widget step by step.
+- [Semantic](/docs/crownui/api/semantic) lists the accessibility modifiers that override `set_role`.
+- [TestApp](/docs/crownui/api/test-app) tests the result.

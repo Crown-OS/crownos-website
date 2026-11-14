@@ -1,0 +1,109 @@
+---
+title: Errors
+description: "Every CrownUI diagnostic code with where it comes from, what it means and how to fix it."
+---
+
+Every diagnostic CrownUI prints or returns starts with a stable code such as `CUI0101`. Search this page for the code to find where it comes from, what it means and how to fix it.
+
+```text
+CUI0101: no node matches role(button).name("Save"); similar nodes:
+  button "Save draft" at stack > button
+```
+
+The first two digits name the area. The last two count up inside it.
+
+| Range | Area |
+|---|---|
+| `CUI00xx` | Reactive state |
+| `CUI01xx` | Semantic queries and actions (tests, agents, screen readers) |
+| `CUI02xx` | Style variants |
+| `CUI03xx` | Error boundaries |
+| `CUI04xx` | Runtime, renderer and platform |
+| `CUI05xx` | Widgets |
+| `CUI06xx` | Configuration |
+| `CUI07xx` | Audio |
+| `CUI08xx` | Reserved for video (`media`, `camera`) |
+
+## How a code reaches you
+
+Codes arrive in three ways.
+
+- A panic. `CUI0001` panics, and so does every `crowntest` helper that hits a `CUI01xx` error.
+- A returned error. `Ui::perform` returns `ActionError` (`CUI0103` to `CUI0106`), `audio::Microphone::open` returns `AudioError` (`CUI07xx`), and `crownui::run` returns `RunError` for `CUI0405` and `CUI0406`.
+- A log line through `tracing`. Everything else is logged and the app keeps running. Install a subscriber such as `tracing-subscriber` to see these lines.
+
+## Reactive state
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0001` | `reactive` | A `Signal`, `Memo` or `Store` was read or written after the scope that owns it was disposed. This panics. | Keep the handle inside the component that created it. For a value that outlives its component, such as one captured by a `cx.spawn` callback, use `try_get`, `try_set` or `Store::try_update`. |
+
+## Semantic queries and actions
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0101` | `semantics` | A query matched no node. The message lists nodes with the same role or a similar name. | Fix the role or the name. If the node appears later, call `advance_ms` or `settle` first. |
+| `CUI0102` | `semantics` | A query matched more than one node. The message lists every match. | Narrow the query with `role(..).name(..)`, or give the node a unique `.label(..)`. |
+| `CUI0103` | `view` | An action named a semantic id that is not in the current tree. | Read the tree again. Ids are stable, but the node unmounted. |
+| `CUI0104` | `view` | The node does not support the action, for example `scroll` on a node that does not scroll. | Check the node's `actions` in the tree and act on a node that has the action. |
+| `CUI0105` | `view` | Something tried to type into a node marked `secure`. Agents may never do this. | This is by design. In a test, focus the field and send each character with `press_key`. |
+| `CUI0106` | `view` | The node is disabled. | Enable it first, or test that it stays disabled. |
+
+## Style variants
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0201` | `view` | A layout property such as `.p(..)` or `.w(..)` was used inside a variant (`hover`, `active`, `focus`, `focus_visible`, `when_disabled`, `dark`, `enter` or `exit`). It is ignored. | Variants take paint, composite and text properties only. Move layout changes to the element itself or to a `bind(..)`. |
+| `CUI0202` | `view` | A modifier that is not a style was used inside a variant, or a bound value was used inside `enter` or `exit`. It is ignored. | Use style methods only inside variants. Give `enter` and `exit` literal values. Bound values such as `.bg(bind(..))` are fine in the other variants. |
+
+## Error boundaries
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0301` | `view` | A component panicked inside an `error_boundary`. The fallback is shown in its place. | Read the logged message and component path, then fix the panic. |
+
+## Runtime, renderer and platform
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0401` | `runtime` | The renderer rejected an image upload, usually because the byte length is wrong. | Pass exactly `width * height * 4` bytes of straight-alpha RGBA8. |
+| `CUI0402` | `runtime` | The renderer failed to start on the window. | Check the GPU driver. Run with `CROWNUI_RENDERER=gles` to skip Vulkan and use OpenGL ES. |
+| `CUI0403` | `runtime` | The window surface was lost. | The compositor closed the connection or destroyed the surface. Check the compositor log. |
+| `CUI0404` | `runtime` | One frame failed to render. | Read the backend error that follows the code. |
+| `CUI0405` | `runtime` | The render thread stopped. `run` returns `RunError::Platform`. | Look for the `CUI0402` to `CUI0404` line logged before it. |
+| `CUI0406` | `runtime` | The platform created a window without a surface. `run` returns `RunError::Platform`. | This is a platform bug. Report it with the compositor name and version. |
+| `CUI0407` | `runtime` | The async executor failed to start. `cx.spawn` still returns a `TaskId`, but its futures wait in a queue and never run. | Read the I/O error in the log line. It is usually a thread limit. |
+| `CUI0408` | `runtime` | The in-app MCP server failed to start, so agents cannot reach the app. | Check that `$XDG_RUNTIME_DIR/crownui` exists, belongs to you and has mode 0700. |
+
+## Widgets
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0501` | `widgets` | `svg` or `icon` failed to parse its source. Nothing is drawn. | Validate the SVG. `svg` supports solid fills and strokes through usvg. |
+
+## Configuration
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0601` | `crownconfig` | Writing a config section failed. | Check the permissions of `$CROWN_CONFIG_DIR`, which defaults to `~/.config/crownos`. |
+
+## Audio
+
+| Code | Where | Meaning | Fix |
+|---|---|---|---|
+| `CUI0701` | `audio` | PipeWire is unreachable or refused to create the capture stream. | Check that `pipewire` and `wireplumber` run for your user with `pw-cli info 0`. |
+| `CUI0702` | `audio` | The capture thread failed to spawn. | Read the I/O error. It is usually a thread limit. |
+| `CUI0703` | `audio` | The mono 48 kHz capture format failed to serialize. | This is a library bug. Report it. |
+| `CUI0704` | `audio` | The capture thread stopped before the stream was set up. | Look for the `CUI0701` line logged before it. |
+
+<Note>
+  `kit::use_microphone` never returns these errors. It shows them as `StreamState::Failed(message)` in its `state` signal instead.
+</Note>
+
+## Why codes, and what they cost
+
+A code is a fixed string you can search for. Error text changes as the code base changes, so a search for a sentence breaks after a rewrite. A search for `CUI0102` keeps working, in this page, in the source and in an agent's memory of an earlier session. `AGENTS.md` makes stable codes a workspace invariant for the same reason. AI agents read logs as text, and a stable token lets them jump from a log line to the fix without guessing.
+
+The `CUI01xx` messages carry the most context because a failed query is the most common test failure. A bare "not found" makes you rerun the test with a print. The message lists the nodes that came close, with their roles, names and component paths, so you usually see the typo in the first read.
+
+The cost is upkeep. Each new diagnostic needs a code, a row on this page and a message that starts with the code. A code is never reused for a different meaning, so old logs stay correct. Most codes are log lines instead of errors, because a broken image or a stray `.p(..)` in a `hover` variant should not take the app down. That makes them easy to miss. Run tests and apps with a `tracing` subscriber so warnings show up.

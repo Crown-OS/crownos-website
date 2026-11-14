@@ -1,0 +1,194 @@
+---
+title: Inputs
+description: Text inputs, search bars with suggestions, shortcut recorders and the month calendar from the kit.
+sidebarTitle: Inputs
+---
+
+The kit has three editable inputs and one calendar. Each editable input is bound to a signal that it keeps current as the user types, and each one fires DOM-named events you listen to. The examples on this page assume these imports:
+
+```rust
+use crownui::{
+    kit::{
+        calendar, icons, keybind_input, quick_panel, search, suggestion, text_input, CalendarDate,
+        ClearButton, FieldShape, KeybindInputOptions, SearchOptions, Suggestion, TextInputOptions,
+    },
+    prelude::*,
+};
+```
+
+## Text input
+
+`text_input(value)` is a single-line field bound to a `Signal<String>`. The field writes every edit into the signal.
+
+```rust
+let name = cx.signal(String::new());
+text_input(name)
+    .placeholder("Network name")
+    .on_submit(move |cx, event| join_network(cx, &event.value))
+```
+
+It fires three events, all with the full new text in `event.value`:
+
+| Listener | When it fires |
+|---|---|
+| `.on_input` | After every edit. |
+| `.on_change` | When the field loses focus or the user presses Enter. |
+| `.on_submit` | When the user presses Enter. |
+
+The prelude's primitive `text_field(value, placeholder)` is the unstyled version of the same editor and takes the placeholder as its second argument. The kit's `text_input` takes only the value and sets the placeholder with an option.
+
+### Options
+
+All options come from the `TextInputOptions` trait.
+
+| Option | Effect |
+|---|---|
+| `.placeholder(text)` | Muted text shown while the field is empty. It also names the field for assistive technology unless a `.label(..)` follows. |
+| `.secret()` | Shows one bullet per character. The value stays real but is hidden from assistive technology, agents and the clipboard. |
+| `.read_only()` | Keeps the value selectable and copyable but refuses every edit. |
+| `.clear_button(ClearButton::Visible)` | Adds a trailing button that empties the field while it holds text. `ClearButton::Hidden` turns it off. |
+| `.shape(FieldShape::Pill)` | Fully rounded ends, as a search bar wears. The default is `FieldShape::Rounded`, the kit's standard control corner. |
+| `.leading_icon(body)` | A muted Lucide icon at the leading edge, with the text pushed clear of it. |
+| `.width(px)` | A fixed width in logical pixels. The default is 252, the width of a select trigger. |
+| `.stretch()` | Takes the whole width the parent offers. |
+| `.configure_input(\|kind\| ..)` | Edits the underlying `TextInputKind`. Widgets built on a text input, like `search`, use it to pass options through. |
+
+```rust
+let password = cx.signal(String::new());
+text_input(password).placeholder("Password").secret()
+
+let filter = cx.signal(String::new());
+text_input(filter)
+    .shape(FieldShape::Pill)
+    .leading_icon(icons::SEARCH)
+    .clear_button(ClearButton::Visible)
+    .stretch()
+
+let serial = cx.signal(String::from("CRWN-0042"));
+text_input(serial).read_only().label("Serial number")
+```
+
+Disable a field with `.disabled(true)`, which takes a literal, a signal or a `bind`.
+
+## Search
+
+`search(query)` is a pill-shaped text input with a magnifier, a clear button and a popup of suggestions under it. The popup is up while the bar has focus and there are suggestions. Up and Down walk the rows, Enter picks the highlighted one or submits the query, and Escape hides the popup until the next edit. An empty bar says `"Search…"` (`kit::DEFAULT_PLACEHOLDER`).
+
+```rust
+let query = cx.signal(String::new());
+search(query).on_submit(move |cx, event| run_search(cx, &event.value))
+```
+
+### Suggestions
+
+`.suggestions(rows)` takes a `Signal<Vec<Suggestion>>`. The search bar shows the rows in order and does not filter them. Filtering is your job, so any matching rule works. Recompute the rows from the query with an effect:
+
+```rust
+const SETTINGS: [&str; 4] = ["Wi-Fi", "Wi-Fi Calling", "Bluetooth", "Wallpaper"];
+
+let query = cx.signal(String::new());
+let rows = cx.signal(Vec::<Suggestion>::new());
+cx.effect(move |runtime| {
+    let needle = query.with(runtime, |query| query.to_lowercase());
+    let matches = SETTINGS
+        .iter()
+        .filter(|name| !needle.is_empty() && name.to_lowercase().contains(&needle))
+        .map(|name| suggestion(*name).icon(icons::SETTINGS))
+        .collect();
+    rows.set(runtime, matches);
+});
+search(query).suggestions(rows).max_suggestions(5)
+```
+
+A `Suggestion` is a label with an optional icon and detail:
+
+- `suggestion(label)` makes one. A `&str` or a `String` also converts into a `Suggestion` with `.into()`.
+- `.icon(body)` adds a Lucide icon before the label.
+- `.detail(text)` adds muted text at the trailing edge. It shows whole beside the label or not at all.
+- `.label()` returns the text the row shows.
+
+### Search options
+
+| Option | Effect |
+|---|---|
+| `.suggestions(rows)` | The rows the popup offers, in order. |
+| `.max_suggestions(count)` | The most rows the popup shows. The default is eight. |
+| `.on_select(\|cx, index\| ..)` | Runs with the index of a suggestion when it is clicked, or highlighted and entered. Without it, picking a suggestion writes its label into the query. |
+| `.widens_on_focus(resting, focused)` | Rests at a flex basis of `resting` and springs to `focused` while the bar has focus. |
+
+Every `TextInputOptions` method also works on a search bar, so `.width(320.0)`, `.placeholder(..)` and `.stretch()` behave as they do on `text_input`.
+
+```rust
+search(query)
+    .suggestions(rows)
+    .on_select(move |cx, index| open_page(cx, index))
+    .widens_on_focus(200.0, 320.0)
+```
+
+For a search bar in a sidebar window's toolbar, use [`sidebar_search`](/docs/crownui/kit-layout), which is a `search` already sized for it.
+
+## Keybind input
+
+`keybind_input(value)` records a keyboard shortcut. Click it or press Enter on it, then strike the chord. The field draws each key as a keycap lit by an accent glow along its top edge.
+
+```rust
+use crownconfig::Keybind;
+
+let push_to_talk = cx.signal(Keybind::SUPER_SPACE);
+keybind_input(push_to_talk)
+    .label("Push to talk")
+    .on_change(|_, event| println!("bound to {}", event.value))
+```
+
+While it records:
+
+- A key with any modifiers commits the chord, such as `Super+Space`.
+- Holding only modifiers and releasing them commits a modifier-only chord, such as `Super+Ctrl`. Push-to-talk and launcher shortcuts use these.
+- Escape with no modifiers cancels and keeps the old chord.
+- Backspace or Delete with no modifiers clears the binding to `Keybind::NONE`.
+
+`.on_change` receives the chord as the config file writes it, for example `"Super+Space"`, or `"None"` once cleared. `.width(px)` sets the width, which defaults to 252, the width of a select trigger.
+
+<Note>
+  The signal holds a `crownconfig::Keybind`, the type the CrownOS config files use, with `mods` and an optional `key`. It is a different type from `crownui::ext::Keybind`, which the shortcut system matches against key events. Add `crownconfig` as a dependency to name it.
+</Note>
+
+## Calendar
+
+`calendar(today)` draws a month grid opened on the month of `today`. It shows six Monday-first weeks under the month's name, today on an accent disc, and the neighbouring months' days dimmed. Two arrows page one month at a time. The grid keeps its height whatever the month, so it never resizes under the pointer.
+
+```rust
+use std::time::{SystemTime, UNIX_EPOCH};
+
+let days = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|elapsed| elapsed.as_secs() / 86_400)
+    .unwrap_or_default();
+let today = cx.signal(CalendarDate::from_days_since_epoch(days as i64));
+quick_panel(calendar(today))
+```
+
+The calendar shows dates. It does not pick one. Paging moves the shown month and leaves `today` alone. Set `today` again after midnight and the disc moves.
+
+`CalendarDate` carries its own date math on the proleptic Gregorian calendar:
+
+| Item | What it does |
+|---|---|
+| `year`, `month`, `day` | Public fields. Month is 1 to 12, day is 1 to 31. |
+| `CalendarDate::new(year, month, day)` | The date, clamped into a real day. |
+| `CalendarDate::from_days_since_epoch(days)` | The date `days` after 1970-01-01. |
+| `.days_since_epoch()` | Days since 1970-01-01, negative before it. |
+| `.weekday_from_monday()` | Monday 0 to Sunday 6. |
+| `.is_weekend()` | Whether it falls on a Saturday or a Sunday. |
+| `.first_of_month_shifted(months)` | The first of this date's month, moved by whole months. |
+| `.month_title()` | The month and year as text, such as `"September 2026"`. |
+
+## Why inputs keep their text in a signal
+
+Every keystroke writes the whole string into the signal, and `on_input` hands you the whole string again. The field never asks you for permission to change its value, and you never echo the value back into the field.
+
+The signal always holds the current text, so code that reads it, an agent that types into the field, and a test that calls `type_text` all see the same text.
+
+The cost is that you cannot reject a keystroke before it lands. To limit what the user types, read the new value in `on_input` and write a corrected one back into the signal. The field then shows the corrected text. Each edit also stores a fresh `String` in the runtime and wakes everything that reads the signal, so keep expensive work, such as a search over many files, behind `on_change` or a debounce and not inside every `bind` that reads the text.
+
+The search bar leaves filtering to you for a similar reason. It cannot know whether you match by prefix, by fuzzy score or by a database query on another thread. Taking a plain list of rows keeps the widget small, and your effect decides what is relevant.

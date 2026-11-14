@@ -1,0 +1,143 @@
+---
+title: run_windows
+description: Run several windows from one app, each with its own UI, until the last one closes.
+api: FN crownui::run_windows
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run_windows(vec![
+        (
+            component(|_cx| text("Library")).boxed(),
+            AppConfig::new("Library").size(900, 600),
+        ),
+        (
+            component(|_cx| text("Now playing")).boxed(),
+            AppConfig::new("Now playing").size(360, 120),
+        ),
+    ])
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn run_windows(windows: Vec<(AnyView, AppConfig)>) -> Result<(), RunError>
+```
+</ResponseExample>
+</ApiExamples>
+
+`run_windows` opens one window for each `(view, config)` pair and runs until the last window closes.
+Each pair is a separate window with its own UI, its own layout and its own render thread. All of
+them share the one UI thread that called `run_windows`.
+
+Use it when one process shows more than one surface. A launcher pairs its window with a full-screen
+layer that catches clicks outside it. A notification daemon pairs a toast strip with a notification
+center. A media app pairs its library with a small player window.
+
+<Warning>
+  The threading rule of [`run`](/docs/crownui/api/run) applies. Call `run_windows` from `main`
+  before you start any other thread.
+</Warning>
+
+## Parameters
+
+<ParamField name="windows" type="Vec<(AnyView, AppConfig)>" required>
+  One entry per window. Turn any view into an `AnyView` with `.boxed()`. The windows open in the
+  order given. An empty `Vec` returns `Ok(())` at once without connecting to the compositor.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Ok(())" type="()">
+  Every window closed.
+</ResponseField>
+
+<ResponseField name="Err(RunError)" type="RunError">
+  A window failed to start, or a running window failed. One failing window stops the whole app.
+  See [RunError](/docs/crownui/api/run#runerror).
+</ResponseField>
+
+## Windows do not share signals
+
+A `Signal` belongs to the UI that created it. A signal from one window is not valid in another,
+even though both run on the same thread. State that several windows show lives outside the UI, and
+each window follows it through `cx.spawn`.
+
+This example sends a value from a panel window to a main window over a tokio channel. The receiving
+window spawns a task that waits for the next message, applies it, and spawns again:
+
+```rust title="main.rs"
+use crownui::prelude::*;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+
+fn main() -> Result<(), crownui::RunError> {
+    let (sender, receiver) = unbounded_channel();
+    crownui::run_windows(vec![
+        (main_window(receiver).boxed(), AppConfig::new("Main")),
+        (panel(sender).boxed(), AppConfig::new("Panel").size(240, 120)),
+    ])
+}
+
+fn panel(sender: UnboundedSender<String>) -> impl View {
+    component(move |_cx| {
+        button("Say hello").on_click(move |_cx, _| {
+            let _ = sender.send("Hello from the panel".to_string());
+        })
+    })
+}
+
+fn main_window(receiver: UnboundedReceiver<String>) -> impl View {
+    component(move |cx| {
+        let message = cx.signal(String::from("Waiting"));
+        follow(cx, message, receiver);
+        text(message).p(24.0)
+    })
+}
+
+fn follow(cx: &mut Cx, message: Signal<String>, mut receiver: UnboundedReceiver<String>) {
+    let next = async move {
+        let latest = receiver.recv().await;
+        (receiver, latest)
+    };
+    cx.spawn(next, move |cx, (receiver, latest)| {
+        let Some(latest) = latest else {
+            return;
+        };
+        message.set(cx, latest);
+        follow(cx, message, receiver);
+    });
+}
+```
+
+The `tokio` crate here is your app's own dependency. `cx.spawn` needs the `tokio` feature of
+`crownui`, which is on by default.
+
+## Closing
+
+Each window closes on its own. The user closes one with its close button, or the app calls
+`cx.close_window()` from inside it. The others stay open. When the last one closes,
+`run_windows` returns. See [close requests](/docs/crownui/windows#close-requests) in the windows
+guide.
+
+## Why each window has its own UI
+
+A window's UI owns its element tree, its signals and its render thread. Keeping them apart means a
+window's layout pass, semantic tree and frames never wait on another window, and closing one window
+drops everything it owned in one step. It also keeps the rule "no shared mutable state" without
+exceptions: windows talk the same way any outside code talks to a UI, through channels.
+
+The cost is the plumbing you just saw. Two windows that show the same list each hold a copy, and
+something outside both has to send updates to each. For a single document with a few panels inside
+it, prefer one window with overlays such as [popover](/docs/crownui/api/popover) instead.
+
+## Related
+
+- [run](/docs/crownui/api/run)
+- [AppConfig](/docs/crownui/api/app-config)
+- [LayerOptions](/docs/crownui/api/layer-options)
+- [Async work](/docs/crownui/async)

@@ -1,0 +1,195 @@
+---
+title: image
+description: "Show pixels with image, crop a registered image with cover_image, and manage uploads with register_image."
+api: FN image
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn swatch() -> impl View {
+    let side = 32;
+    let rgba = [0x3b, 0x82, 0xf6, 0xff].repeat(side * side);
+    image(side as u32, side as u32, rgba)
+}
+
+fn header(cx: &mut Cx, width: u32, height: u32, rgba: Vec<u8>) -> impl View + use<> {
+    let banner = cx.register_image(width, height, rgba);
+    cx.release_image_on_cleanup(banner);
+    cover_image(banner, Size::new(width as f32, height as f32), 16.0)
+        .w_full()
+        .h(180.0)
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn image(width: u32, height: u32, rgba: Vec<u8>) -> Element<ImageKind>;
+
+pub fn cover_image(image: ImageId, natural_size: Size, radius: f32) -> Element<CoverImageKind>;
+
+impl Cx {
+    pub fn register_image(&mut self, width: u32, height: u32, rgba: Vec<u8>) -> ImageId;
+    pub fn release_image(&mut self, image: ImageId);
+    pub fn release_image_on_cleanup(&mut self, image: ImageId);
+    pub fn set_image(&mut self, node: NodeId, image: ImageId, natural_size: Size);
+    pub fn scale_factor(&self) -> Signal<f32>;
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`image` shows raw pixels. `cover_image` shows an image you registered yourself, cropped to fill a box. `cx.register_image` uploads pixels once and gives you an `ImageId` to draw anywhere, including inside a canvas.
+
+## Parameters
+
+<ParamField name="width" type="u32" required>
+  Width in pixels.
+</ParamField>
+
+<ParamField name="height" type="u32" required>
+  Height in pixels.
+</ParamField>
+
+<ParamField name="rgba" type="Vec<u8>" required>
+  Straight alpha RGBA8 pixels, row by row, exactly `width * height * 4` bytes.
+</ParamField>
+
+<ParamField name="image" type="ImageId" required>
+  For `cover_image`: an id from `cx.register_image`.
+</ParamField>
+
+<ParamField name="natural_size" type="Size" required>
+  For `cover_image`: the image's own size, which sets its aspect ratio.
+</ParamField>
+
+<ParamField name="radius" type="f32" required>
+  For `cover_image`: the corner radius of the crop, in logical pixels.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Element<ImageKind>" type="Element<ImageKind>">
+  From `image`. Sized to its pixel dimensions unless styled.
+</ResponseField>
+
+<ResponseField name="Element<CoverImageKind>" type="Element<CoverImageKind>">
+  From `cover_image`. Has no size of its own.
+</ResponseField>
+
+<ResponseField name="ImageId" type="ImageId">
+  From `register_image`. A `Copy` id to draw the image by.
+</ResponseField>
+
+## image
+
+`image(width, height, rgba)` registers the pixels when the element mounts and releases them when it unmounts. You never handle an id.
+
+- The element's natural size is `width` by `height` logical pixels. Style it with `.w()` and `.h()` to show it at another size.
+- The element gets the `Image` role. Add `.label("..")` to name it for screen readers and agents.
+- Each mount uploads the pixels again. To show the same picture several times, register it once instead.
+
+```rust
+image(width, height, pixels)
+    .w(96.0)
+    .h(96.0)
+    .label("Album cover")
+```
+
+CrownUI does not decode image files. Decode with any crate into straight alpha RGBA8 first:
+
+```rust
+let decoded = ::image::load_from_memory(bytes)?.to_rgba8();
+let (width, height) = decoded.dimensions();
+image(width, height, decoded.into_raw())
+```
+
+A byte count that does not match `width * height * 4` makes the renderer reject the upload with `CUI0401`, and nothing is drawn.
+
+## cover_image
+
+`cover_image(image, natural_size, radius)` scales an already registered image to cover the box it is given, centers it, and crops it to a rounded rectangle. It is CSS `object-fit: cover`.
+
+- It never sizes itself. Always give it a width and height.
+- The long axis overflows evenly on both sides.
+- It draws as one image-filled shape, so the rounded corners are anti-aliased with no clip.
+- It does not own the image. The caller releases it.
+- It gets the `Image` role.
+
+```rust
+let thumbnails = for_each(photos, |photo| photo.id, |cx, photo| {
+    let (texture, natural) = photo.with(cx, |photo| (photo.texture, photo.size));
+    cover_image(texture, natural, 8.0).w(120.0).h(120.0)
+});
+```
+
+## register_image
+
+`cx.register_image(width, height, rgba)` queues the pixels for upload with the next frame and returns their `ImageId`. Draw the id with:
+
+- `cover_image(id, natural_size, radius)`
+- `list.image(id, dest)` inside a canvas, to draw it unclipped into `dest`
+- `Paint::image(id, rect)` as the paint of `list.fill(..)` or a path, to crop it to that shape
+
+```rust
+use crownui::ext::Paint;
+
+let photo = cx.register_image(width, height, rgba);
+cx.release_image_on_cleanup(photo);
+
+canvas(move |_rt, size, list| {
+    let circle = Rect::new(Point::ZERO, size);
+    list.fill(circle, CornerRadii::uniform(size.width / 2.0), Paint::image(photo, circle));
+})
+.size(64.0)
+```
+
+## release_image and release_image_on_cleanup
+
+An uploaded image stays in GPU memory until you release it.
+
+| Method | When the image is freed |
+|---|---|
+| `cx.release_image(id)` | Once nothing on screen draws it, nodes playing an exit animation included. An image released before its upload is dropped without uploading. Drawing it afterwards draws nothing. |
+| `cx.release_image_on_cleanup(id)` | When the current scope ends, which is when the component that called it unmounts. |
+
+Pair every `register_image` with one of the two. `release_image_on_cleanup` right after registering is the usual choice.
+
+## set_image
+
+`cx.set_image(node, image, natural_size)` makes a custom `Kind`'s node draw a registered image at `natural_size` unless styled otherwise, and sets its role to `Image`. `image()` is built on it.
+
+## scale_factor
+
+`cx.scale_factor()` returns a `Signal<f32>` with the window's device pixels per logical pixel. Make pixels at `logical_size * scale` and style the element to the logical size, and the image maps one to one onto the screen:
+
+```rust
+let scale = cx.scale_factor();
+
+keyed(
+    move |rt| scale.get(rt),
+    move |_cx, scale| {
+        let side = (48.0 * scale).round() as u32;
+        image(side, side, render_avatar(side)).w(48.0).h(48.0)
+    },
+)
+```
+
+`keyed` rebuilds the branch when the scale changes, for example when the window moves to another screen. The old element unmounts and frees its pixels.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Drawing guide" icon="image" href="/docs/crownui/drawing">
+    Images in context, with the cost of uploads explained.
+  </Card>
+  <Card title="canvas" icon="code" href="/docs/crownui/api/canvas">
+    Draw registered images inside a painter.
+  </Card>
+  <Card title="DrawList" icon="code" href="/docs/crownui/api/draw-list">
+    `image`, `Paint::image` and `Brush::Image`.
+  </Card>
+</CardGroup>

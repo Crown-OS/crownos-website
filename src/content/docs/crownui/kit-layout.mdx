@@ -1,0 +1,410 @@
+---
+title: Layout
+description: Cards, sections, panes, icons, quick panels, sidebars, path bars, wizards and title bars from the kit.
+sidebarTitle: Layout
+---
+
+Layout widgets give a window its structure: the surfaces content sits on, the frame around a page, and the chrome of a client-drawn title bar. They take children like stacks do, as one view or a tuple of views. The examples on this page assume these imports:
+
+```rust
+use crownui::{
+    kit::{self, *},
+    prelude::{bind, component, hstack, rgb, spacer, text, vstack, Listeners, Semantic, Signal, Styled, View},
+};
+```
+
+The prelude is imported by name here, without its `divider` and `icon`, so the kit's versions are the ones in scope.
+
+## Card
+
+`card(content)` is the kit's card chrome around its content: the raised surface, a 1px border and rounded corners.
+
+```rust
+card((
+    text("Network").p(12.0),
+    divider(),
+    status("Connected").tone(Tone::Success).m(12.0),
+))
+.w(280.0)
+```
+
+A card pads its content only by the 1px border width, so dividers inside it run edge to edge. Pad the rows instead. `kit::CARD_RADIUS` (14) and `kit::CARD_BORDER_WIDTH` (1) let content inside the card round concentrically with it.
+
+## Section and setting row
+
+`section(title, children)` is a titled group of rows on one card surface, like a section of a settings page. `setting_row(label, control)` puts a label on the left and a control on the right.
+
+```rust
+let bluetooth = cx.signal(false);
+let wifi = cx.signal(true);
+section(
+    "Connectivity",
+    (
+        setting_row("Wi-Fi", toggle(wifi).label("Wi-Fi")),
+        divider(),
+        setting_row("Bluetooth", toggle(bluetooth).label("Bluetooth")),
+        divider(),
+        setting_row("Network", status("Connected").tone(Tone::Success)),
+    ),
+)
+.w(360.0)
+```
+
+The section draws its title above the card in a smaller, muted heading. Each setting row pads itself, so rows and dividers line up without extra styling. The control is any view, so a switch, a slider, a select or a status line all fit.
+
+## Divider
+
+`divider()` is a 1px hairline in the surface border color, centered in its height.
+
+| Option | Effect |
+|---|---|
+| `.color(color)` | Replaces the theme's surface border color. Takes a literal, a signal or a `bind`. |
+| `.height(px)` | The total vertical footprint. The 1px line stays centered in it, so this adds space around the line. |
+
+```rust
+vstack((text("Above"), divider().height(12.0).w(240.0), text("Below")))
+```
+
+## Panes
+
+`pane(content)` is a panel behind its content. It starts unfilled and square, and its options make it a surface. Content is clipped to its corners.
+
+```rust
+hstack((
+    pane(text("Brand").p(24.0)).accent_gradient().radii(Radii::left(24.0)),
+    pane(text("Details").p(24.0))
+        .themed_fill(|theme| PaneFill::Color(theme.surface.raised))
+        .radii(Radii::right(24.0)),
+))
+.w(320.0)
+```
+
+All options come from `PaneOptions`:
+
+| Option | Effect |
+|---|---|
+| `.fill(color)` | One flat color. |
+| `.gradient(stops)` | A two-stop `GradientStops` gradient, top to bottom. |
+| `.accent_gradient()` | The theme's accent gradient, following the theme as it changes. |
+| `.themed_fill(\|theme\| ..)` | Whatever `PaneFill` the closure returns for the current theme. |
+| `.radii(radii)` | Per-corner radii. |
+| `.bordered(color, width)` | A border of `width` drawn inside the pane's edge. |
+| `.bordered_with(width, \|theme\| ..)` | A border colored from the current theme. |
+
+`PaneFill` is what a pane paints behind its content: `PaneFill::None` (only a clip and border), `PaneFill::Color(color)` or `PaneFill::Stops(stops)`.
+
+`Radii` holds four corners, clockwise from the top left, as the public fields `top_left`, `top_right`, `bottom_right` and `bottom_left`:
+
+- `Radii::all(radius)` rounds every corner the same.
+- `Radii::left(radius)` rounds the left edge and squares the right, the left half of a split card.
+- `Radii::right(radius)` does the opposite.
+
+Prefer `themed_fill` and `bordered_with` over `fill` and `bordered` with a literal, so the pane follows light and dark mode:
+
+```rust
+pane(text("Sunken").p(16.0))
+    .themed_fill(|theme| PaneFill::Color(theme.surface.sunken))
+    .bordered_with(1.0, |theme| theme.surface.border)
+    .radii(Radii::all(12.0))
+```
+
+`hero_pane(content)` is the left panel of a `hero_wizard`: the accent gradient, rounded down the outer edge and square at the seam, with the content centered in it.
+
+## Soft shadow
+
+`soft_shadow(content, radius)` puts a soft, diffuse drop shadow behind its content. Match `radius` to the content's own corners, or the shadow shows past them.
+
+```rust
+soft_shadow(card(text("Network").m(12.0)), kit::CARD_RADIUS)
+```
+
+## Icons
+
+Three builders draw a glyph from `kit::icons`:
+
+| Builder | Color | Size |
+|---|---|---|
+| `icon(body)` | The theme's icon color, matching body text. | 16px. Resize with `.size(..)`. |
+| `icon_muted(body)` | The theme's muted icon color. | 16px. |
+| `icon_colored(body, stroke_width, \|theme\| ..)` | Whatever the closure picks from the theme. | 16px. The stroke width is in the 24 unit view box. |
+
+```rust
+hstack((icon(icons::WIFI), text("Studio")))
+    .gap(8.0)
+    .items_center()
+
+icon_colored(icons::CROWN, 1.5, |theme| theme.text.on_accent).size(96.0)
+```
+
+The color closure in `icon_colored` gets the current `&Theme`, so the icon follows theme changes.
+
+## Quick panel
+
+`quick_panel(rows)` is a control center panel: a fixed-width, translucent rounded card that a status bar or dock opens over the desktop. Every quick panel is `kit::PANEL_WIDTH` (296) wide, whatever rows it holds. Pair it with a platform material on the window, so the compositor blurs what is behind it. The [windows guide](/docs/crownui/windows) covers materials and layer surfaces.
+
+```rust
+const DOT: &str = r#"<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>"#;
+
+let enabled = cx.signal(true);
+let volume = cx.signal(0.6);
+let output = cx.signal(0_u32);
+quick_panel((
+    panel_header("Sound").switch(enabled),
+    panel_slider("Volume", volume)
+        .glyph(|tint| crownui::prelude::icon(DOT, tint).size(18.0).boxed()),
+    panel_separator(),
+    panel_section("Output"),
+    panel_item("Speakers")
+        .badge(|tint| crownui::prelude::icon(DOT, tint).size(16.0).boxed())
+        .selected(bind(move |runtime| output.get(runtime) == 0))
+        .on_click(move |cx, _| output.set(cx, 0)),
+    panel_item("Headphones")
+        .badge(|tint| crownui::prelude::icon(DOT, tint).size(16.0).boxed())
+        .detail("70%")
+        .selected(bind(move |runtime| output.get(runtime) == 1))
+        .on_click(move |cx, _| output.set(cx, 1)),
+    panel_section("Other Devices").disclosure(),
+    panel_separator(),
+    panel_action("Sound Settings…"),
+))
+```
+
+Glyph and badge closures receive a `Memo<Color>` with the color the row wants, which follows the theme and the row's selection. Return any view as an `AnyView`. The prelude's primitive `icon(svg_source, tint)` takes a full SVG document and recolors it with the tint.
+
+### Panel rows
+
+| Row | What it is | Options |
+|---|---|---|
+| `panel_header(title)` | The panel's title row. | `.switch(on)` puts the panel's master switch at the right edge. `.trailing(view)` adds views between the title and the switch, such as a refresh button. |
+| `panel_slider(label, value)` | A continuous control bound to a `Signal<f32>` in `0.0..=1.0`, with a glyph column at its left. | `.glyph(\|tint\| ..)` sets the glyph on a disc at the slider's left, such as a speaker for volume. |
+| `panel_section(title)` | A small muted heading above a group of rows, such as "Output". | `.disclosure()` makes the heading a link with a chevron and a hover wash. |
+| `panel_item(label)` | A device or network row: glyph, label, then optional detail and trailing views. | See below. |
+| `panel_action(label)` | A footer row that hands off elsewhere, such as "Sound Settings…". | Listen with `.on_click`. |
+| `panel_readout(reading, caption)` | A large reading with a line beneath it, like a clock's time over its date. | None. |
+| `panel_separator()` | A hairline between groups of rows. | None. |
+
+`panel_item` options come from `PanelItemOptions`:
+
+- `.badge(|tint| ..)` puts a glyph in a filled circle at the row's left, the way a device is marked.
+- `.glyph(|tint| ..)` puts a bare glyph where a badge's circle would be.
+- `.detail(text)` adds right-aligned secondary text, such as "70%".
+- `.trailing(view)` adds views after the detail, such as a battery cell or a warning sign.
+- `.selected(flag)` marks the current choice with an accent capsule and, on a badged row, an accent badge.
+- `.chevron()` adds a disclosure chevron at the right edge.
+- `.inert()` dims the row and makes it inert, for a status line.
+
+```rust
+quick_panel(panel_readout("21:47", "Monday, 5 October"))
+```
+
+`kit::panel_fill(theme, opacity)` and `kit::panel_rim(theme, opacity)` return the panel body color and its edge hairline at an opacity. Use them to draw your own surface that matches a quick panel. The [theme reference](/docs/crownui/api/kit-theme) has their details.
+
+## Sidebar windows
+
+`sidebar(menus, content)` is an app frame: a menu column on the left and a rounded content card filling the rest. The frame is painted in the title bar's color, so the menu column reads as part of the window around the card.
+
+```rust
+let page = cx.signal(0);
+let finance_open = cx.signal(false);
+sidebar(
+    (
+        sidebar_brand("Acme", icons::HOUSE),
+        sidebar_section(
+            "Personal",
+            (
+                sidebar_item("Inbox", icons::INBOX, bind(move |runtime| page.get(runtime) == 0))
+                    .on_click(move |cx, _| page.set(cx, 0)),
+                sidebar_item("Tasks", icons::CIRCLE_DOT, bind(move |runtime| page.get(runtime) == 1))
+                    .on_click(move |cx, _| page.set(cx, 1)),
+            ),
+        ),
+        sidebar_separator(),
+        sidebar_group(
+            "Finance",
+            icons::WALLET,
+            finance_open,
+            sidebar_column((
+                sidebar_subitem("Accounts", false),
+                sidebar_subitem("Budgets", false),
+            )),
+        ),
+    ),
+    text("Tasks"),
+)
+```
+
+### Sidebar rows
+
+| Builder | What it is |
+|---|---|
+| `sidebar_item(label, icon, selected)` | A leaf row with a leading icon. `selected` raises it into the pill. It takes a literal, a signal or a `bind`. |
+| `sidebar_subitem(label, selected)` | A nested row without an icon, indented under a group. |
+| `sidebar_brand(label, icon)` | The top brand row: a bigger icon and label, never selected. |
+| `sidebar_group(label, icon, open, children)` | An expandable group: a header row that toggles the `Signal<bool>` and a collapsing body of children. |
+| `sidebar_section(caption, items)` | A muted caption over a block of rows. The caption is not a row, so it never hovers or selects. |
+| `sidebar_separator()` | A thin horizontal divider that chunks the sidebar into groups. |
+| `sidebar_column(items)` | Sidebar rows stacked with the sidebar's own row gap. Use it for a group's children. |
+| `sidebar_collapse(view, open)` | Springs the visible height of a view between its natural size and nothing as `open` changes. The child keeps its layout and is only clipped. `sidebar_group` uses it. |
+
+Rows take trailing content through `SidebarItemOptions`:
+
+- `.trailing_text(caption)` adds a muted caption, such as how many new downloads there are.
+- `.trailing_icon(body)` pins a Lucide icon to the trailing edge.
+- `.trailing(view)` adds any view after the caption: a status dot, an eject `icon_button` or a spinner.
+
+```rust
+vstack((
+    sidebar_item("Downloads", icons::DOWNLOAD, false).trailing_text("3"),
+    sidebar_item("USB Drive", icons::HARD_DRIVE, true).trailing(
+        icon_button(icons::ARROW_UP_FROM_LINE, "Eject").variant(ButtonVariant::Ghost),
+    ),
+))
+.w(240.0)
+```
+
+### A toolbar and title bar
+
+`sidebar_with_header(menus, header, content)` adds a toolbar row above the content card. For a window with client-side decorations, that row is the title bar. Lead it with `title_bar_spacer()` so the user drags the window by it, and end it with `window_controls()`.
+
+```rust
+let query = cx.signal(String::new());
+sidebar_with_header(
+    sidebar_section("Library", sidebar_item("All apps", icons::LAYOUT_GRID, true)),
+    (
+        title_bar_spacer(),
+        sidebar_search(query).placeholder("Search apps"),
+        hstack((title_bar_spacer(), window_controls())).flex_1(),
+    ),
+    text("All apps"),
+)
+```
+
+- `sidebar_search(query)` is the kit `search` bar sized for this toolbar. It is wide enough for a query, springs wider while open, and gives way when the content side is narrower. Every search and text input option chains onto it.
+- `title_bar_spacer()` is empty space that grows like `spacer()`. Dragging it moves the window, and double-clicking it maximizes or restores the window.
+- `window_controls()` draws maximize, minimize and close, ordered and drawn like the compositor's own title bar. Each one is a `WindowControl` (`Maximize`, `Minimize` or `Close`) that asks the window manager to act.
+
+### Concentric corners
+
+The compositor rounds each window's corners. When the content card sits a few pixels inside the window edge, its corners look right only when they are concentric with the window's. `provide_window_radius(cx, WindowRadius(radius))` tells kit layouts the window's radius, and the sidebar's card rounds itself to match.
+
+```rust
+component(|cx| {
+    provide_configured_theme(cx);
+    provide_window_radius(cx, WindowRadius(12.0));
+    app_shell()
+})
+```
+
+`WindowRadius(radius).concentric(inset)` returns the radius for a box inset by `inset` from the window's edges, never below zero. `provide_window_radius` returns a `Signal<WindowRadius>`, so you set it again when the desktop's corner radius changes. CrownOS apps read the value from `appearance.ron`. Without a provided radius, the sidebar card uses a fixed 16px corner.
+
+## Path bar
+
+`path_bar(segments, on_select)` is a breadcrumb of folders. Segments are hoverable pills between muted chevrons, and the last one is the current folder. Clicking segment `index` runs `on_select(cx, index)`.
+
+```rust
+let segments = cx.signal(vec![
+    PathSegment::new("Home").icon(icons::HOUSE),
+    PathSegment::new("Documents"),
+    PathSegment::new("Projects"),
+    PathSegment::new("crownos"),
+]);
+hstack(path_bar(segments, move |cx, index| {
+    segments.update(cx, |segments| segments.truncate(index + 1));
+}))
+.w(420.0)
+```
+
+The path bar takes the free width of its row. When the path does not fit, the leading segments fold into an ellipsis that leads to the deepest folded one. The last segment never folds.
+
+`PathSegment::new(label)` makes a segment and `.icon(body)` gives it a leading icon, such as a house for home. Its fields `label` and `icon` are public.
+
+Each segment is also a drop target, through `PathBarOptions`:
+
+- `.on_segment_drag_over(|cx, index, event| ..)` runs while a drag moves over a segment, like HTML `dragover`. Call `event.accept(..)` to take the drop there, and the segment lights up.
+- `.on_segment_drop(|cx, index, event| ..)` runs when an accepted drag is dropped on a segment, like HTML `drop`.
+
+The [clipboard and drag guide](/docs/crownui/clipboard-and-drag) explains the drag events these handlers receive.
+
+## Wizards
+
+`wizard(steps, current, page, footer)` is the chrome for a step-by-step flow: a step rail on top, the page in the middle, and a button bar pinned to the bottom under a hairline. It owns the frame, not the navigation, so you keep the step in a signal and swap the page yourself.
+
+```rust
+const STEPS: [&str; 4] = ["Welcome", "Disk", "Review", "Restart"];
+
+let step = cx.signal(1_usize);
+wizard(
+    STEPS,
+    step,
+    wizard_page(
+        "How much room should CrownOS get?",
+        Some("Windows keeps everything it is using now."),
+        text("Disk controls go here."),
+    ),
+    wizard_footer(
+        button("Back").on_click(move |cx, _| step.update(cx, |step| *step = step.saturating_sub(1))),
+        button("Continue")
+            .variant(ButtonVariant::Primary)
+            .on_click(move |cx, _| step.update(cx, |step| *step += 1)),
+    ),
+)
+```
+
+| Builder | What it is |
+|---|---|
+| `wizard_rail(steps, current)` | The step indicator alone: one dot per step on a connected track, completed steps checked and filled, the current one ringed. `current` is zero-based, and past the end every step reads complete. |
+| `wizard_page(title, subtitle, content)` | A titled step body: a heading, an optional line of explanation, and the step's controls. Pass `None::<&str>` for no subtitle. |
+| `wizard_footer(secondary, primary)` | The button bar: secondary on the left, primary on the right, spare width between them. |
+| `wizard_scroll(content)` | Makes a step's content scroll, so a tall step never pushes the button bar off the bottom. |
+
+### Hero wizard
+
+`hero_wizard(hero, step, content, action)` is a fixed-size split card centered on the page. The hero sits on the left. On the right are the step's heading, the content, and the action stretched across the foot of the column.
+
+```rust
+hero_wizard(
+    hero_pane(icon_colored(icons::CROWN, 1.5, |theme| theme.text.on_accent).size(96.0)),
+    HeroStep::new("Please select the disk to install to")
+        .subtitle("After selecting the disk, click Next and continue with the installation")
+        .steps(4, 1_usize),
+    card((
+        text("Samsung SSD 990 PRO 1 TB").p(14.0),
+        divider(),
+        text("WD Blue SN580 500 GB").p(14.0),
+    )),
+    button("Next step").variant(ButtonVariant::Primary).stretch(),
+)
+```
+
+`HeroStep` is the right column's heading:
+
+- `HeroStep::new(title)` is a heading with nothing under it.
+- `.subtitle(text)` adds a line or two under the heading. It wraps at the column width.
+- `.steps(total, current)` adds a step bar of `total` steps with the zero-based `current` reached. `current` takes anything that implements `IntoStep`.
+
+`kit::HERO_CARD_RADIUS` (22) is the card's corner radius and `kit::HERO_COLUMN_WIDTH` (452) is the width of the right column's content.
+
+## Slide transition
+
+`slide_transition(index, pane)` slides between panes as a `Signal<usize>` changes. The new pane enters from the right when the index grew and from the left when it shrank, and the old one leaves by the opposite edge. Both are clipped to the container.
+
+```rust
+let page = cx.signal(0_usize);
+slide_transition(page, |cx, ordinal| match ordinal {
+    0 => welcome(cx).boxed(),
+    1 => choose_disk(cx).boxed(),
+    _ => review(cx).boxed(),
+})
+```
+
+The closure gets `&mut Cx` and the new index and builds the pane. The old pane is retired when its exit finishes, so you never manage an outgoing pane. Panes grow to fill the container, so a pane holding a `scroll_view` scrolls inside it. Return `AnyView` with `.boxed()` when the arms build different view types.
+
+## Why the layouts own their chrome
+
+The sidebar, wizard and hero wizard each draw a complete frame: padding, corner radii, the title bar color, the rail and the button bar. You give them content and they place it.
+
+The sidebar card's corner, the 6px gap between it and the window edge, and the spacing of the window controls are set once in the kit. An app that uses `sidebar_with_header` lines up with Files, the App Store and the Disk Manager without copying numbers.
+
+The cost is that the frames are not configurable piece by piece. You cannot change the sidebar width or the gap around the card from the call site. When an app needs a different frame, build it from `pane`, `card` and stacks, which are the same pieces the kit uses. The wizards also leave navigation to you on purpose. They do not know what "Next" means for your flow, which steps to skip, or when a step is valid. A signal for the current step keeps that logic in your code where you test it.
+
+The quick panel has a fixed width for the same reason. Every panel a status bar opens is the same width, so the desktop looks consistent when the user moves from the sound panel to the network panel.

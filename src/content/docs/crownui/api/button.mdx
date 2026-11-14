@@ -1,0 +1,161 @@
+---
+title: button
+description: A push button with a text label that runs its click handler on a click, Enter, Space or a shortcut.
+api: FN button
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        hstack((
+            text(bind(move |rt| format!("Count: {}", count.get(rt)))),
+            button("+1").on_click(move |cx, _| count.update(cx, |count| *count += 1)),
+        ))
+        .items_center()
+        .gap(12.0)
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn button(label: impl IntoProp<String>) -> Element<ButtonKind>
+```
+</ResponseExample>
+</ApiExamples>
+
+`button` is a push button with a text label. It has the `Button` role, takes keyboard focus, and runs its `on_click` handler on a click, on Enter or Space, and when a test or an agent clicks it.
+
+`button` builds a row with the label as its only child. Style it with any [`Styled`](/docs/crownui/api/styled) method, restyle its states with [variants](/docs/crownui/api/variants), and attach behavior with [`on_click`](/docs/crownui/api/listeners).
+
+## Parameters
+
+<ParamField name="label" type="impl IntoProp<String>" required>
+  The text shown on the button and its accessible name. Pass a `&str`, a `String`, a `Signal<String>`, a `Memo<String>` or a `bind` closure for a label that changes.
+</ParamField>
+
+## Returns
+
+<ResponseField name="button" type="Element<ButtonKind>">
+  The button element. Chain style, listener and semantic methods on it.
+</ResponseField>
+
+## Default style
+
+The button sets these defaults when it mounts. Your own modifiers apply after them and win.
+
+| Property | Default | Override with |
+|---|---|---|
+| Direction | row | `.flex_col()` |
+| Cross axis alignment | center | `.items_start()` and friends |
+| Main axis alignment | center | `.justify_start()` and friends |
+| Horizontal padding | 12 | `.px(..)` |
+| Vertical padding | 6 | `.py(..)` |
+| Corner radius | 8 | `.rounded(..)` |
+| Background | gray at 16% alpha | `.bg(..)` |
+| Cursor | `CursorIcon::Pointer` | `.cursor(..)` |
+
+The text inherits the button's text properties, so `.text_color(..)`, `.text_size(..)` and `.font_semibold()` on the button style the label.
+
+## Handling clicks
+
+`button` has no click handler of its own. Add one with `.on_click(|cx, event| ..)`. The handler receives `&mut Cx` and `&mut Event<ClickEvent>`. The event carries the click `position`, the click `count` and the held `modifiers`.
+
+```rust
+let items = cx.signal(vec!["a", "b", "c"]);
+button("Delete").on_click(move |cx, event| {
+    if event.modifiers.shift_key {
+        items.set(cx, Vec::new());
+    } else {
+        items.update(cx, |items| { items.pop(); });
+    }
+})
+```
+
+The click listener also makes the button pressable. The `active` variant only applies to an element with a click listener, so add `on_click` before relying on `.active(..)`.
+
+## Keyboard and shortcuts
+
+The `Button` role is focusable, so Tab reaches it. Enter or Space on a focused button sends a click, as long as the key has no modifiers and no key handler on the way called `prevent_default`.
+
+`.shortcut(keybind)` clicks the button when the shortcut is pressed anywhere in the window.
+
+```rust
+use crownui::ext::{Key, Keybind, Modifiers};
+
+const SAVE: Keybind = Keybind {
+    key: Key::Character('s'),
+    modifiers: Modifiers { ctrl_key: true, ..Modifiers::NONE },
+};
+
+let saves = cx.signal(0);
+button("Save").shortcut(SAVE).on_click(move |cx, _| saves.update(cx, |count| *count += 1))
+```
+
+## Disabled buttons
+
+`.disabled(..)` from the `Semantic` trait blocks clicks, keyboard activation and focus, and turns on the `when_disabled` variant. Bind it to keep the button in step with your state.
+
+```rust
+let draft = cx.signal(String::new());
+button("Send")
+    .disabled(bind(move |rt| draft.with(rt, |text| text.trim().is_empty())))
+    .when_disabled(|style| style.opacity(0.4))
+    .on_click(move |cx, _| draft.set(cx, String::new()))
+```
+
+Tests and agents that click a disabled button get the error CUI0106.
+
+## Styled buttons
+
+A primary button with hover, press and focus states:
+
+```rust
+let step = cx.signal(0);
+button("Continue")
+    .px(16.0)
+    .py(8.0)
+    .rounded(10.0)
+    .bg(rgb(0x3b82f6))
+    .text_color(WHITE)
+    .font_semibold()
+    .hover(|style| style.bg(rgb(0x2563eb)))
+    .active(|style| style.scale(0.97))
+    .focus_visible(|style| style.ring(2.0, rgb(0x93c5fd)))
+    .transition(Spring::snappy())
+    .on_click(move |cx, _| step.update(cx, |step| *step += 1))
+```
+
+A label that follows state:
+
+```rust
+let playing = cx.signal(false);
+button(bind(move |rt| if playing.get(rt) { "Pause".to_string() } else { "Play".to_string() }))
+    .on_click(move |cx, _| playing.update(cx, |on| *on = !*on))
+```
+
+## Accessibility and testing
+
+The label is the button's accessible name. Screen readers, `crowntest` and MCP agents find it by role and name.
+
+```rust
+let mut app = TestApp::new(counter());
+app.click(role(Role::Button).name("+1"));
+assert_eq!(app.text_of(role(Role::Text).text("Count")), "Count: 1");
+```
+
+When the visible label is an icon or a symbol, give it a clear name with `.label("Close window")`.
+
+## Buttons with icons and themed buttons
+
+The primitive `button` holds one text. For an icon next to a label, build an `hstack` with `icon(..)` and `text(..)`, add `.role(Role::Button)`, `.label(..)` and `.on_click(..)`, and style it like a button. For CrownOS apps, `kit::button(label)` and `kit::icon_button(icon, label)` are themed buttons with the variants `Primary`, `Secondary`, `Tinted`, `Ghost` and `Destructive` and the sizes `Small`, `Medium` and `Icon`. They follow the desktop theme. See [kit controls](/docs/crownui/kit-controls).
+
+## Why button is this small
+
+The primitive `button` sets a role, a few defaults and one text child. It reads no theme and owns no state. That keeps it the same in every app and cheap to mount, and it leaves the look to you or to the kit. The cost is that a plain `button` looks plain. Apps that want the CrownOS look use the kit button, which is built from the same primitives and reads every color from the theme.

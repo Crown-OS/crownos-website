@@ -1,6 +1,6 @@
 ---
 title: run
-description: Run a view in a window on Wayland, rendered by Impeller, until the window closes.
+description: Run a view in one window on Wayland, rendered by Impeller, until the window closes.
 api: FN crownui::run
 ---
 
@@ -11,7 +11,11 @@ use crownui::prelude::*;
 
 fn main() -> Result<(), crownui::RunError> {
     crownui::run(
-        component(|cx| text("Hello")),
+        component(|cx| {
+            let count = cx.signal(0);
+            button(bind(move |rt| format!("Clicked {} times", count.get(rt))))
+                .on_click(move |cx, _| count.update(cx, |count| *count += 1))
+        }),
         AppConfig::new("Hello").size(480, 320),
     )
 }
@@ -25,55 +29,122 @@ pub fn run(root: impl View, config: AppConfig) -> Result<(), RunError>
 </ResponseExample>
 </ApiExamples>
 
-`run` opens one window, lays it out with taffy and renders it with Impeller until the window closes.
+`run` opens one window, builds `root` into it once and runs the event loop until the window closes.
+It uses the Wayland platform, the Impeller renderer (Vulkan first, GLES when Vulkan fails) and the
+taffy layout engine. It blocks the calling thread for the life of the app.
+
+`run` is `run_windows(vec![(root.boxed(), config)])`. Everything on the
+[run_windows](/docs/crownui/api/run-windows) page applies to it.
 
 <Warning>
-  Call `run` from `main` before starting other threads. It limits the Vulkan loader to the
-  compositor's GPU driver through the process environment.
+  Call `run` from `main` before you start any other thread. Before the renderer starts, `run` sets
+  `VK_LOADER_DRIVERS_SELECT` in the process environment so the Vulkan loader only loads the driver
+  of the compositor's GPU, unless you already picked a driver or GPU with
+  `VK_LOADER_DRIVERS_SELECT`, `VK_LOADER_DRIVERS_DISABLE`, `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`,
+  `VK_ADD_DRIVER_FILES`, `DRI_PRIME`, `MESA_VK_DEVICE_SELECT` or `__NV_PRIME_RENDER_OFFLOAD`. On a hybrid laptop this keeps the other GPU asleep and saves
+  about 50 MiB of RSS. Changing the environment while other threads run is unsound
+  in Rust.
 </Warning>
 
 ## Parameters
 
 <ParamField name="root" type="impl View" required>
-  The view to show. Usually a `component(|cx| ..)` whose closure builds the UI once.
+  The view to show. Usually a `component(|cx| ..)` whose closure creates the app's state and returns
+  the view tree. The closure runs once.
 </ParamField>
 
 <ParamField name="config" type="AppConfig" required>
-  Window options, built from `AppConfig::new(title)`.
-
-  <Expandable title="builder methods">
-    <ParamField name="size" type="(u32, u32)">
-      Initial window size in logical pixels.
-    </ParamField>
-    <ParamField name="min_size" type="(u32, u32)">
-      Smallest size the window can be resized to.
-    </ParamField>
-    <ParamField name="app_id" type="impl Into<String>">
-      The Wayland app id used by the compositor and the launcher.
-    </ParamField>
-    <ParamField name="font" type="(Vec<u8>, Option<&str>)">
-      Registers a font, with an optional family alias.
-    </ParamField>
-    <ParamField name="layer" type="LayerOptions">
-      Turns the app into a panel, dock or overlay on the desktop shell.
-    </ParamField>
-    <ParamField name="mcp" type="bool">
-      Turns the in-app MCP server on or off.
-    </ParamField>
-  </Expandable>
+  How the window starts: title, size, material, layer role, MCP and so on. See
+  [AppConfig](/docs/crownui/api/app-config).
 </ParamField>
 
 ## Returns
 
 <ResponseField name="Ok(())" type="()">
-  The window was closed.
+  The window closed normally, either because the user closed it or because the app called
+  `cx.close_window()`.
 </ResponseField>
 
-<ResponseField name="Err" type="RunError">
-  The graphics backend, the platform or a thread failed to start.
+<ResponseField name="Err(RunError)" type="RunError">
+  The app failed to start or a window failed while running. An error that stops a running window
+  is also logged through `tracing`.
 </ResponseField>
 
-## Several windows
+## RunError
 
-`crownui::run_windows(vec![..])` takes `(AnyView, AppConfig)` pairs and runs until the last window
-closes. Each window has its own UI, so signals are not shared between them.
+```rust title="Signature"
+pub enum RunError {
+    Graphics(GraphicsError),
+    Platform(String),
+    Thread(std::io::Error),
+}
+```
+
+`RunError` is at `crownui::RunError`. It implements `std::error::Error` through `thiserror`, so `?`
+converts it into `anyhow::Error`.
+
+| Variant | When |
+| --- | --- |
+| `Graphics` | The graphics backend failed to initialize. |
+| `Platform` | The platform failed, for example when no Wayland compositor is reachable. |
+| `Thread` | The OS refused to spawn a thread, such as the render thread. |
+
+## Cargo features
+
+`run` exists only when both the `wayland` and `impeller` features are on. Both are default
+features. With either one off, the function is not compiled, and you drive the app yourself with
+`crownui::ext::Runner` and the platform and backend of your choice.
+
+## Examples
+
+### With anyhow
+
+Binaries use `anyhow`. `RunError` converts with `?`:
+
+```rust title="main.rs"
+use anyhow::{Context, Result};
+use crownui::prelude::*;
+
+fn main() -> Result<()> {
+    crownui::run(app(), AppConfig::new("Notes").app_id("org.example.notes"))
+        .context("the notes window stopped")
+}
+
+fn app() -> impl View {
+    component(|_cx| text("Notes"))
+}
+```
+
+### Letting agents drive the app
+
+```rust
+crownui::run(app(), AppConfig::new("Notes").mcp(true))
+```
+
+### Forcing GLES
+
+Set `CROWNUI_RENDERER=gles` in the environment before you start the app. `run` then skips Vulkan.
+
+```bash
+CROWNUI_RENDERER=gles cargo run
+```
+
+## Why run blocks and owns main
+
+Wayland delivers events on one connection, and CrownUI keeps all UI state on the thread that reads
+it. So the thread that calls `run` becomes the UI thread for good. It runs your handlers, flushes
+signals, computes layout and shapes text. Each window also gets its own render thread that owns the
+GPU and runs animations. The two threads only talk through channels.
+
+The cost is that `run` never hands the thread back while the app is open. Work that has to happen
+elsewhere goes through `cx.spawn`, which needs the `tokio` feature. A task spawned while the first
+view is built waits until the executor starts, so it is safe to call from a component. Do not start
+a plain `std::thread` inside a component closure: `run` builds the first view before it selects the
+Vulkan driver, so that thread would already be running when the environment changes.
+
+## Related
+
+- [run_windows](/docs/crownui/api/run-windows)
+- [AppConfig](/docs/crownui/api/app-config)
+- [Quickstart](/docs/crownui/quickstart)
+- [Windows guide](/docs/crownui/windows)

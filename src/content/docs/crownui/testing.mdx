@@ -1,0 +1,314 @@
+---
+title: Testing
+description: "Test CrownUI views headlessly with crowntest: role and name queries, user actions, a manual clock and text snapshots."
+---
+
+`crowntest` tests a CrownUI view the way a user uses it. You mount the view in a `TestApp`, find elements by role, name and text, click and type, move a manual clock, and compare a plain-text snapshot of the result. The whole pipeline runs headlessly, so tests need no GPU, no compositor and no fonts.
+
+```rust
+use crownui::prelude::*;
+use crowntest::{Role, TestApp, role, text as text_query};
+
+fn counter() -> impl View {
+    component(|cx| {
+        let count = cx.signal(0);
+        vstack((
+            text(bind(move |rt| format!("Count: {}", count.get(rt)))).text_size(20.0),
+            hstack((
+                button("-1").on_click(move |cx, _| count.update(cx, |value| *value -= 1)),
+                button("+1").on_click(move |cx, _| count.update(cx, |value| *value += 1)),
+            ))
+            .gap(8.0),
+        ))
+        .p(16.0)
+        .gap(12.0)
+    })
+}
+
+#[test]
+fn clicking_buttons_updates_the_count() {
+    let mut app = TestApp::new(counter());
+    app.click(role(Role::Button).name("+1"));
+    app.click(role(Role::Button).name("+1"));
+    app.click(role(Role::Button).name("-1"));
+    assert_eq!(app.text_of(text_query("Count")), "Count: 1");
+}
+```
+
+## Set up
+
+Add `crowntest` and `insta` as dev-dependencies. Inside the CrownUI workspace, or next to it like the CrownOS apps, use path dependencies.
+
+```toml
+[dev-dependencies]
+crowntest = { path = "../crownui/crowntest" }
+insta = "1"
+```
+
+In the published `crownui` crate, the harness is `crownui::crowntest`. Run the tests with `cargo test` as usual.
+
+## Find elements
+
+Every query starts from one of three functions and narrows with the others.
+
+```rust
+role(Role::Button)                    // every button
+role(Role::Button).name("Save")       // the button whose accessible name is exactly "Save"
+text("left")                          // any node whose name or value contains "left"
+role(Role::Text).text("Count")        // a text node containing "Count"
+```
+
+<Tip>
+  The `crowntest::text` query shares its name with the `text` view, so import it as `text as text_query` when the test file also builds views.
+</Tip>
+
+Use the query with a reader.
+
+```rust
+let node = app.find(role(Role::Switch).name("Wi-Fi"));   // exactly one, or panic
+assert_eq!(node.states.checked, Some(true));
+
+assert!(app.exists(role(Role::Text).name("milk")));      // exactly one matches
+assert_eq!(app.count(role(Role::Text).text("Item")), 12);
+assert_eq!(app.text_of(text_query("left")), "2 left");   // the accessible name
+```
+
+When a query that needs one node finds none, it panics with `CUI0101` and lists the nodes that came close. When it finds several, it panics with `CUI0102` and lists them all.
+
+```text
+CUI0101: no node matches role(button).name("Remove eggs"); similar nodes:
+  button "Remove milk" at stack > stack[1] > stack > button
+  button "Add" at stack > stack > button
+```
+
+The panic also prints the whole semantic tree, so the failure output usually shows the fix. A missing name means the element needs a `.label(..)`. Two matches mean the label needs to be unique, for example `.label(bind(..))` with the row's title in it.
+
+## Act like a user
+
+Actions find their target, perform it and render a frame. They return `&mut TestApp`, so they chain.
+
+```rust
+app.click(role(Role::TextField).name("New todo"))
+    .type_text("milk")
+    .press_key("Enter");
+
+app.double_click(role(Role::ListItem).name("notes.txt"));
+app.hover(role(Role::Button).name("Hover me"));
+app.focus(role(Role::TextField).name("Search"));
+app.scroll(role(Role::ScrollView), 400.0);
+app.drag(role(Role::Slider).name("Volume"), 240.0, 32.0);
+```
+
+- `type_text` and `press_key` go to the focused node, so click or focus a field first. `press_key` takes shortcuts like `"Enter"`, `"Space"`, `"Ctrl+S"` or a single letter.
+- `hold_modifiers(Modifiers { ctrl_key: true, ..Modifiers::NONE })` holds a modifier for the clicks that follow.
+- An action on a disabled node panics with `CUI0106`. To test that a control stays disabled, read `app.find(..).states.disabled` instead of clicking it.
+- `type_text` refuses secure fields with `CUI0105`, the same rule agents follow. To fill a password field, focus it and send one `press_key` per character.
+
+```rust
+app.focus(role(Role::TextField).name("Password"));
+for key in ["h", "u", "n", "t", "e", "r", "2"] {
+    app.press_key(key);
+}
+```
+
+These actions go straight to the semantic node, which is what agents and screen readers do. To test a gesture, such as a long press or a drag with slop, send raw pointer events. They go through hit testing and the gesture arena like a real mouse.
+
+```rust
+let center = app.find(role(Role::Button).name("+1")).bounds.center();
+app.pointer_down(center.x, center.y)
+    .advance_ms(50)
+    .pointer_up(center.x, center.y);
+```
+
+## Control time
+
+The clock in a test only moves when you move it. Animations, delays and long presses wait for you.
+
+```rust
+app.click(role(Role::Switch).name("Wi-Fi"));
+assert!(app.is_animating());      // the knob is mid-spring
+app.advance_ms(50);               // render every frame for 50 ms
+assert!(app.is_animating());
+app.settle();                     // run until every animation stops
+assert!(!app.is_animating());
+```
+
+Use `advance_ms` to check a state in the middle of a motion, and `settle` before a snapshot so the snapshot never catches a frame halfway.
+
+## Snapshots
+
+`app.snapshot()` returns the semantic tree, the layout and the recorded draw commands as plain text. Compare it with `insta`.
+
+```rust
+#[test]
+fn counter_snapshot_is_readable_text() {
+    let mut app = TestApp::new(counter());
+    app.click(role(Role::Button).name("+1"));
+    insta::assert_snapshot!(app.snapshot());
+}
+```
+
+The stored snapshot for that test starts like this. The `...` lines stand for more of the same.
+
+```text
+## semantics
+window @0,0 800x600
+  text "Count: 1" @16,16 768x24
+  button "-1" @16,52 40.8x28.8
+  button "+1" [focused] @64.8,52 40.8x28.8
+
+## layout
+stack @0,0 800x600 p-16 gap-12/12 w-100% h-100%
+stack > text @16,16 768x24
+stack > stack[1] @16,52 768x28.8 flex-row gap-8/8
+stack > stack[1] > button @16,52 40.8x28.8 flex-row pt-6 pr-12 pb-6 pl-12 bg-#80808029 rounded-8
+stack > stack[1] > button > text @28,58 16.8x16.8
+...
+
+## frame
+clear #00000000
+layer
+  layer at 16,16
+    text "Count: 1" at 0,0
+  layer at 16,52
+    layer
+      fill 0,0 40.8x28.8 r8 #80808029
+...
+```
+
+- The semantics part is what screen readers and agents see: role, name, value, states in brackets and bounds. Secure values print as `value=<secure>`.
+- The layout part lists every element by component path, with its rectangle and its resolved style in Tailwind terms.
+- The frame part lists what the renderer was asked to draw: layers, fills with corner radius and color, and text runs.
+
+A review of a snapshot diff shows exactly what changed on screen, in words. When a test fails, insta writes a `.snap.new` file next to the snapshot. Review it with `cargo insta review`, or list every pending file in the workspace with `cargo xtask snapshot`.
+
+For a narrow check, search one part instead of storing all of it.
+
+```rust
+assert!(app.frame_snapshot().contains("text \"Count: 1\""));
+assert!(app.layout_snapshot().contains("kit_badge @24,24 80.8x20.4"));
+assert!(app.semantics_snapshot().contains("[checked]"));
+```
+
+## Clipboard
+
+The test app has a fake system clipboard. Fill it as another app would, and serve the app's own clipboard requests when you are ready.
+
+```rust
+app.set_clipboard(&[("text/uri-list", b"file:///b")]);
+app.click(role(Role::Button).name("paste")).serve_clipboard();
+assert_eq!(app.text_of(role(Role::Text)), "text/uri-list file:///b");
+
+app.click(role(Role::Button).name("copy"));
+assert_eq!(app.clipboard().len(), 3);   // serves the copy, then returns (mime, bytes) pairs
+```
+
+`serve_clipboard` answers every copy, paste and read the app made since the last call. Copies replace the clipboard. Pastes and reads get the first matching type.
+
+## Drag and drop
+
+Play a drag from another app over the window, then drop it.
+
+```rust
+use crownui::prelude::{DndAction, DndActions, DragOutcome};
+
+app.drag_enter(20.0, 20.0, &["text/uri-list"], DndActions::COPY_MOVE);
+assert!(matches!(app.drag_acceptance(), Some(Some(_))));   // the window accepted it
+app.drag_over(40.0, 40.0);
+app.drop_data(40.0, 40.0, "text/uri-list", b"file:///a.desktop", DndAction::Copy);
+```
+
+For a drag the app starts with `cx.start_drag`, end it with `app.end_drag(DragOutcome::Dropped(DndAction::Move))` or `DragOutcome::Cancelled`.
+
+## Closing the window
+
+`request_close` presses the compositor's close button and returns whether the window closed. A `cx.on_close_requested` handler that calls `event.prevent_default()` keeps it open.
+
+```rust
+#[test]
+fn a_busy_app_asks_before_closing() {
+    let mut app = TestApp::new(component(|cx| {
+        let asking = cx.signal(false);
+        cx.on_close_requested(move |cx, event| {
+            event.prevent_default();
+            asking.set(cx, true);
+        });
+        vstack((
+            text("Writing image…"),
+            show(
+                asking,
+                || button("Quit anyway").on_click(|cx, _| cx.close_window()),
+                || vstack(()),
+            ),
+        ))
+    }));
+    assert!(!app.request_close());
+    app.click(role(Role::Button).name("Quit anyway"));
+    assert!(app.take_close_request());
+}
+```
+
+## Testing kit widgets
+
+Kit widgets read their colors from a theme. Provide one in the test so the output does not depend on the machine's appearance settings.
+
+```rust
+use crownui::kit::{Theme, ToggleOptions, provide_theme, toggle};
+
+#[test]
+fn space_and_enter_flip_the_switch() {
+    let mut app = TestApp::new(component(|cx| {
+        provide_theme(cx, Theme::dark());
+        let on = cx.signal(false);
+        vstack(toggle(on).caption("Airplane mode")).p(24.0)
+    }));
+    let switch = || role(Role::Switch).name("Airplane mode");
+    app.click(switch());
+    assert_eq!(app.find(switch()).states.checked, Some(true));
+    app.press_key("Space");
+    assert_eq!(app.find(switch()).states.checked, Some(false));
+}
+```
+
+Call `app.set_color_scheme(ColorScheme::Dark)` and `settle()` to test `dark` variants. The kit's own tests in `widgets/tests/kit_*.rs` show one test file per widget.
+
+## Async tasks
+
+`TestApp` starts no async executor, so futures passed to `cx.spawn` wait in a queue. Install an executor that hands you the task ids. `set_task_executor` passes it every queued task at once. Then finish each task by hand with the output you want. The boxed output must have the same type as the future's output, or the completion is dropped without a call. `TaskExecutor`, `TaskFuture` and `TaskId` come from the `view` crate.
+
+```rust
+use std::sync::mpsc;
+use view::{TaskExecutor, TaskFuture, TaskId};
+
+struct HeldTasks(mpsc::Sender<TaskId>);
+
+impl TaskExecutor for HeldTasks {
+    fn spawn(&mut self, id: TaskId, _future: TaskFuture) {
+        let _ = self.0.send(id);
+    }
+
+    fn cancel(&mut self, _id: TaskId) {}
+}
+
+let (sender, started) = mpsc::channel();
+app.ui().set_task_executor(Box::new(HeldTasks(sender)));
+let task = started.try_recv().expect("the view spawned a task");
+app.ui().complete_task(task, Box::new(loaded_disks()));
+app.settle();
+```
+
+## Why it works this way, and what it costs
+
+`crowntest` runs the real pipeline: the same reactive runtime, the same taffy layout, the same semantic tree and the same render tree as the app. Only two pieces change. A `RecordingBackend` writes draw commands as text instead of sending them to a GPU. A manual clock replaces the frame clock. Everything between your view and the renderer is the production code, so a passing test means the app does the same thing.
+
+Queries use roles and names for the same reason Testing Library does. A test that clicks `role(Role::Button).name("Save")` keeps working when the button moves, changes color or gets wrapped in another stack. A test that clicked coordinates or a CSS-style selector would break on every redesign. As a side effect, the test proves the button is reachable by a screen reader and by an agent, because all three read the same tree.
+
+Snapshots are text because text diffs are reviewable. A pixel diff tells you something changed. A text diff tells you the button lost 4 pixels of padding and its background went from `#80808029` to `#80808033`. An AI reviewer reads the text diff as easily as a person.
+
+The costs:
+
+- Text is measured with a deterministic monospace approximation, not the real font. That keeps snapshots identical on every machine, but the widths in a snapshot are not the widths in the running app. Do not copy pixel values from a snapshot into a design.
+- The recording backend never rasterizes. A shader bug, a blur radius or a GPU driver issue does not show up. For real pixels, build a `TestApp` with `with_surface` and a GPU backend.
+- Semantic actions skip the gesture arena. A click through `app.click` always lands, even when a real pointer would miss a small target. Use `pointer_down` and `pointer_up` when the gesture itself is under test.
+- There is no async executor by default, so code driven by `cx.spawn` needs the manual executor shown above.
+- Full snapshots churn. Any style change touches the layout and frame parts of every snapshot that contains the widget. Store full snapshots for a few representative screens, and use `contains` checks for the rest.

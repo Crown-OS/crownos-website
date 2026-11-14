@@ -1,0 +1,164 @@
+---
+title: provide
+description: Hand a value to every component built below the current scope and look it up by type with environment.
+api: FN cx.provide
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Provide and read a session"
+#[derive(Clone)]
+struct Session {
+    user: String,
+}
+
+fn app() -> impl View {
+    component(|cx| {
+        cx.provide(Session { user: "ada".to_owned() });
+        vstack((header(), content()))
+    })
+}
+
+fn header() -> impl View {
+    component(|cx| {
+        let session = use_session(cx);
+        text(bind(move |rt| session.with(rt, |session| session.user.clone())))
+    })
+}
+
+fn use_session(cx: &mut Cx) -> Signal<Session> {
+    match cx.environment::<Session>() {
+        Some(session) => session,
+        None => cx.provide(Session { user: String::new() }),
+    }
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+impl Runtime {
+    pub fn provide<T: 'static>(&mut self, value: T) -> Signal<T>
+    pub fn environment<T: 'static>(&self) -> Option<Signal<T>>
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`provide` creates a signal holding `value` in the current scope and registers it in that scope's environment under the type `T`. `environment::<T>()` starts at the current scope and walks up through parent scopes until it finds a value of type `T`. Every `component` opens a child scope, so whatever a component provides is visible to every component built inside it, and to nothing outside it.
+
+Both return a plain `Signal<T>`. Setting it updates every `bind`, `memo` and `effect` that reads it, anywhere below the provider.
+
+## Parameters
+
+<ParamField name="value" type="T: 'static" required>
+  The value to share. The type is the lookup key, so each type has at most one visible value per scope chain.
+</ParamField>
+
+## Returns
+
+<ResponseField name="provide" type="Signal<T>">
+  The signal that now holds `value`. Keep it if the provider also changes the value.
+</ResponseField>
+
+<ResponseField name="environment" type="Option<Signal<T>>">
+  The nearest provided signal of type `T`, or `None` when no scope in the chain provides one. It takes `&self`, so it never subscribes anything.
+</ResponseField>
+
+## Lookup rules
+
+- The search starts at `cx.current_scope()`. In a component body that is the component's own scope.
+- The nearest scope wins. A component that provides a `T` hides any `T` its ancestors provided, for itself and its descendants.
+- Within one scope, the first `provide` of a type wins. A second `provide::<T>` on the same scope creates a signal that lookups never find. To change the value, set the signal the first call returned.
+- The provided signal belongs to the providing scope and is disposed with it.
+
+## Examples
+
+### The kit theme
+
+The kit stores its colors as a provided `Theme`. `use_theme` is the canonical `use_` helper: it returns the nearest theme, or provides the default theme on the current scope when nothing above provides one.
+
+```rust title="widgets/src/kit/theme/environment.rs"
+pub fn provide_theme(cx: &mut Cx, theme: Theme) -> Signal<Theme> {
+    cx.provide(theme)
+}
+
+pub fn use_theme(cx: &mut Cx) -> Signal<Theme> {
+    match cx.environment::<Theme>() {
+        Some(theme) => theme,
+        None => provide_theme(cx, Theme::DEFAULT),
+    }
+}
+```
+
+Every kit widget reads its colors through `use_theme`, so one `provide_theme` at the root restyles the whole window.
+
+```rust
+use crownui::kit::{Theme, provide_theme, use_theme};
+
+component(|cx| {
+    let theme = provide_theme(cx, Theme::light());
+    vstack((
+        button("Dark mode").on_click(move |cx, _| theme.set(cx, Theme::dark())),
+        settings_page(),
+    ))
+})
+```
+
+`provide_configured_theme(cx)` does the same with the theme that `appearance.ron` and `theme.ron` describe, and keeps it in step with edits to those files. See [Async](/docs/crownui/async) for how it follows the files.
+
+### Override a value for one subtree
+
+Provide again lower in the tree. Only the components inside see the new value.
+
+```rust
+fn dark_sidebar() -> impl View {
+    component(|cx| {
+        provide_theme(cx, Theme::dark());
+        sidebar_list()
+    })
+}
+```
+
+### Use a newtype for a second value of the same type
+
+The type is the key. Wrap plain types so two values do not collide.
+
+```rust
+#[derive(Clone, Copy)]
+struct Density(f32);
+
+cx.provide(Density(0.8));
+
+let density = cx.environment::<Density>();
+```
+
+### The color scheme
+
+The view layer provides the window's `ColorScheme` on the root scope. `cx.color_scheme()` returns that signal, and `cx.environment::<ColorScheme>()` finds the same one.
+
+## Look up in the body, not in a handler
+
+Event handlers run in the window's root scope, not in the scope of the component that attached them. A lookup inside `on_click` only sees values provided at the root. Look the value up in the component body and capture the signal.
+
+```rust
+component(|cx| {
+    let session = use_session(cx);
+    button("Sign out").on_click(move |cx, _| {
+        session.update(cx, |session| session.user.clear())
+    })
+})
+```
+
+## Why it works this way
+
+Passing shared values down through every function argument gets noisy, and global statics break the rule that all state lives in the runtime. The environment sits between the two. It reuses the scope tree that already exists for disposal, so a provided value has a clear owner and a clear lifetime, and lookup needs no registry.
+
+The costs:
+
+- Lookup is a walk up the scope chain with a type comparison per entry. It is cheap, but it is not free, so do it once in the body instead of in a `bind` that re-runs.
+- The key is a Rust type. Two values of the same type need a newtype.
+- A missing value is an `Option`, not a compile error. Write a `use_` helper that falls back to a default, as `use_theme` does, so callers never handle `None`.
+- Provided values are signals, so every value must be `'static`, and reads need `&mut` like any other signal.
+
+See [signal](/docs/crownui/api/signal), [kit theme](/docs/crownui/api/kit-theme) and [State](/docs/crownui/state).

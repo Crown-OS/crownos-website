@@ -1,0 +1,156 @@
+---
+title: error_boundary
+description: Show a fallback view in place of a child whose reactive code panics.
+api: FN error_boundary
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Chart card"
+use crownui::prelude::*;
+
+fn chart_card(samples: Signal<Vec<f32>>) -> impl View {
+    error_boundary(
+        move || {
+            text(bind(move |rt| {
+                let first = samples.with(rt, |samples| samples[0]);
+                format!("First sample: {first:.1}")
+            }))
+        },
+        |message| text(format!("The chart failed: {message}")).text_color(rgb(0xdc2626)),
+    )
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn error_boundary<A, B, C, F>(child: C, fallback: F) -> Element<ErrorBoundaryKind<C, F>>
+where
+    A: View,
+    B: View,
+    C: FnOnce() -> A + 'static,
+    F: FnMut(String) -> B + 'static,
+```
+</ResponseExample>
+</ApiExamples>
+
+`error_boundary` shows a fallback view in place of its child when reactive code inside the child
+panics.
+
+## Parameters
+
+<ParamField name="child" type="C: FnOnce() -> A + 'static" required>
+  Builds the protected view. It runs once, when the boundary mounts.
+</ParamField>
+
+<ParamField name="fallback" type="F: FnMut(String) -> B + 'static" required>
+  Builds the replacement. It receives the panic message.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Element<ErrorBoundaryKind<C, F>>" type="Element">
+  A wrapper node around the child, and later around the fallback. It takes every style, event and
+  semantic method.
+</ResponseField>
+
+## What it catches
+
+The child mounts in its own scope, and the boundary installs an error handler on that scope. The
+reactive runtime runs every observer under `catch_unwind`. When an observer panics, the runtime
+walks up the scopes to the nearest handler.
+
+After the child has mounted, the boundary catches panics in observers created inside it, at any
+depth:
+
+- `bind` closures on properties and text
+- `cx.memo` and `cx.effect` closures
+- the same inside nested components, rows and branches
+
+It does not catch:
+
+- a panic in plain code while `child()` builds the view. That panic reaches the caller.
+- a panic in a binding or effect that runs for the first time while the child first builds. That run happens before the boundary installs its handler. The runtime still quarantines the observer, but the panic goes to an outer boundary, or to nobody, and the property starts at its default value.
+- a panic inside an event handler such as `on_click`. Handlers run outside the runtime's observers.
+
+<Warning>
+  Make sure the data is valid when the child mounts. The boundary covers what goes wrong after that.
+</Warning>
+
+A handler that writes a signal is still covered for what follows. If a click sets a signal and a
+binding in the child panics on the new value, the boundary catches it. In the example above, a click
+that clears `samples` makes the binding index an empty `Vec`, and the fallback appears.
+
+## What happens on a panic
+
+<Steps>
+  <Step title="Quarantine">
+    The panicking observer is quarantined. It never runs again.
+  </Step>
+  <Step title="Log">
+    CrownUI logs `CUI0301: component panicked` with the path of the boundary, such as `stack > error_boundary[1]` for a boundary that is the second child of a `vstack`.
+  </Step>
+  <Step title="Unmount">
+    On the next update, the child unmounts and its scope is disposed.
+  </Step>
+  <Step title="Fallback">
+    `fallback(message)` builds in a new scope and takes the child's place.
+  </Step>
+</Steps>
+
+The fallback stays. The boundary does not retry on its own.
+
+## Retry
+
+Wrap the boundary in `keyed` with an attempt counter. A retry button in the fallback bumps the
+counter, and `keyed` builds a fresh boundary and child.
+
+```rust title="retrying_chart.rs"
+fn retrying_chart(samples: Signal<Vec<f32>>) -> impl View {
+    component(move |cx| {
+        let attempt = cx.signal(0_u32);
+        keyed(
+            move |rt| attempt.get(rt),
+            move |_cx, _attempt| {
+                error_boundary(
+                    move || chart(samples),
+                    move |message| {
+                        vstack((
+                            text(message),
+                            button("Retry").on_click(move |cx, _| attempt.update(cx, |n| *n += 1)),
+                        ))
+                        .gap(8.0)
+                    },
+                )
+            },
+        )
+    })
+}
+```
+
+`chart` is your own function that takes the samples signal and returns `impl View`.
+
+## Without a boundary
+
+A panicking observer outside any boundary is quarantined the same way. The rest of the app keeps
+running, and the property it drove keeps its last value. Nothing tells the user that part of the screen stopped updating. A boundary shows a fallback in its place.
+
+## Why it works this way
+
+Panics are caught per observer, so one bad binding stops only itself and the UI thread keeps
+running. The boundary decides what the user sees. The cost is that the boundary is coarse. It
+replaces the whole child, including parts that still work, and it only covers reactive code.
+Handlers that run outside observers need their own error handling. Return `Result` from your own
+functions and show errors with signals instead of panicking.
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Errors" icon="alert" href="/docs/crownui/errors">
+    `CUI0301` and the other diagnostic codes.
+  </Card>
+  <Card title="keyed" icon="code" href="/docs/crownui/api/keyed">
+    Rebuild a branch when a value changes.
+  </Card>
+</CardGroup>

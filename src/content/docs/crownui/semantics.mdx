@@ -1,0 +1,223 @@
+---
+title: Semantics
+description: The semantic tree that screen readers, AI agents, tests and devtools all read, with stable ids, revisions, shared actions and secure fields.
+sidebarTitle: Semantics
+---
+
+Every CrownUI window keeps a semantic tree next to its element tree. It describes what the UI means: a button named "Save", a switch that is checked, a password field that holds a secret. Four consumers read the same tree:
+
+- `accessibility` maps it to AccessKit, so screen readers work over AT-SPI.
+- `mcp` serves it to AI agents and runs their actions.
+- `crowntest` queries it in tests and prints it in snapshots.
+- `crowndev` prints it in the terminal.
+
+A button that a screen reader can press is therefore also a button a test can click and an agent can find. There is one description of the UI, so the consumers cannot disagree.
+
+## Semantic nodes
+
+The `semantics` crate defines the tree as plain data. Each `SemanticNode` has:
+
+| Field | Meaning |
+|---|---|
+| `id` | A `SemanticId` that stays the same across frames. |
+| `role` | What the node is, named like ARIA roles: `Button`, `TextField`, `Switch`, `Slider`, `Heading`, `List`, `Dialog` and more. |
+| `name` | The accessible name. |
+| `value` | The current value, such as a field's text or a slider's position. |
+| `description` | Extra help text. |
+| `states` | `focused`, `focusable`, `disabled`, `checked`, `expanded`, `selected`, `secure` and `offscreen`. |
+| `actions` | The `ActionKind`s the node supports, such as `Click`, `Focus`, `SetValue`, `Scroll` or `Drag`. |
+| `bounds` | The node's rect in logical window pixels. |
+| `children` | Child ids in reading order. |
+| `path` | The element path, for logs and devtools. |
+
+The tree prints as indented text. Secret values never appear in it:
+
+```text
+window @0,0 0x0
+  button "Save" @10,10 80x32
+  button "Cancel" @0,0 0x0
+  text_field "Password" value=<secure> @0,0 0x0
+```
+
+## How the tree is built
+
+The `Ui` builds the semantic tree from the element tree. It starts with a `Window` node and walks the elements:
+
+- Hidden elements and their subtrees are left out.
+- A plain container with the `Group` role, no label, no interactive listener, no focus and no scrolling is flattened. Its children attach to its parent. Layout stacks do not clutter the tree.
+- An element with a click, double click, context menu, long press, drag or input listener counts as interactive. A `Group` that is interactive becomes a `Button`.
+- The name comes from `.label(..)` when set, from the element's own text, or, for interactive and named roles, from the text inside it.
+- Actions come from the listeners. A focusable node also gets `Focus`, and a scroll container gets `Scroll`.
+- A node is `offscreen` when its bounds do not touch the window.
+
+Widgets set their roles in `Kind::mount` with `cx.set_role`. `button` is a `Button`, `toggle` a `Switch`, `text_field` a `TextField`, `scroll_view` a `ScrollView`.
+
+## Describing your own views
+
+The `Semantic` trait adds modifiers to every styled element:
+
+| Modifier | Effect |
+|---|---|
+| `.role(Role)` | Overrides the role. |
+| `.label(impl IntoProp<String>)` | Sets the accessible name. Reactive. |
+| `.value(impl IntoProp<String>)` | Sets the value. Reactive. |
+| `.description(impl Into<String>)` | Sets help text. |
+| `.focusable(bool)` | Makes the node a focus stop. |
+| `.disabled(impl IntoProp<bool>)` | Disables the node. Reactive. |
+| `.secure()` | Marks the value as secret. |
+
+A custom-drawn control needs these, because a canvas has no text for the tree to read:
+
+```rust
+fn volume_bar(volume: Signal<u32>) -> impl View {
+    canvas(move |rt, size, list| {
+        let level = volume.get(rt) as f32 / 100.0;
+        list.fill(
+            Rect::from_xywh(0.0, 0.0, size.width * level, size.height),
+            CornerRadii::uniform(4.0),
+            rgb(0x3b82f6),
+        );
+    })
+    .h(8.0)
+    .role(Role::Slider)
+    .label("Volume")
+    .value(bind(move |rt| format!("{}%", volume.get(rt))))
+    .focusable(true)
+}
+```
+
+A screen reader now announces a slider named "Volume" with its percentage, and a test can find it with `role(Role::Slider).name("Volume")`.
+
+## Stable ids
+
+Agents and tests hold on to ids between calls, so an id must not change when unrelated parts of the UI do. The view layer derives each `SemanticId` from three things:
+
+1. the parent's id,
+2. the element's key, or its position among its siblings when it has none,
+3. the element's kind name, such as `button` or `text`.
+
+The root window is always `SemanticId(0)`. Ids are recomputed only below a node whose children changed.
+
+Keys make ids survive reordering. `for_each` keys each row by the item's key, `lazy_index` keys rows by index, and `.key(value)` sets a key by hand:
+
+```rust
+for_each(contacts, |contact: &Contact| contact.id, |cx, contact| {
+    contact_row(cx, contact)
+})
+```
+
+Inserting a contact at the top keeps every other row's id, so an agent that found "Ada" still reaches "Ada".
+
+## Revisions
+
+`SemanticTree::revision()` increments on every change to the tree, including a node that only moved. The MCP server uses it as a guard: `ui_act` takes the id and the revision the agent saw, and refuses the action when the tree changed since. The agent reads the tree again and retries. After an action, the server answers once the frame it caused is laid out, and reports the new revision.
+
+This stops an agent from clicking whatever moved under its stale id, for example the row that slid up after a delete.
+
+## Actions
+
+`UiAction` is the action vocabulary that tests, agents and screen readers share. The names follow Testing Library and Playwright:
+
+| Action | What `Ui::perform` does |
+|---|---|
+| `Click` | Focuses the node when it is focusable, then clicks its center. |
+| `DoubleClick` | Clicks, then sends a double click. |
+| `Hover` | Moves the pointer to the node's center. |
+| `Focus` | Moves keyboard focus to the node. |
+| `TypeText { text }` | Focuses the node and commits `text` as typed input. |
+| `PressKey { keybind }` | Presses and releases a key combination such as `Ctrl+S`. |
+| `Scroll { delta }` | Scrolls the nearest scroll container by a pixel delta. |
+| `Drag { to }` | Presses at the center, moves to `to` and releases. |
+
+`Ui::perform(id, &action)` runs each action as real input through the normal event path, so listeners, focus, hover styles and bubbling behave as they do for a person. It refuses unknown ids, disabled nodes and, for typing, secure nodes, with an `ActionError`. The MCP server checks more before that: the revision, and that the node advertises the `ActionKind` the action needs.
+
+```rust
+let mut app = TestApp::new(counter());
+app.click(role(Role::Button).name("+1"));
+assert_eq!(app.text_of(role(Role::Text).text("Count")), "Count: 1");
+insta::assert_snapshot!(app.snapshot());
+```
+
+## When the tree is built
+
+Building the semantic tree walks every element, so it runs on demand. Any frame that sends render ops marks the tree stale. It is rebuilt the next time something reads it: `semantic_tree()`, `take_semantic_diff()` or `perform`. When layout moves nodes, the `Ui` patches their bounds in place with `SemanticTree::update_bounds`. That patch only spares a rebuild in a frame that sends no render ops. A scroll sends the new offset as a render op, so the next reader rebuilds the tree anyway.
+
+A rebuild compares the new tree with the old one and keeps a `SemanticDiff` of updated and removed nodes. The accessibility bridge sends only that diff to AccessKit.
+
+## The consumers
+
+### Screen readers
+
+With the `accessibility` feature, which is on by default, and `AppConfig::accessibility` set to `true`, which is its default, the runtime starts an AccessKit adapter for each window. It converts the tree to an AccessKit update, and after each frame it sends the diff. Screen reader actions come back as `UiAction`s and go through `Ui::perform`. Roles map to AccessKit roles: `Text` becomes `Label`, a `secure` text field becomes `PasswordInput`. Bounds are logical pixels, and the bridge adds the window's scale so AT-SPI gets physical pixels. Offscreen nodes stay in the tree and advertise scroll-into-view, but the runtime does not act on that request yet. Only actions that map to a `UiAction` are forwarded.
+
+### AI agents
+
+With the `mcp` feature and `AppConfig::mcp(true)`, each window starts an MCP server on `$XDG_RUNTIME_DIR/crownui/<app>-<pid>.sock`, reachable only by the same user. When the compositor offers an agent access protocol, the runtime asks it first through `Platform::request_agent_access`, and the server starts only after the user grants access. Without that protocol it starts right away. The server offers the tree as the `ui://tree` and `ui://tree.json` resources and as tools:
+
+- `ui_tree` returns the tree as text.
+- `ui_query { role, name, text }` finds nodes.
+- `ui_act { id, revision, action }` performs a `UiAction`, such as `{"action": "click"}` or `{"action": "type_text", "text": "hello"}`.
+- `inspect_snapshot` returns a devtools snapshot.
+- `ui_screenshot` is listed, but it answers with an error until the CrownOS agent access protocol can supply screenshots.
+
+```rust
+crownui::run(root, AppConfig::new("Notes").mcp(true))
+```
+
+<Note>
+  `AppConfig` defaults `mcp` to `false` even though the `mcp` cargo feature is on by default. Without `.mcp(true)` the app opens no socket, and neither agents nor `crowndev` can see it.
+</Note>
+
+Agents usually connect through `crownmcp`, which finds the sockets of running apps and proxies one of them over stdio. Text from the app is wrapped as untrusted content against prompt injection, and `ui_act` and app tools share a rate limit of 20 actions per second by default.
+
+### Tests
+
+`crowntest` runs the real pipeline headlessly and queries the same tree with `role(..)`, `name(..)` and `text(..)`. Its actions are the same Testing Library names. `snapshot()` prints the semantic tree, the layout and the draw commands as text, so a snapshot diff shows what changed in meaning, position and paint. See [Testing](/docs/crownui/testing).
+
+### Devtools
+
+`crowndev` talks to the same MCP socket:
+
+```sh
+crowndev tree notes
+crowndev act notes role=button,name=Save click
+crowndev watch notes
+```
+
+## Secure fields
+
+`.secure()` marks a node's value as secret. `text_field(password, "Password").secure()` is the usual case. A secure value:
+
+- prints as `value=<secure>` in the text tree and in test snapshots,
+- is `null` in `ui://tree.json`,
+- is never exported to AccessKit, and the field is a `PasswordInput`,
+- cannot be typed into by `Ui::perform`, which returns `ActionError::Secure`,
+- refuses `type_text` and `press_key` from MCP agents.
+
+`SemanticNode::exposed_value()` returns `None` for secure nodes, and every consumer reads values through it or applies the same rule. Inside the app the value is still an ordinary `Signal<String>` that your code reads.
+
+## Why it works this way
+
+A UI toolkit usually grows three separate descriptions of the screen: an accessibility tree, a test query layer and, now, an automation layer for agents. They drift apart, and each one breaks in its own way. CrownUI keeps one, derived from the same elements that draw the pixels. Fixing the accessible name of a widget fixes its test query and its agent description in one change.
+
+The ids are derived from structure instead of being counters, so they survive rebuilds and frames. The revision makes those ids safe to act on: an agent can hold an id across a slow model call without clicking the wrong thing.
+
+## What it costs
+
+- Rebuilds walk the whole element tree. When something reads the tree after a frame that sent render ops, the rebuild visits every element and diffs the result. The accessibility bridge asks for the diff after every frame, so with a screen reader bridge running, a busy animation frame also pays for a rebuild. The benchmark builds turn the bridge off.
+- Position ids. An element without a key takes its sibling position as part of its id. Inserting an unkeyed sibling before it changes its id. Key dynamic lists.
+- Revisions move a lot. A scroll or a layout change bumps the revision, because bounds changed. An agent that waits between reading and acting gets a stale-revision error and must read again.
+- Ids are stable within a run, not across runs. They are hashed with the standard library's default hasher, whose algorithm can change between Rust releases. Do not store them on disk.
+- Flattening hides structure. Plain containers vanish from the tree. A layout group that matters to a screen reader needs a label, a role or focus to stay in it.
+- Secrets live in memory. `secure` controls what leaves the app, not what the app holds.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Accessibility" icon="info" href="/docs/crownui/accessibility">
+    How to make a view work with screen readers.
+  </Card>
+  <Card title="Agents" icon="sparkles" href="/docs/crownui/agents">
+    Drive a running app from Claude Code over MCP.
+  </Card>
+</CardGroup>

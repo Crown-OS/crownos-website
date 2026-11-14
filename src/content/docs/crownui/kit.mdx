@@ -1,0 +1,257 @@
+---
+title: The kit
+description: The themed CrownOS widgets in crownui::kit, how to give them a theme, and how they get their look.
+sidebarTitle: Overview
+---
+
+`crownui::kit` is the set of CrownOS widgets: buttons, switches, fields, menus, sidebars, wizards and the panels the desktop shell uses. Each one is built from the primitive widgets and `canvas`, and each one reads every color from one `Theme`. Their sizes and springs match the rest of the CrownOS desktop, so an app built from the kit looks like it belongs there.
+
+```rust title="main.rs"
+use crownui::{
+    kit::{self, ButtonOptions, ButtonVariant, button, provide_configured_theme, section, setting_row, toggle},
+    prelude::*,
+};
+
+fn main() -> Result<(), crownui::RunError> {
+    crownui::run(
+        component(|cx| {
+            let theme = provide_configured_theme(cx);
+            let wifi = cx.signal(true);
+            let background = theme.with(cx, |theme| theme.surface.bg);
+            vstack((
+                section("Network", setting_row("Wi-Fi", toggle(wifi))),
+                button("Save").variant(ButtonVariant::Primary),
+            ))
+            .p(24.0)
+            .gap(16.0)
+            .bg(background)
+        }),
+        AppConfig::new("Network")
+            .size(420, 320)
+            .font(kit::inter_font().to_vec(), Some(kit::INTER_FAMILY)),
+    )
+}
+```
+
+## Import the kit
+
+The prelude exports the plain primitives `button`, `toggle`, `divider` and `icon`. The kit has widgets with the same names. Import the kit names you want by name next to `prelude::*`. A named import wins over a glob import, so `button` then means the kit button.
+
+```rust
+use crownui::{
+    kit::{button, divider, icons, toggle, ButtonOptions, ButtonVariant, ToggleOptions},
+    prelude::*,
+};
+```
+
+Kit options are methods on traits such as `ButtonOptions` or `ToggleOptions`. Import the trait for each widget you configure. The compiler names the missing trait when you forget one. Options go before listeners, and every normal modifier from `Styled`, `Semantic` and `Listeners` still works on a kit widget.
+
+```rust
+button("Delete")
+    .variant(ButtonVariant::Destructive)
+    .leading_icon(icons::TRASH)
+    .on_click(move |cx, _| items.set(cx, Vec::new()))
+    .w(160.0)
+```
+
+## Provide a theme
+
+Kit widgets look up the nearest theme when they mount. Provide one near the root of your view, before you build any kit widget.
+
+`provide_configured_theme(cx)` builds the theme from the desktop's `appearance.ron` (dark mode and accent) and `theme.ron` (a custom accent and per-slot color edits). It keeps following both files while the calling component is mounted. When the user switches to light mode in Settings, your app switches too.
+
+```rust
+component(|cx| {
+    provide_configured_theme(cx);
+    app_body()
+})
+```
+
+`provide_theme(cx, theme)` sets a fixed theme instead. Use it for tests, previews, or a part of the window that always uses one palette.
+
+```rust
+use crownui::kit::{provide_theme, Theme};
+
+component(|cx| {
+    provide_theme(cx, Theme::light());
+    app_body()
+})
+```
+
+Both functions return a `Signal<Theme>`. Setting that signal restyles every kit widget below it on the next frame. This switches a window between light and dark with a kit switch:
+
+```rust
+use crownui::{
+    kit::{provide_theme, setting_row, toggle, Theme},
+    prelude::*,
+};
+
+component(|cx| {
+    let theme = provide_theme(cx, Theme::dark());
+    let dark = cx.signal(true);
+    cx.effect(move |runtime| {
+        let next = if dark.get(runtime) { Theme::dark() } else { Theme::light() };
+        theme.set(runtime, next);
+    });
+    setting_row("Dark mode", toggle(dark))
+})
+```
+
+A theme is scoped like any other provided value. A `provide_theme` call inside a child component overrides the theme for that child and everything it builds. Its siblings keep the outer theme.
+
+<Note>
+  Without any provided theme, `use_theme` provides `Theme::DEFAULT` on the current scope. That is the dark palette with the purple accent. A kit widget never fails for lack of a theme.
+</Note>
+
+## Read the theme in your own views
+
+`use_theme(cx)` returns the nearest `Signal<Theme>`. Read it inside `bind` so the property follows theme changes, the same way kit widgets do.
+
+```rust
+use crownui::{kit::use_theme, prelude::*};
+
+fn banner(message: String) -> impl View {
+    component(move |cx| {
+        let theme = use_theme(cx);
+        text(message)
+            .p(12.0)
+            .rounded(10.0)
+            .bg(bind(move |runtime| theme.with(runtime, |theme| theme.surface.raised)))
+            .text_color(bind(move |runtime| theme.with(runtime, |theme| theme.text.body)))
+    })
+}
+```
+
+Use `theme.with(..)` to copy out one color instead of `theme.get(..)`, which copies the whole palette. A one-time read with `theme.with(cx, ..)` outside `bind` gives a fixed value that does not follow later changes.
+
+## What a theme holds
+
+`Theme` is one plain `Copy` struct with every color a kit widget paints. Its fields are groups:
+
+| Field | Type | What it colors |
+|---|---|---|
+| `mode` | `ThemeMode` | Which palette this is, light or dark. Read only for the direction of a shadow or tint. |
+| `accent` | `GradientStops` | The accent gradient: toggle on state, slider fill, selected radio, focus rings, primary buttons. |
+| `surface` | `SurfaceColors` | Window background, raised and sunken surfaces, borders, hairlines, hover wash and shadow. |
+| `text` | `TextColors` | Text from primary to disabled, text on the accent, and two icon strokes. |
+| `control` | `ControlColors` | The slider track, the toggle knob and slider thumb, and the knob shadow. |
+| `toggle_off` | `GradientStops` | The off state of a switch track. |
+| `status` | `StatusColors` | Success, warning, danger and neutral, plus the destructive fill and its text. |
+| `popover` | `PopoverColors` | Field-like triggers (select, keybind, toggle group) and opaque popovers. |
+| `radio` | `RadioColors` | Radio circles in both states. |
+| `menu` | `MenuColors` | Every frosted-glass surface: menus, select and search panels, tooltips, toasts and dialogs. |
+| `sidebar` | `SidebarColors` | The sidebar layout and its three row states. |
+| `title_bar` | `TitleBarColors` | Client-drawn title bars and their window controls. |
+
+[`Theme` in the API reference](/docs/crownui/api/kit-theme) lists every slot in every group.
+
+To change a few colors, spread a stock palette with struct update syntax:
+
+```rust
+use crownui::kit::{provide_theme, SurfaceColors, Theme};
+use crownui::prelude::*;
+
+let base = Theme::dark();
+provide_theme(
+    cx,
+    Theme {
+        surface: SurfaceColors { bg: rgb(0x101014), ..base.surface },
+        ..base
+    },
+);
+```
+
+The user edits the same slots in `~/.config/crownos/theme.ron`. The kit reads its custom `accent` and two maps of dotted slot names, one per mode. `provide_configured_theme` applies them for you. Slots the file leaves out keep their stock color.
+
+```ron title="~/.config/crownos/theme.ron"
+(
+    accent: Some((start: "#5aa2ff", end: "#2563eb")),
+    light: {},
+    dark: { "surface.bg": "#101014" },
+)
+```
+
+## The kit font
+
+The kit is drawn for Inter at a 14px body size (`kit::TEXT_SIZE`). The font ships inside the kit. Register it once in `AppConfig` so text matches the rest of the desktop:
+
+```rust
+AppConfig::new("Files").font(kit::inter_font().to_vec(), Some(kit::INTER_FAMILY))
+```
+
+`inter_font()` returns the bundled font bytes and `INTER_FAMILY` is the family name it registers under, `"Inter Variable"`. Without this call, text falls back to the system's default family and no longer matches the desktop.
+
+## Icons
+
+`kit::icons` is the Lucide icon set as constants such as `icons::TRASH`, `icons::SETTINGS` or `icons::CHEVRON_RIGHT`. Each constant is the inner SVG markup of one 24 by 24 glyph. Kit options that take an icon accept these constants directly.
+
+```rust
+use crownui::kit::{button, icon, icon_muted, icons, ButtonOptions};
+
+button("Add").leading_icon(icons::PLUS)
+icon(icons::WIFI)
+icon_muted(icons::LOCK).size(14.0)
+```
+
+`icon(body)` draws a glyph at 16px in the theme's icon color. `icon_muted(body)` uses the muted icon color. `icon_colored(body, stroke_width, color)` sets the stroke width and picks the color from the theme with a closure. The [layout page](/docs/crownui/kit-layout) covers all three.
+
+## Previews
+
+Every kit widget has preview entries: the widget built in a representative state. List them and render one without opening a window:
+
+```sh
+cargo xtask preview --list
+cargo xtask preview button_primary
+cargo xtask preview button_primary --png button.png
+```
+
+Without `--png`, the command mounts the preview in a 480 by 320 test app and prints its semantic snapshot. With `--png`, it renders the preview offscreen with Impeller at scale 2 and writes the image. `kit::previews()` returns the same catalog as a `Vec<Preview>`, which `crowndev` also reads. Each `Preview` has a `name` and a `build` function, and `preview.view()` builds it.
+
+When you add a kit widget, add a `previews/<name>.rs` entry next to it, so agents and reviewers can see it without running an app.
+
+## The kit_gallery example
+
+`crownui/examples/kit_gallery.rs` puts the common controls in one scrolling window: a section of setting rows with a switch, a slider and a toggle group, a card with a status line, buttons, a spinner and a radio group, and a choice list.
+
+```sh
+cargo run -p crownui --example kit_gallery
+```
+
+It follows the desktop theme, so change the accent or dark mode in Settings while it runs and watch it restyle.
+
+## Why kit widgets read every color from the theme
+
+A kit widget never paints a literal color. Every fill, stroke and text color comes from the `Theme` that `use_theme(cx)` returns, and the painter reads it through the theme signal.
+
+First, the desktop owns the look. The user's accent, dark mode and `theme.ron` edits reach every widget in every app, because there is no color for a widget to keep for itself. One `theme.set(..)` restyles a whole window, and nothing else in the app changes.
+
+Second, meaning stays separate from decoration. The `status` group does not follow the accent, so a user who picks a red accent still sees errors in the danger color and never mistakes a primary button for a warning.
+
+Third, custom views stay consistent. Your own views read the same slots through `use_theme`, so a card you draw yourself sits next to a kit card without a mismatch.
+
+The cost is flexibility at the call site. You cannot pass `rgb(..)` to recolor one part of a kit widget, except through the options that exist for it, such as `divider().color(..)`, the `color` argument of `badge` and `tag_chip`, or `pane(..).fill(..)`. To recolor a widget, change its slot in a `Theme` and provide that theme around it. A theme change also repaints every kit widget at once, because each one reads the signal. Theme changes are rare, so this costs nothing in normal use, but do not animate a theme frame by frame.
+
+Building the kit from primitives has its own tradeoff. A kit widget is a small tree of nodes with canvases, so it costs more than one primitive node. In return it gets the same layout, semantics, focus, testing selectors and agent access as everything else, and you can restyle it with the usual modifiers.
+
+## Widgets by group
+
+<CardGroup cols={2}>
+  <Card title="Controls" icon="settings" href="/docs/crownui/kit-controls">
+    Buttons, switches, sliders, radio groups, choice lists, toggle groups, selects and popup menus.
+  </Card>
+  <Card title="Inputs" icon="pencil" href="/docs/crownui/kit-inputs">
+    Text inputs, search with suggestions, shortcut recording and the calendar.
+  </Card>
+  <Card title="Feedback" icon="bell" href="/docs/crownui/kit-feedback">
+    Status lines, badges, callouts, progress, spinners and the audio meters.
+  </Card>
+  <Card title="Layout" icon="layers" href="/docs/crownui/kit-layout">
+    Cards, sections, panes, quick panels, sidebars, path bars, wizards and title bars.
+  </Card>
+  <Card title="Overlays" icon="copy" href="/docs/crownui/kit-overlays">
+    Dialogs, tooltips, toasts and context menus.
+  </Card>
+  <Card title="Theme API" icon="code" href="/docs/crownui/api/kit-theme">
+    `provide_theme`, `use_theme` and every field of `Theme`.
+  </Card>
+</CardGroup>

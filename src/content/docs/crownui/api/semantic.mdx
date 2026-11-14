@@ -1,0 +1,218 @@
+---
+title: Semantic
+description: "Accessibility modifiers that set an element's name, role, value, description, focus and secure flag."
+api: FN Semantic::label
+---
+
+The `Semantic` trait adds accessibility properties to any element: its accessible name, role, description, value, focus behavior and secure flag. Screen readers, MCP agents and `crowntest` queries all read these properties from one semantic tree.
+
+<ApiExamples>
+<RequestExample>
+```rust title="volume.rs"
+use crownui::prelude::*;
+
+fn volume_row() -> impl View {
+    component(|cx| {
+        let volume = cx.signal(40_u8);
+        hstack((
+            text("Volume"),
+            button("+")
+                .label("Raise volume")
+                .description("Raises the volume by ten percent")
+                .disabled(bind(move |rt| volume.get(rt) >= 100))
+                .on_click(move |cx, _| volume.update(cx, |level| *level += 10)),
+            text(bind(move |rt| format!("{}%", volume.get(rt))))
+                .role(Role::ProgressBar)
+                .label("Volume level")
+                .value(bind(move |rt| format!("{} percent", volume.get(rt)))),
+        ))
+        .gap(8.0)
+    })
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub trait Semantic: Styled {
+    fn label(self, label: impl IntoProp<String>) -> Self;
+    fn value(self, value: impl IntoProp<String>) -> Self;
+    fn description(self, description: impl Into<String>) -> Self;
+    fn role(self, role: Role) -> Self;
+    fn focusable(self, focusable: bool) -> Self;
+    fn secure(self) -> Self;
+    fn disabled(self, disabled: impl IntoProp<bool>) -> Self;
+}
+
+impl<T: Styled> Semantic for T {}
+```
+</ResponseExample>
+</ApiExamples>
+
+## Signature
+
+`Semantic` and `Role` are in `crownui::prelude`. The blanket impl means every `Element<K>` has these methods, including kit widgets and your own kinds.
+
+## Methods
+
+<ParamField name="label" type="impl IntoProp<String>">
+  `aria-label`. The accessible name a screen reader announces and a `name(..)` query matches. Reactive.
+</ParamField>
+<ParamField name="value" type="impl IntoProp<String>">
+  `aria-valuetext`. The accessible value, such as a slider position or a text field's contents. Reactive.
+</ParamField>
+<ParamField name="description" type="impl Into<String>">
+  `aria-description`. A longer description read after the name.
+</ParamField>
+<ParamField name="role" type="Role">
+  `role`. Overrides the role the element's kind implies.
+</ParamField>
+<ParamField name="focusable" type="bool">
+  `tabindex="0"` or `"-1"`. Whether keyboard focus can land on the element.
+</ParamField>
+<ParamField name="secure" type="()">
+  `type="password"`. Hides the value from assistive technology, agents and test snapshots.
+</ParamField>
+<ParamField name="disabled" type="impl IntoProp<bool>">
+  `disabled`. Blocks interaction and turns on the `when_disabled` variant. Reactive.
+</ParamField>
+
+"Reactive" means the method takes `impl IntoProp<T>`. You pass a literal, a `Signal`, a `Memo` or a `bind(..)`, and the property updates when the signals it reads change.
+
+### label
+
+```rust
+fn label(self, label: impl IntoProp<String>) -> Self
+```
+
+Sets the accessible name. Without a label, a node takes its name from its content. A text node uses its text. A button, link, menu item, tab, heading, checkbox, switch or radio button joins the text of its descendants. Use `label` when that content does not describe the element, for example an icon button.
+
+```rust
+button("×").label("Close")
+
+button("Remove")
+    .label(bind(move |rt| todo.with(rt, |todo| format!("Remove {}", todo.title))))
+```
+
+The second form gives every row's button a unique name, so a test or an agent picks the right one with `name("Remove milk")`.
+
+### value
+
+```rust
+fn value(self, value: impl IntoProp<String>) -> Self
+```
+
+Sets the accessible value. A `text(..)` node reports its text as its name, and the `text(..)` query also matches the value. A secure node never exposes its value.
+
+```rust
+text(bind(move |rt| format!("{}%", progress.get(rt))))
+    .role(Role::ProgressBar)
+    .label("Upload progress")
+    .value(bind(move |rt| format!("{} percent", progress.get(rt))))
+```
+
+### description
+
+```rust
+fn description(self, description: impl Into<String>) -> Self
+```
+
+Sets a longer description. It is a plain string, not reactive.
+
+```rust
+button("Reset").description("Restores every setting on this page to its default")
+```
+
+### role
+
+```rust
+fn role(self, role: Role) -> Self
+```
+
+Overrides the role. Every kind sets a default role in its `mount`, for example `button` sets `Role::Button` and `toggle` sets `Role::Switch`. A plain container is `Role::Group`, and a group with a click listener becomes `Role::Button` on its own. Override the role when a generic element plays a specific part.
+
+```rust
+vstack(rows).role(Role::List).label("Downloads")
+```
+
+### focusable
+
+```rust
+fn focusable(self, focusable: bool) -> Self
+```
+
+Overrides whether keyboard focus can land on the element. By default an element is focusable when it is enabled and either has an interactive role (`Button`, `Link`, `TextField`, `SearchField`, `Checkbox`, `Switch`, `Slider`) or has a click listener.
+
+```rust
+text("Read-only summary").focusable(true)
+button("Decoration").focusable(false)
+```
+
+### secure
+
+```rust
+fn secure(self) -> Self
+```
+
+Marks the element as holding a secret. Screen readers see a password input with no value. MCP agents read no value and may not type into it or press keys on it. `crowntest` and other callers of `Ui::perform` get `CUI0105` when they type into it. The semantic tree prints `value=<secure>` in place of the value, so test snapshots and `crowndev tree` never show it.
+
+`secure` hides the value from the semantic tree only. Masking the drawn text is the widget's job. The kit `text_input(..).secret()` draws bullets and sets `secure` for you, so prefer it for passwords.
+
+```rust
+use crownui::kit::{TextInputOptions, text_input};
+
+text_input(password).placeholder("Password").secret()
+```
+
+### disabled
+
+```rust
+fn disabled(self, disabled: impl IntoProp<bool>) -> Self
+```
+
+Disables the element. A disabled element ignores clicks, keyboard activation and focus. Tests that act on it panic with `CUI0106`, and agents get an error. The `when_disabled` variant applies while it is disabled.
+
+```rust
+button("Send")
+    .disabled(bind(move |rt| draft.with(rt, |text| text.trim().is_empty())))
+    .when_disabled(|style| style.opacity(0.4))
+```
+
+## Role
+
+```rust
+pub enum Role {
+    Window, Group, Text, Heading, Button, Link, TextField, SearchField,
+    Checkbox, Switch, RadioButton, Slider, ProgressBar, Image, List, ListItem,
+    ScrollView, Menu, MenuItem, Tab, TabList, Dialog, Tooltip, ComboBox, Separator,
+}
+```
+
+Roles print in `snake_case` in snapshots, in `crowndev` output and in the MCP `ui_query` tool, for example `text_field` and `menu_item`.
+
+## shortcut
+
+```rust
+fn shortcut(self, keybind: Keybind) -> Self
+```
+
+`shortcut` is on the `Listeners` trait, not on `Semantic`, but it belongs to the same job of making an element reachable without a pointer. It clicks the element when the keybind is pressed anywhere in the window while the element is mounted and enabled. Letters match case-insensitively. `Keybind`, `Key`, `NamedKey` and `Modifiers` are in `crownui::ext`.
+
+```rust
+use crownui::ext::{Key, Keybind, Modifiers};
+
+const SAVE: Keybind = Keybind {
+    key: Key::Character('s'),
+    modifiers: Modifiers { ctrl_key: true, ..Modifiers::NONE },
+};
+
+button("Save").shortcut(SAVE).on_click(|cx, _| save(cx))
+```
+
+`Keybind` also implements `FromStr`, so `"Ctrl+S".parse::<Keybind>()` works when the shortcut comes from a config file.
+
+## Related
+
+- [Accessibility](/docs/crownui/accessibility) explains what screen readers see.
+- [Kind](/docs/crownui/api/kind) covers `cx.set_role`, `cx.bind_value` and `cx.bind_checked` for your own kinds.
+- [TestApp](/docs/crownui/api/test-app) queries these properties.

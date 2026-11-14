@@ -1,0 +1,162 @@
+---
+title: canvas
+description: "An element you draw into with a painter that re-runs when its size or the signals it reads change."
+api: FN canvas
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Usage"
+use crownui::prelude::*;
+
+fn meter(level: Signal<f32>) -> impl View {
+    canvas(move |rt, size, list| {
+        if size.is_empty() {
+            return;
+        }
+        let track = Rect::new(Point::ZERO, size);
+        let filled = Rect::from_xywh(0.0, 0.0, size.width * level.get(rt), size.height);
+        let corners = CornerRadii::uniform(size.height / 2.0);
+        list.fill(track, corners, rgb(0xe5e7eb));
+        list.fill(filled, corners, rgb(0x22c55e));
+    })
+    .w(200.0)
+    .h(8.0)
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub fn canvas<P>(painter: P) -> Element<CanvasKind<P>>
+where
+    P: FnMut(&mut Runtime, Size, &mut DrawList) + 'static;
+```
+</ResponseExample>
+</ApiExamples>
+
+`canvas` creates an element you draw into yourself. Its painter records commands into a `DrawList` in the element's local coordinates, and it runs again whenever the element's size or any signal it reads changes.
+
+## Parameters
+
+<ParamField name="painter" type="impl FnMut(&mut Runtime, Size, &mut DrawList) + 'static" required>
+  Records the drawing. Receives the reactive runtime, the element's current size and an empty list.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Element<CanvasKind<P>>" type="Element<CanvasKind<P>>">
+  An element. Style it with `Styled`, listen with `Listeners` and describe it with `Semantic`, like any other element.
+</ResponseField>
+
+## Painter arguments
+
+| Argument | Type | Description |
+|---|---|---|
+| `rt` | `&mut Runtime` | Read signals, memos and stores with it, for example `values.with(rt, ..)`. Every read becomes a dependency. |
+| `size` | `Size` | The element's laid out size in logical pixels. Zero on the first run, before layout. |
+| `list` | `&mut DrawList` | A fresh, empty list. What you record replaces the previous drawing. |
+
+## Behavior
+
+- Coordinates are local. `(0, 0)` is the element's top-left corner and `size` is its bottom-right.
+- The painter is an effect. It runs once at mount, then again when `size` changes or any signal it read changes.
+- A canvas has no intrinsic size. Size it with `.w()`, `.h()`, `.size()`, `.w_full()` or `.flex_1()`.
+- A canvas has no role. Add `.role(Role::Image)` and `.label(..)` when it conveys information.
+- Background, border, rounded corners, shadow, opacity and transforms from `Styled` apply to the element as usual. Your drawing sits on top of its background.
+- Animating `.rotate`, `.scale`, `.translate` or `.opacity` does not re-run the painter. Those run on the render thread.
+
+## Examples
+
+### React to data
+
+```rust
+fn sparkline(points: Signal<Vec<f32>>) -> impl View {
+    canvas(move |rt, size, list| {
+        if size.is_empty() {
+            return;
+        }
+        points.with(rt, |points| {
+            let slot = size.width / points.len().max(1) as f32;
+            for (index, value) in points.iter().enumerate() {
+                let height = value * size.height;
+                let bar = Rect::from_xywh(index as f32 * slot, size.height - height, slot - 1.0, height);
+                list.fill(bar, CornerRadii::ZERO, rgb(0x6366f1));
+            }
+        });
+    })
+    .w_full()
+    .h(32.0)
+}
+```
+
+### Draw where the user clicks
+
+A click reports its position relative to the target, which is the canvas's own coordinate space.
+
+```rust
+let dots = cx.signal(Vec::<Point>::new());
+
+canvas(move |rt, _size, list| {
+    dots.with(rt, |dots| {
+        for dot in dots {
+            let disc = Rect::from_xywh(dot.x - 4.0, dot.y - 4.0, 8.0, 8.0);
+            list.fill(disc, CornerRadii::uniform(4.0), rgb(0xf43f5e));
+        }
+    });
+})
+.w(320.0)
+.h(200.0)
+.bg(rgb(0xf8fafc))
+.on_click(move |cx, event| {
+    let at = event.position;
+    dots.update(cx, |dots| dots.push(at));
+})
+```
+
+An `on_click` listener also makes the canvas focusable, so Enter and Space click it at its center.
+
+### Paths and strokes
+
+```rust
+use crownui::ext::{DrawCommand, Paint, Path, Stroke};
+
+canvas(|_rt, size, list| {
+    let check = Path::new()
+        .move_to(Point::new(size.width * 0.2, size.height * 0.55))
+        .line_to(Point::new(size.width * 0.42, size.height * 0.75))
+        .line_to(Point::new(size.width * 0.8, size.height * 0.3));
+    list.push(DrawCommand::StrokePath(check, Stroke::rounded(2.5), Paint::solid(WHITE)));
+})
+.size(20.0)
+.rounded(10.0)
+.bg(rgb(0x22c55e))
+```
+
+### Layers
+
+Split a drawing that changes in parts into stacked canvases, so a change re-records only one of them.
+
+```rust
+zstack((
+    canvas(draw_grid).absolute().inset(0.0),
+    canvas(move |rt, size, list| draw_cursor(rt, size, list, cursor)).absolute().inset(0.0),
+))
+.w(400.0)
+.h(300.0)
+```
+
+## From a Kind
+
+`canvas` is a thin wrapper. A custom `Kind` draws into its own node with `cx.set_canvas(node, painter)`, which takes the same painter. See [custom components](/docs/crownui/custom-components).
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Drawing guide" icon="image" href="/docs/crownui/drawing">
+    Shapes, gradients, images, SVG and the tradeoffs.
+  </Card>
+  <Card title="DrawList" icon="code" href="/docs/crownui/api/draw-list">
+    Every command you record.
+  </Card>
+</CardGroup>

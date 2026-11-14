@@ -1,0 +1,273 @@
+---
+title: Async
+description: Run futures off the UI thread with cx.spawn and handle their results on the UI thread, where state lives.
+---
+
+`cx.spawn(future, on_done)` runs `future` on a background tokio runtime and calls `on_done` with its output back on the UI thread. `on_done` receives `&mut Cx`, so it writes signals like any event handler. The future never touches UI state, and the UI thread never waits for the future.
+
+```rust
+let notes = cx.signal(String::new());
+
+cx.spawn(tokio::fs::read_to_string("notes.txt"), move |cx, result| {
+    if let Ok(contents) = result {
+        notes.set(cx, contents);
+    }
+});
+```
+
+## Setup
+
+The `tokio` cargo feature of `crownui` is on by default. It starts the executor that runs your futures. Your own crate still needs `tokio` as a dependency to call its APIs, such as timers, files or channels. Turn on only the features you use.
+
+```toml title="Cargo.toml"
+[dependencies]
+crownui = "0.1.1"
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "time", "fs"] }
+```
+
+`spawn_blocking` needs the `rt` feature. Timers need `time`, and watch channels need `sync`.
+
+## Load data step by step
+
+A typical screen shows a placeholder, starts a load, and swaps in the result.
+
+### 1. Hold the result in a signal
+
+Use an enum so the view can show every state.
+
+```rust
+#[derive(Clone, PartialEq)]
+enum Load<T> {
+    Pending,
+    Ready(T),
+    Failed(String),
+}
+
+let weather = cx.signal(Load::<Report>::Pending);
+```
+
+### 2. Spawn in the component body
+
+The future and its output must be `Send + 'static`. `on_done` does not need `Send`, so it captures signals freely. Here `fetch_report` is your own `async fn` that returns `Result<Report, String>`.
+
+```rust
+cx.spawn(fetch_report(city), move |cx, result| {
+    let next = match result {
+        Ok(report) => Load::Ready(report),
+        Err(message) => Load::Failed(message),
+    };
+    weather.set(cx, next);
+});
+```
+
+### 3. Show each state
+
+```rust
+keyed(
+    move |rt| weather.get(rt),
+    |_cx, state| match state {
+        Load::Pending => text("Loading…").boxed(),
+        Load::Ready(report) => report_card(report).boxed(),
+        Load::Failed(message) => text(message).text_color(rgb(0xdc2626)).boxed(),
+    },
+)
+```
+
+When the task finishes, `weather` changes, `keyed` rebuilds its branch, and the report appears.
+
+## Where on_done runs
+
+The executor sends the output back over a channel and wakes the event loop. On the next turn the UI thread calls `on_done` with the spawning scope made current, then flushes. So:
+
+- signals and effects that `on_done` creates belong to the component that spawned the task,
+- a `cx.spawn` inside `on_done` belongs to that same component, which is how you re-arm a task in a loop,
+- every write in `on_done` reaches the screen in the same frame.
+
+## Cancellation
+
+A task belongs to the scope that was current when you called `spawn`. When that scope is disposed, the runtime aborts the tokio task and drops `on_done` without calling it. A component that unmounts never sees a stale result.
+
+There is no cancel method on `Cx`. To stop work on demand, put the spawning component inside a `show` or `keyed` branch and let the branch go away, or tag each request and ignore old answers:
+
+```rust
+let generation = cx.store(0_u64);
+
+let search = move |cx: &mut Cx, query: String| {
+    let ticket = generation.update(cx, |generation| {
+        *generation += 1;
+        *generation
+    });
+    cx.spawn(run_search(query), move |cx, hits| {
+        if generation.with(cx, |current| *current == ticket) {
+            results.set(cx, hits);
+        }
+    });
+};
+```
+
+<Warning>
+  Event handlers run in the window's root scope. A task spawned from `on_click` belongs to the window, so it is not cancelled when its component unmounts, and its `on_done` still runs. Write results with `try_set`, which returns `false` instead of panicking when the signal is gone.
+</Warning>
+
+## Blocking work
+
+The executor is one current-thread tokio runtime on its own thread, named `crownui-tasks`. Every spawned future shares it. A future that blocks, such as a CPU-heavy decode or a synchronous file read, stalls every other task until it returns. Move blocking work to tokio's blocking pool:
+
+```rust
+let decode = async move { tokio::task::spawn_blocking(move || load_or_compute_peaks(&path)).await };
+
+cx.spawn(decode, move |cx, decoded| {
+    if let Ok(Ok(decoded)) = decoded {
+        peaks.try_set(cx, WaveformPeaks::new(decoded));
+    }
+});
+```
+
+This is how the CrownOS sound recorder decodes waveforms for files it did not record.
+
+## Repeat on a timer
+
+Re-arm a task from its own `on_done`. Each round is one small spawn, and the loop stops on its own when the component unmounts.
+
+```rust
+use std::ops::ControlFlow;
+use std::time::Duration;
+
+fn repeat_every(
+    cx: &mut Cx,
+    period: Duration,
+    mut tick: impl FnMut(&mut Cx) -> ControlFlow<()> + 'static,
+) {
+    cx.spawn(
+        async move { tokio::time::sleep(period).await },
+        move |cx, ()| {
+            if tick(cx).is_continue() {
+                repeat_every(cx, period, tick);
+            }
+        },
+    );
+}
+```
+
+For per-frame updates use `cx.request_animation_frame` instead. It runs in step with the display.
+
+## Follow a config file
+
+`crownconfig` watches the files in `~/.config/crownos`. A `SectionWatch<T>` holds the latest value, and `changed().await` resolves on the next edit. To feed a signal with it, spawn one wait, apply the value in `on_done`, and spawn the next wait. The watch moves into the future and comes back with the value, so the task needs no shared state.
+
+The kit's `provide_configured_theme` is built exactly this way:
+
+```rust title="widgets/src/kit/theme/follow.rs"
+pub fn provide_configured_theme(cx: &mut Cx) -> Signal<Theme> {
+    let settings = ThemeSettings::load();
+    let theme = provide_theme(cx, Theme::from_settings(&settings));
+    follow_config(cx, theme, watch_theme_settings(settings));
+    theme
+}
+
+fn follow_config(cx: &mut Cx, theme: Signal<Theme>, mut watch: SectionWatch<ThemeSettings>) {
+    let next_change = async move {
+        let settings = watch.changed().await;
+        (watch, settings)
+    };
+    cx.spawn(next_change, move |cx, (watch, settings)| {
+        theme.set(cx, Theme::from_settings(&settings));
+        follow_config(cx, theme, watch);
+    });
+}
+```
+
+Call it once at the root of your app, and every kit widget restyles when the user edits `appearance.ron` or `theme.ron`:
+
+```rust
+use crownui::kit::provide_configured_theme;
+
+component(|cx| {
+    provide_configured_theme(cx);
+    settings_window()
+})
+```
+
+The same shape works for any section and for a plain `tokio::sync::watch::Receiver`. With a receiver, stop when the sender is gone and when the signal is gone:
+
+```rust
+fn follow_watch<T: Clone + Send + Sync + 'static>(
+    cx: &mut Cx,
+    signal: Signal<T>,
+    mut receiver: tokio::sync::watch::Receiver<T>,
+) {
+    let next_change = async move {
+        let open = receiver.changed().await.is_ok();
+        (receiver, open)
+    };
+    cx.spawn(next_change, move |cx, (receiver, open)| {
+        let latest = receiver.borrow().clone();
+        if open && signal.try_set(cx, latest) {
+            follow_watch(cx, signal, receiver);
+        }
+    });
+}
+```
+
+## Tasks spawned before the window exists
+
+`crownui::run` builds your root view before it creates the window and before it starts the executor. A `cx.spawn` in that first build does not fail. The task waits in a queue and starts the moment the executor is installed. Spawning from the root component's body is safe.
+
+## When the executor is missing
+
+If the tokio runtime or its thread fails to start, the runtime logs:
+
+```text
+CUI0407: task executor unavailable: <io error>
+```
+
+`cx.spawn` still returns a `TaskId`, but the futures stay queued and `on_done` never runs. The same happens when you build `crownui` without the `tokio` feature: there is no executor, so spawned tasks never start. If a screen stays on its loading state forever, check the log for `CUI0407` and check your features.
+
+## Testing tasks
+
+`crowntest::TestApp` does not run futures on its own. Install a `TaskExecutor` that records task ids, then complete each task by hand with the output you want. This makes async screens deterministic in tests. `TaskExecutor`, `TaskFuture` and `TaskId` live in the `view` crate, which the published `crownui` crate ships as `crownui::view`, and `crowntest` is `crownui::crowntest` there. Inside the CrownUI workspace, add `view` and `crowntest` as path dev-dependencies, as below.
+
+```rust
+use std::sync::mpsc;
+
+use crowntest::{Role, TestApp, role};
+use view::{TaskExecutor, TaskFuture, TaskId};
+
+struct HeldTasks(mpsc::Sender<TaskId>);
+
+impl TaskExecutor for HeldTasks {
+    fn spawn(&mut self, id: TaskId, _future: TaskFuture) {
+        let _ = self.0.send(id);
+    }
+
+    fn cancel(&mut self, _id: TaskId) {}
+}
+
+#[test]
+fn shows_the_report_once_loaded() {
+    let mut app = TestApp::new(weather_screen());
+    let (sender, started) = mpsc::channel();
+    app.ui().set_task_executor(Box::new(HeldTasks(sender)));
+    app.settle();
+
+    let task = started.try_recv().expect("the screen spawned a load");
+    app.ui().complete_task(task, Box::new(Ok::<Report, String>(sample_report())));
+    app.settle();
+
+    assert!(app.exists(role(Role::Text).name("Sunny")));
+}
+```
+
+The boxed output must have exactly the type the future returns, or `on_done` is skipped. See [Testing](/docs/crownui/testing).
+
+## Why it works this way
+
+The reactive runtime is single threaded by construction. It holds every signal behind plain keys with no locks, so it cannot be touched from another thread. Async work therefore splits in two: the future runs elsewhere and produces a value, and a closure applies that value on the UI thread. This is the same rule the rest of the framework follows: threads talk only through channels.
+
+The split has costs:
+
+- The future and its output must be `Send + 'static`. You move owned data in and get owned data back. You cannot read a signal from inside the future. Read what you need before you spawn.
+- Results arrive on a later event loop turn. `on_done` never runs inside the `spawn` call, so the view always needs a state for "not loaded yet".
+- One current-thread runtime runs every task. It is cheap and keeps ordering simple, but a blocking call stalls all tasks. `spawn_blocking` is the fix.
+- Cancellation follows scopes, not handles. That makes cleanup automatic for tasks spawned in a component body, and makes handler-spawned tasks live as long as the window.
+- Each re-armed wait is a new spawn with a fresh boxed future. For a config file that changes a few times a day this is nothing. For a stream with thousands of items a second, batch the items in the future and send them as one value.

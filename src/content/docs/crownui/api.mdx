@@ -1,44 +1,120 @@
 ---
 title: API overview
 sidebarTitle: Overview
-description: The entry points, handles and conventions shared by every CrownUI API.
+description: Where every CrownUI API lives, the conventions they share, and how stable they are.
 ---
 
-Everything in this reference is exported from `crownui::prelude`. Import it once at the top of each
-file.
+Most apps need one import:
 
 ```rust
 use crownui::prelude::*;
 ```
 
+This reference documents that import, the entry points at the crate root and the extension points in
+`crownui::ext`. Each page shows a usage example and the exact signature, then lists every parameter,
+builder method and return value.
+
+## Where things live
+
+| Path | What is in it |
+| --- | --- |
+| `crownui::run`, `crownui::run_windows` | Open windows and run the app. |
+| `crownui::AppConfig`, `crownui::FramePacing` | Window options. Also in the prelude. |
+| `crownui::RunError` | The error the entry points return. |
+| `crownui::prelude` | Everything an app author needs: views, widgets, modifiers, signals, colors, springs, window and layer options. |
+| `crownui::kit` | The themed CrownOS widgets and `kit::icons`, the Lucide icon set. |
+| `crownui::ext` | Extension points for component libraries and other backends: `Kind`, `DrawList`, `Listener`, `StyleProp`, `Runner` and the backend traits. |
+
+The prelude groups into a few kinds of items:
+
+- Views and structure: `component`, `show`, `keyed`, `for_each`, `error_boundary`, `bind`,
+  `View`, `ViewSeq`, `AnyView`, `Element`, `IntoProp`.
+- Widgets: `vstack`, `hstack`, `zstack`, `spacer`, `divider`, `text`, `button`, `toggle`,
+  `text_field`, `scroll_view`, `lazy_list`, `lazy_vstack`, `lazy_grid`, `canvas`, `image`,
+  `cover_image`, `svg`, `icon`, `popover`, with `LazyListOptions`, `ScrollOptions` and
+  `ScrollHandle`.
+- Modifier traits and their values: `Styled`, `Listeners`, `Semantic`, `Event`, `PointerEvents`,
+  `ColorScheme`.
+- State: `Cx`, `Runtime`, `Signal`, `Memo`, `Store`.
+- Values: `Color`, `rgb`, `rgba`, `WHITE`, `BLACK`, `TRANSPARENT`, `Point`, `Size`, `Rect`,
+  `Vector`, `CornerRadii`, `CornerShape`, `Shadow`, `Spring`, `Curve`, `GridTrack`, `Role`.
+- Windows: `AppConfig`, `FramePacing`, `LayerOptions`, `Layer`, `Anchor`, `LayerExtent`,
+  `LayerMargin`, `KeyboardInteractivity`, `Material`, `MaterialBlur`, `MaterialShadow`,
+  `Capabilities`, `CursorIcon`, `AppWindows`.
+- Clipboard and drag and drop: `ClipboardData`, `DragSource`, `DragIcon`, `DragOutcome`,
+  `DndAction`, `DndActions`.
+
 ## Conventions
 
-- **Builders are lowercase nouns** such as `vstack`, `text` and `button`, and return an element you
-  chain modifiers on.
-- **Modifiers are Tailwind names** with literal values in logical pixels.
-- **Listeners use DOM names** and receive `(&mut Cx, &mut Event<T>)`. Events bubble, and handlers can
-  call `stop_propagation()` or `prevent_default()`.
-- **State is reached through `&mut Cx`**, which derefs to the reactive runtime.
+### Builders are lowercase nouns
 
-## Reference
+A view builder is a function named like a SwiftUI view: `vstack`, `text`, `button`. It returns an
+`Element` you chain modifiers on.
 
-<CardGroup cols={2}>
-  <Card title="crownui::run" icon="rocket" href="/docs/crownui/api/run">
-    Open a window and run the app until it closes.
-  </Card>
-  <Card title="cx.signal" icon="zap" href="/docs/crownui/api/signal">
-    Create reactive state that updates only the views that read it.
-  </Card>
-</CardGroup>
+```rust
+vstack((text("Title"), button("OK")))
+```
 
-## Stability
+### Modifiers are Tailwind names
 
-CrownUI is <Badge>pre-1.0</Badge>. Following Cargo's semver rules, a minor release such as 0.2 may
-change these APIs. Check the [changelog](/docs/crownui/changelog) before you upgrade.
+Style methods use Tailwind class names with literal values in logical pixels. `.p(16.0)` is
+Tailwind's `p-4`. Variants take a closure: `.hover(|style| ..)`, `.dark(|style| ..)`.
+
+```rust
+text("Hello").p(16.0).rounded(8.0).hover(|style| style.opacity(0.8))
+```
+
+### Listeners are DOM names
+
+Handlers are named after DOM events (`on_click`, `on_key_down`, `on_input`) and get
+`(&mut Cx, &mut Event<T>)`. Events bubble. A handler calls `event.stop_propagation()` to stop them
+and `event.prevent_default()` to cancel the default action.
+
+```rust
+button("Save").on_click(|cx, event| {
+    event.stop_propagation();
+    save(cx);
+})
+```
+
+### Any property takes a value or a reactive source
+
+A parameter typed `impl IntoProp<T>` takes a literal, a `Signal<T>`, a `Memo<T>` or a
+`bind(move |rt| ..)`. With a literal the property is fixed. With the others it updates when its
+source changes.
+
+```rust
+let width = cx.signal(320.0);
+vstack(()).w(320.0);                                  // fixed
+vstack(()).w(width);                                  // follows the signal
+vstack(()).w(bind(move |rt| width.get(rt) * 2.0));    // follows an expression
+```
+
+### State goes through `&mut Cx`
+
+`Cx` derefs to the reactive runtime. Signal reads and writes both take it mutably, so read into a
+local first, then write.
+
+```rust
+let initial = todo.with(cx, |todo| todo.done); // read
+let done = cx.signal(initial);                  // then write
+```
+
+### No macros
+
+Every API is a real function, method or type. There is no macro in the authoring API.
 
 ## Errors
 
-Entry points return `Result<(), RunError>`.
+The entry points return `Result<(), RunError>`.
+
+```rust title="Signature"
+pub enum RunError {
+    Graphics(GraphicsError),
+    Platform(String),
+    Thread(std::io::Error),
+}
+```
 
 <ResponseField name="RunError::Graphics" type="GraphicsError">
   The graphics backend failed to initialize.
@@ -49,5 +125,162 @@ Entry points return `Result<(), RunError>`.
 </ResponseField>
 
 <ResponseField name="RunError::Thread" type="std::io::Error">
-  A thread could not be spawned.
+  The OS refused to start a thread, such as a window's render thread.
 </ResponseField>
+
+Problems that do not stop the app are logged through `tracing` with a stable code such as
+`CUI0402`. The [errors](/docs/crownui/errors) page lists every code with its fix.
+
+## Cargo features
+
+Default features are `wayland`, `impeller`, `tokio`, `mcp` and `accessibility`. `static` and `audio`
+are off. `run` and `run_windows` exist only with `wayland` and `impeller` on, and `cx.spawn` needs
+`tokio`.
+
+## Stability
+
+CrownUI is <Badge>pre-1.0</Badge>. Under Cargo's semver rules for 0.x crates, a minor release such as
+0.2 can change any API on these pages. The repository keeps a snapshot of every crate's public API
+in `api/*.txt`, and `cargo xtask api --check` fails when the API changes without the snapshot being
+updated, so every API change is visible in review. Check the [changelog](/docs/crownui/changelog)
+before you upgrade.
+
+## Reference
+
+### Running an app
+
+<CardGroup cols={2}>
+  <Card title="run" icon="rocket" href="/docs/crownui/api/run">
+    Open one window and run until it closes.
+  </Card>
+  <Card title="run_windows" icon="layers" href="/docs/crownui/api/run-windows">
+    Open several windows, each with its own UI.
+  </Card>
+  <Card title="AppConfig" icon="settings" href="/docs/crownui/api/app-config">
+    Title, size, material, decorations, MCP and frame pacing.
+  </Card>
+  <Card title="LayerOptions" icon="layers" href="/docs/crownui/api/layer-options">
+    Panels, docks, overlays and wallpapers.
+  </Card>
+</CardGroup>
+
+### State
+
+<CardGroup cols={2}>
+  <Card title="Cx" icon="cpu" href="/docs/crownui/api/cx">
+    The context every component and handler receives.
+  </Card>
+  <Card title="cx.signal" icon="zap" href="/docs/crownui/api/signal">
+    Reactive state that updates only what reads it.
+  </Card>
+  <Card title="cx.memo" icon="zap" href="/docs/crownui/api/memo">
+    A derived value that recomputes when its inputs change.
+  </Card>
+  <Card title="cx.effect" icon="refresh" href="/docs/crownui/api/effect">
+    Run code when the signals it reads change.
+  </Card>
+  <Card title="cx.store" icon="copy" href="/docs/crownui/api/store">
+    Untracked state. Reads subscribe nothing and writes notify nobody.
+  </Card>
+  <Card title="bind" icon="link" href="/docs/crownui/api/bind">
+    Turn any expression into a reactive property.
+  </Card>
+  <Card title="cx.provide" icon="puzzle" href="/docs/crownui/api/provide">
+    Pass a value down the tree without threading it through every call.
+  </Card>
+</CardGroup>
+
+### Structure
+
+<CardGroup cols={2}>
+  <Card title="component" icon="puzzle" href="/docs/crownui/api/component">
+    A closure that creates state and returns a view, once.
+  </Card>
+  <Card title="show" icon="code" href="/docs/crownui/api/show">
+    Mount one of two branches.
+  </Card>
+  <Card title="keyed" icon="refresh" href="/docs/crownui/api/keyed">
+    Rebuild a branch when a derived value changes.
+  </Card>
+  <Card title="for_each" icon="layers" href="/docs/crownui/api/for-each">
+    A keyed list with a signal per row.
+  </Card>
+  <Card title="error_boundary" icon="alert" href="/docs/crownui/api/error-boundary">
+    Catch a panicking component and show a fallback.
+  </Card>
+</CardGroup>
+
+### Views
+
+<CardGroup cols={2}>
+  <Card title="Stacks" icon="layers" href="/docs/crownui/api/stacks">
+    `vstack`, `hstack`, `zstack`, `spacer` and `divider`.
+  </Card>
+  <Card title="text" icon="pencil" href="/docs/crownui/api/text">
+    Static and reactive text.
+  </Card>
+  <Card title="button" icon="check-circle" href="/docs/crownui/api/button">
+    A pressable control.
+  </Card>
+  <Card title="toggle" icon="check" href="/docs/crownui/api/toggle">
+    A switch bound to a `Signal<bool>`.
+  </Card>
+  <Card title="text_field" icon="pencil" href="/docs/crownui/api/text-field">
+    Text input bound to a `Signal<String>`.
+  </Card>
+  <Card title="scroll_view" icon="layers" href="/docs/crownui/api/scroll-view">
+    A scrolling container.
+  </Card>
+  <Card title="lazy_list" icon="layers" href="/docs/crownui/api/lazy-list">
+    Mount only the visible rows of a long list.
+  </Card>
+  <Card title="canvas" icon="image" href="/docs/crownui/api/canvas">
+    Draw paths, shapes and text into a `DrawList`.
+  </Card>
+  <Card title="image" icon="image" href="/docs/crownui/api/image">
+    Show RGBA pixels.
+  </Card>
+  <Card title="svg" icon="image" href="/docs/crownui/api/svg">
+    Show an SVG document.
+  </Card>
+  <Card title="popover" icon="layers" href="/docs/crownui/api/popover">
+    Content anchored to another element.
+  </Card>
+</CardGroup>
+
+### Modifiers
+
+<CardGroup cols={2}>
+  <Card title="Styled" icon="pencil" href="/docs/crownui/api/styled">
+    Every Tailwind-named style method.
+  </Card>
+  <Card title="Variants" icon="sparkles" href="/docs/crownui/api/variants">
+    Hover, active, focus, dark, enter and exit styles.
+  </Card>
+  <Card title="Listeners" icon="bell" href="/docs/crownui/api/listeners">
+    DOM-named event handlers.
+  </Card>
+  <Card title="Semantic" icon="info" href="/docs/crownui/api/semantic">
+    Labels and roles for screen readers, tests and agents.
+  </Card>
+  <Card title="Spring and Curve" icon="sparkles" href="/docs/crownui/api/spring-curve">
+    The motion that transitions use.
+  </Card>
+</CardGroup>
+
+### Kit, testing and extension
+
+<CardGroup cols={2}>
+  <Card title="Kit theme" icon="settings" href="/docs/crownui/api/kit-theme">
+    Read and provide the CrownOS theme.
+  </Card>
+  <Card title="TestApp" icon="check-circle" href="/docs/crownui/api/test-app">
+    Run a view headless and act on it.
+  </Card>
+  <Card title="Kind" icon="wrench" href="/docs/crownui/api/kind">
+    Write a widget from scratch.
+  </Card>
+  <Card title="DrawList" icon="image" href="/docs/crownui/api/draw-list">
+    The drawing commands a canvas records.
+  </Card>
+</CardGroup>

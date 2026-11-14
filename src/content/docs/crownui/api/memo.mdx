@@ -1,0 +1,123 @@
+---
+title: memo
+description: Derive a value from signals, recompute it only when its inputs change, and stop updates when the result is the same.
+api: FN cx.memo
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Derived total"
+let items = cx.signal(vec![3, 4, 5]);
+let total = cx.memo(move |rt| items.with(rt, |items| items.iter().sum::<i32>()));
+
+text(bind(move |rt| format!("Total: {}", total.get(rt))))
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+impl Runtime {
+    pub fn memo<T: PartialEq + 'static>(
+        &mut self,
+        compute: impl FnMut(&mut Self) -> T + 'static,
+    ) -> Memo<T>
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`memo` runs `compute` once, right away, and stores the result. Every signal or memo that `compute` reads becomes a dependency. When a dependency changes, the runtime runs `compute` again at the next flush and compares the new result with the stored one using `PartialEq`. If they are equal, nothing downstream runs. If they differ, the memo stores the new value and marks its own subscribers dirty.
+
+You call it as `cx.memo(..)` because `Cx` derefs to `Runtime`. The closure receives `&mut Runtime`, not `&mut Cx`, so it reads signals but cannot build views or spawn tasks.
+
+## Parameters
+
+<ParamField name="compute" type="impl FnMut(&mut Runtime) -> T + 'static" required>
+  Derives the value. It runs once on creation and again whenever a value it read changes. It tracks what it reads on each run, so a branch that stops reading a signal also stops depending on it.
+</ParamField>
+
+## Returns
+
+<ResponseField name="Memo<T>" type="Copy handle">
+  A read-only key into the runtime, owned by the current scope. It implements `Copy`, `Clone`, `PartialEq`, `Eq`, `Hash` and `Debug`, and `IntoProp<T>` when `T: Clone`.
+</ResponseField>
+
+## Memo methods
+
+<ResponseField name="get" type="fn(self, &mut Runtime) -> T where T: Clone">
+  Clones the current value and subscribes the running observer. Panics with `CUI0001` when the memo's scope was disposed.
+</ResponseField>
+
+<ResponseField name="try_get" type="fn(self, &mut Runtime) -> Option<T> where T: Clone">
+  Clones the value, or returns `None` when the memo was disposed.
+</ResponseField>
+
+<ResponseField name="with" type="fn<R>(self, &mut Runtime, impl FnOnce(&T) -> R) -> R">
+  Lends `&T` to a closure and subscribes the running observer.
+</ResponseField>
+
+A memo has no `set`. Its value only ever comes from `compute`.
+
+## Examples
+
+### Stop work that would change nothing
+
+A radio group with many rows needs one "is this row selected" flag per row. Each row reads a memo instead of the selection signal itself. When the selection moves, every memo re-runs, but only the two whose result flipped notify their row. This is how the kit's `radio_group` is built.
+
+```rust
+let options = ["Small", "Medium", "Large"];
+let selected = cx.signal(Some(0_usize));
+
+let rows: Vec<_> = (0..options.len())
+    .map(|index| {
+        let is_selected = cx.memo(move |rt| selected.get(rt) == Some(index));
+        text(options[index])
+            .opacity(bind(move |rt| if is_selected.get(rt) { 1.0 } else { 0.6 }))
+    })
+    .collect();
+```
+
+### Use a memo as a property
+
+`Memo<T>` implements `IntoProp<T>`, so you pass it straight to any property of the same type.
+
+```rust
+let name = cx.signal(String::from("Ada"));
+let greeting = cx.memo(move |rt| name.with(rt, |name| format!("Hello, {name}")));
+
+text(greeting)
+```
+
+### Turn a `Prop` into a memo
+
+Components that accept `impl IntoProp<T>` often store the property as a memo so several bindings share one computation. Match on the `Prop` and wrap either case.
+
+```rust
+let value = match label.into_prop() {
+    Prop::Static(value) => cx.memo(move |_| value.clone()),
+    Prop::Dynamic(mut compute) => cx.memo(move |rt| compute(rt)),
+};
+```
+
+`Prop` lives in `crownui::ext`.
+
+## When to use a memo
+
+Use `bind` when one property reads a value once. Use a memo when:
+
+- several properties or effects read the same derived value, so the work runs once instead of once per reader, or
+- the derived value changes much less often than its inputs, so the equality check saves downstream work.
+
+## Why it works this way
+
+The runtime is push based and glitch free. Observers run in height order, where a memo sits one level above the highest signal it reads. A view that reads both a signal and a memo derived from it never sees the memo's stale value, because the memo runs first.
+
+The equality check is the reason memos exist. A `Signal` never compares values on `set`, because that would force `PartialEq` on every stored type and cost a comparison on every write. A memo opts in. You pay for one stored copy of `T` and one comparison per recompute, and in return unchanged results cut the update short.
+
+Memos are eager. A memo with no readers still recomputes when its inputs change, until its scope is disposed. Create memos inside the component that uses them, so they go away when it unmounts.
+
+<Warning>
+  `cx.with2` and `update_from` take `Signal` handles only. To combine a memo with a signal, read the memo into a local first.
+</Warning>
+
+See [signal](/docs/crownui/api/signal), [effect](/docs/crownui/api/effect) and [State](/docs/crownui/state).

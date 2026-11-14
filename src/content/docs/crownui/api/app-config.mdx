@@ -1,0 +1,240 @@
+---
+title: AppConfig
+description: The options a window starts with, built with chained methods from AppConfig::new.
+api: FN crownui::AppConfig
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="main.rs"
+use crownui::prelude::*;
+
+fn main() -> Result<(), crownui::RunError> {
+    let config = AppConfig::new("Notes")
+        .app_id("org.example.notes")
+        .size(960, 640)
+        .min_size(480, 360)
+        .color_scheme(ColorScheme::Dark)
+        .clear_color(rgb(0x0f172a));
+    crownui::run(component(|_cx| text("Hello")), config)
+}
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+pub struct AppConfig {
+    pub title: String,
+    pub app_id: Option<String>,
+    pub size: LogicalSize,
+    pub min_size: Option<LogicalSize>,
+    pub material: Option<Material>,
+    pub clear_color: Color,
+    pub color_scheme: ColorScheme,
+    pub fonts: Vec<(Vec<u8>, Option<String>)>,
+    pub mcp: bool,
+    pub accessibility: bool,
+    pub layer: Option<LayerOptions>,
+    pub corner_shape: CornerShape,
+    pub decorations: Decorations,
+    pub frame_pacing: FramePacing,
+}
+
+impl AppConfig {
+    pub fn new(title: impl Into<String>) -> Self
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`AppConfig` says how one window starts. You pass it to [`crownui::run`](/docs/crownui/api/run), or pair it with a view in [`crownui::run_windows`](/docs/crownui/api/run-windows). Start from `AppConfig::new(title)` and chain the methods you need. Every method takes `self` and returns `Self`, so the order of calls does not matter, with one exception: `material` also sets the clear color, so call `clear_color` after it if you want a different one.
+
+`AppConfig` is in `crownui::prelude` and at the crate root as `crownui::AppConfig`. It implements `Default`, `Clone` and `Debug`. All fields are public, so you can also write `AppConfig { size: .., ..AppConfig::default() }`.
+
+## Defaults
+
+| Field | Default |
+| --- | --- |
+| `title` | `"CrownUI"` |
+| `app_id` | `None` |
+| `size` | 800 by 600 logical pixels |
+| `min_size` | `None` |
+| `material` | `None` |
+| `clear_color` | `WHITE` |
+| `color_scheme` | `ColorScheme::Light` |
+| `fonts` | empty |
+| `mcp` | `false` |
+| `accessibility` | `true` |
+| `layer` | `None`, a normal window |
+| `corner_shape` | `CornerShape::Round` |
+| `decorations` | `Decorations::Client` |
+| `frame_pacing` | `FramePacing::Display` |
+
+<Warning>
+  The `mcp` cargo feature is on by default, but `AppConfig` still defaults `mcp` to `false`. The
+  feature compiles the server in. The config field decides whether a given window starts it. Call
+  `.mcp(true)` to let agents reach the app.
+</Warning>
+
+## Constructor
+
+<ParamField name="new" type="fn new(title: impl Into<String>) -> Self" required>
+  A config with the given title and every other field at its default. The title is the window
+  title and also the app name that MCP agents and screen readers see.
+</ParamField>
+
+## Builder methods
+
+<ParamField name="size" type="fn size(self, width: u32, height: u32) -> Self">
+  The initial content size in logical pixels. For a layer surface it is the fallback size until
+  the compositor reports the output size.
+</ParamField>
+
+<ParamField name="min_size" type="fn min_size(self, width: u32, height: u32) -> Self">
+  The smallest content size the user can resize the window to. Set it when your layout clips
+  below some size.
+</ParamField>
+
+<ParamField name="app_id" type="fn app_id(self, app_id: impl Into<String>) -> Self">
+  The Wayland application id. The compositor and the launcher use it to match the window to its
+  desktop entry and icon. When MCP is on, the app asks the platform for agent access under this
+  id, or under the title when no id is set.
+</ParamField>
+
+<ParamField name="material" type="fn material(self, material: Material) -> Self">
+  Puts a compositor-rendered material (blur, tint, rim and shadow) behind the whole window and
+  sets the clear color to `TRANSPARENT` so the material shows through. `Material::thin()` and
+  `Material::thick()` are the two presets.
+</ParamField>
+
+<ParamField name="clear_color" type="fn clear_color(self, color: Color) -> Self">
+  The color the window is cleared to before your views draw. Use `TRANSPARENT` for a material or
+  for a layer surface that should only show what it draws.
+</ParamField>
+
+<ParamField name="color_scheme" type="fn color_scheme(self, scheme: ColorScheme) -> Self">
+  The initial light or dark scheme. `.dark(|style| ..)` variants apply when it is
+  `ColorScheme::Dark`. Read the live value with `cx.color_scheme()`.
+</ParamField>
+
+<ParamField name="font" type="fn font(self, bytes: Vec<u8>, alias: Option<&str>) -> Self">
+  Registers a font before the first layout. The alias is the family name you pass to
+  `.font_family(..)`. Call it once per font file.
+</ParamField>
+
+<ParamField name="mcp" type="fn mcp(self, enabled: bool) -> Self">
+  Starts the in-app MCP server so agents can read the semantic tree and act on it. It needs the
+  `mcp` feature, which is on by default.
+</ParamField>
+
+<ParamField name="accessibility" type="fn accessibility(self, enabled: bool) -> Self">
+  Turns the AT-SPI screen reader bridge on or off. It is on by default. Panels and overlays that
+  only decorate the screen often turn it off.
+</ParamField>
+
+<ParamField name="layer" type="fn layer(self, layer: LayerOptions) -> Self">
+  Runs the window as a desktop-shell layer surface (panel, dock, overlay or wallpaper) instead of
+  an application window. See [LayerOptions](/docs/crownui/api/layer-options).
+</ParamField>
+
+<ParamField name="corner_shape" type="fn corner_shape(self, shape: CornerShape) -> Self">
+  The curve every rounded corner in the window follows, kit widgets included.
+  `CornerShape::Squircle` matches the corners the CrownOS compositor draws.
+</ParamField>
+
+<ParamField name="decorations" type="fn decorations(self, decorations: Decorations) -> Self">
+  Who draws the window frame. `Decorations::Client`, the default, means the app draws its own
+  title bar with the kit's `window_controls()` and resizes from its edges. `Decorations::Server`
+  asks the compositor to draw the title bar and borders.
+</ParamField>
+
+<ParamField name="frame_pacing" type="fn frame_pacing(self, pacing: FramePacing) -> Self">
+  When the render thread draws frames. See [FramePacing](#framepacing) below.
+</ParamField>
+
+## Examples
+
+### A glass window
+
+```rust
+AppConfig::new("Player")
+    .size(420, 220)
+    .material(Material::thin())
+    .corner_shape(CornerShape::Squircle)
+```
+
+The compositor draws the blur behind the window. On a compositor without the CrownOS material
+protocol, nothing is drawn behind it and the transparent window shows what is under it. Check
+`cx.platform_capabilities()` and its `materials` field to pick an opaque fallback.
+
+### A bundled font
+
+```rust
+use crownui::kit;
+
+AppConfig::new("Settings").font(kit::inter_font().to_vec(), Some(kit::INTER_FAMILY))
+```
+
+### Server-drawn decorations
+
+```rust
+use crownui::windowing::Decorations;
+
+AppConfig::new("Terminal").decorations(Decorations::Server)
+```
+
+`Decorations` is not in the prelude. The published `crownui` crate exposes it as
+`crownui::windowing::Decorations`.
+
+### A panel
+
+```rust
+AppConfig::new("Bar")
+    .app_id("crownbar")
+    .clear_color(TRANSPARENT)
+    .accessibility(false)
+    .layer(
+        LayerOptions::new("crownbar", Anchor::TOP | Anchor::LEFT | Anchor::RIGHT)
+            .height(LayerExtent::Fixed(36))
+            .exclusive_zone(36),
+    )
+```
+
+## FramePacing
+
+```rust title="Signature"
+pub enum FramePacing {
+    Display,
+    Unpaced,
+}
+```
+
+`FramePacing` is in the prelude and at `crownui::FramePacing`.
+
+<ResponseField name="FramePacing::Display" type="variant">
+  The default. Each frame waits for the platform's frame callback, so the app draws at most one
+  frame per display refresh.
+</ResponseField>
+
+<ResponseField name="FramePacing::Unpaced" type="variant">
+  The render thread draws the next frame as soon as it submits the previous one. Frames the
+  display cannot show are drawn and dropped. Use it to measure throughput, never in a shipped app.
+</ResponseField>
+
+```rust
+AppConfig::new("Bench").frame_pacing(FramePacing::Unpaced)
+```
+
+## Why the config is fixed at start
+
+Most fields describe how the window is created on the Wayland side: its app id, its layer role,
+its decorations and its material. CrownUI reads the config once, when it opens the window. Things that change while the app runs have their own calls on
+`Cx` instead, for example `cx.set_layer_height`, `cx.set_keyboard_interactivity` and
+`cx.color_scheme()`. The cost is that you cannot turn a normal window into a panel at runtime.
+Open a second window with [`run_windows`](/docs/crownui/api/run-windows) for that.
+
+## Related
+
+- [Windows guide](/docs/crownui/windows)
+- [LayerOptions](/docs/crownui/api/layer-options)
+- [run](/docs/crownui/api/run)

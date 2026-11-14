@@ -1,0 +1,148 @@
+---
+title: effect
+description: Run a side effect now and again whenever the signals it read change, and clean up when its scope ends.
+api: FN cx.effect
+---
+
+<ApiExamples>
+<RequestExample>
+```rust title="Sync a toggle into a list"
+let done = cx.signal(initially_done);
+
+cx.effect(move |rt| {
+    let checked = done.get(rt);
+    let id = todo.with_untracked(rt, |todo| todo.id);
+    todos.update(rt, |list| {
+        if let Some(item) = list.iter_mut().find(|item| item.id == id) {
+            item.done = checked;
+        }
+    });
+});
+```
+</RequestExample>
+
+<ResponseExample>
+```rust title="Signature"
+impl Runtime {
+    pub fn effect(&mut self, run: impl FnMut(&mut Self) + 'static) -> EffectId
+    pub fn dispose_effect(&mut self, effect: EffectId)
+    pub fn on_cleanup(&mut self, cleanup: impl FnOnce(&mut Self) + 'static)
+    pub fn untrack<R>(&mut self, read: impl FnOnce(&mut Self) -> R) -> R
+}
+```
+</ResponseExample>
+</ApiExamples>
+
+`effect` runs `run` once, right away, and records every signal and memo it read. When one of them changes, the runtime runs `run` again at the next flush and records the reads again. The effect belongs to the current scope and stops when that scope is disposed.
+
+You call it as `cx.effect(..)` because `Cx` derefs to `Runtime`. The closure receives `&mut Runtime`, not `&mut Cx`. It reads and writes signals and stores. It cannot build views, request focus or spawn tasks.
+
+## Parameters
+
+<ParamField name="run" type="impl FnMut(&mut Runtime) + 'static" required>
+  The side effect. It runs once on creation and again after any value it read changes. Reads through `get`, `with`, `try_get` or `cx.with2` subscribe it. Reads through `with_untracked`, `Store::with` or inside `untrack` do not.
+</ParamField>
+
+## Returns
+
+<ResponseField name="EffectId" type="Copy handle">
+  Identifies the effect so you can stop it early with `dispose_effect`. Most code ignores it and lets the scope end the effect. The type is `reactive::EffectId`. It is not re-exported from `crownui::prelude`, so keep it in a `let` and let inference name it.
+</ResponseField>
+
+## Related methods
+
+<ResponseField name="dispose_effect" type="fn(&mut self, EffectId)">
+  Stops the effect now and drops its subscriptions. Its scope keeps running everything else.
+</ResponseField>
+
+<ResponseField name="on_cleanup" type="fn(&mut self, impl FnOnce(&mut Runtime) + 'static)">
+  Registers `cleanup` on the current scope. It runs once, when that scope is disposed. Cleanups of one scope run in reverse order of registration, after the scope's child scopes are gone and before its signals are freed.
+</ResponseField>
+
+<ResponseField name="untrack" type="fn<R>(&mut self, impl FnOnce(&mut Runtime) -> R) -> R">
+  Runs `read` without subscribing the running observer to anything it reads.
+</ResponseField>
+
+## When effects run
+
+1. `cx.effect(..)` runs the closure once, during the call.
+2. A write to a tracked signal marks the effect dirty. Nothing runs yet.
+3. The UI flushes after each event handler, task completion, animation frame callback and clipboard or close callback. The flush runs dirty observers in height order, so memos the effect reads are already fresh.
+4. If the effect writes a signal, the subscribers of that signal run in the next pass of the same flush.
+5. A flush stops after 64 passes and logs `reactive cycle: still dirty after 64 passes (an effect writes a signal it reads)`.
+
+## Examples
+
+### Clean up when a component unmounts
+
+`on_cleanup` is the place to stop threads, close channels or release anything the component started. Register it in the component body, beside the effect, not inside the effect.
+
+```rust
+use std::sync::mpsc::{TryRecvError, channel};
+
+component(|cx| {
+    let (stop, stopped) = channel::<()>();
+    std::thread::spawn(move || {
+        while let Err(TryRecvError::Empty) = stopped.try_recv() {
+            poll_sensor();
+        }
+    });
+    cx.on_cleanup(move |_| {
+        let _ = stop.send(());
+    });
+    text("Reading the sensor")
+})
+```
+
+`cx.release_image_on_cleanup(id)` is built the same way. It queues the image release when the scope ends.
+
+### Skip the first run
+
+Sometimes you only want to react to changes. Keep a flag in the closure and flip it on the first run.
+
+```rust
+let mut primed = false;
+cx.effect(move |rt| {
+    let value = query.get(rt);
+    if std::mem::replace(&mut primed, true) {
+        history.update(rt, |log| log.push(value));
+    }
+});
+```
+
+### Read without subscribing
+
+`untrack` reads a signal for context without making the effect depend on it. The effect below runs when `query` changes, not when `limit` changes.
+
+```rust
+cx.effect(move |rt| {
+    let query = query.get(rt);
+    let limit = rt.untrack(|rt| limit.get(rt));
+    results.set(rt, search(&query, limit));
+});
+```
+
+### Stop an effect early
+
+```rust
+let logger = cx.effect(move |rt| println!("count is {}", count.get(rt)));
+
+button("Stop logging").on_click(move |cx, _| cx.dispose_effect(logger))
+```
+
+## Pitfalls
+
+- An effect body runs with the scope that owns the effect as the current scope. An `rt.signal(..)` or `rt.on_cleanup(..)` inside the body creates a new one on every run, and none are freed until that scope ends. Create state and cleanups in the component body, outside the effect.
+- An effect that writes a signal it also reads loops until the 64 pass cap. Read the old value with `with_untracked`, or derive the value with a `memo` instead.
+- A panic inside an effect is caught. The effect is quarantined and never runs again, and the nearest `error_boundary` receives the message. Without a boundary, the runtime keeps the panic in a list that `take_panics` returns.
+- The root component's scope lives as long as the window. Closing the window drops the runtime without disposing scopes, so cleanups registered there do not run. Values captured by those cleanups are still dropped, so put exit work in a `Drop` impl.
+
+## Why it works this way
+
+Effects are the escape hatch from the declarative model. Most UI work does not need them, because `bind` and `memo` already re-run when their inputs change and the view applies the result. The framework itself uses effects for exactly that: each bound property is a small effect that queues one command for the element tree.
+
+Effects get `&mut Runtime` and not `&mut Cx` because the runtime is a separate crate with no knowledge of views. The view flushes the runtime first and applies the queued tree commands afterwards, so during a flush effects only touch signals and stores. Restricting them to the runtime keeps a flush from mounting nodes or moving focus halfway through. Do view work in event handlers, where you hold a `Cx`.
+
+Writes from an effect wait for the next pass instead of running inline. That keeps each pass glitch free, at the cost of one extra pass per chain of effect writes. The pass cap turns an accidental cycle into a logged error instead of a frozen window.
+
+See [memo](/docs/crownui/api/memo) for derived values, [State](/docs/crownui/state) for scopes and [error_boundary](/docs/crownui/api/error-boundary) for catching panics.
