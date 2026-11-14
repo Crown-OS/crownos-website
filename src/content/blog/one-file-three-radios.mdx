@@ -1,0 +1,184 @@
+---
+title: "One file, three radios: making FileShare fast"
+description: We sent one file from a laptop to a phone over USB, Wi-Fi and Bluetooth at the same time. These are the benchmarks, the bugs and the fixes that took it from 0 bytes to 53 MB/s.
+date: "2026-11-14"
+tag: Engineering
+author: rama-krishnan
+---
+
+FileShare now sends a 256 MiB file from our test laptop to our test phone in 5.04 seconds. That is 53.2 MB/s, and it is 2.7 times faster than USB alone. At the start of the day, the same transfer sent 0 bytes. This post shows every step between those two results.
+
+## What FileShare does
+
+FileShare is the CrownOS app that moves files between a Linux computer and an Android phone. It runs on FFSP, a transfer protocol that we wrote in Rust. FFSP cuts a file into 1 MiB chunks. Each chunk has its own hash, so the receiver can verify each chunk alone and in any order.
+
+Each connection between the two devices is a lane. A lane can be Bluetooth, Wi-Fi or USB. Each lane has its own AES-256-GCM key. The sender's scheduler decides which chunk goes down which lane. The idea is simple. If USB and Wi-Fi each carry part of the file at the same time, the file arrives sooner.
+
+A session starts over Bluetooth, because Bluetooth needs no cable and no network setup. The laptop then uses the Bluetooth lane to invite the phone onto Wi-Fi and onto USB. For USB, the laptop puts the phone into Android Open Accessory (AOA) mode. The laptop is the sender in all of the tests below. The phone is the receiver.
+
+The only earlier full run was in September. It sent 64 MiB at 7.2 Mbit/s, with 998 buffer starvations and 123 abandoned chunks. So we knew that the scheduler had problems before we started.
+
+## Step 1: make the run start
+
+We installed the app over USB debugging and pressed Start. Bluetooth connected, and then the run stopped with no error.
+
+The cause was in the app. When the app asks for USB accessory permission, a broadcast receiver must hear the answer. We wrote that receiver but never registered it. A reinstall resets the permission, so the app asked again and never heard the reply. The USB lane waited forever.
+
+The app now registers the receiver when the user presses Start and removes it on Stop. We also added an activity log to the app screen. It shows each status change, each lane that opens or closes and the speed of each lane at every 10% of progress. We used this log for the rest of the day.
+
+## Step 2: the stall at 0 bytes
+
+With all three lanes up, the phone accepted a 256 MiB offer. Then nothing happened for 10 minutes.
+
+The engine dropped events that it did not show, so we added a debug log for every engine event on the sender. The log showed this error on the laptop's USB reader:
+
+```text
+frame 1 arrived where 0 was expected
+```
+
+Each lane has a strict frame counter, because the counter is part of the AES-GCM nonce. A new session must start at frame 0. Frame 1 came from an older session. When we killed a laptop process during tests, the phone kept writing into the USB accessory. Those bytes stayed in the USB pipe until the next process read them.
+
+We wrote a small probe to check this. With no session running, the probe found 159 bytes in the pipe. The header bytes matched an FFSP frame on lane 3, which was the USB lane.
+
+That explained the stall. The laptop saw the bad frame and closed its USB lane. It did not tell the phone. Both ends send control messages over the lane with the lowest round trip time, and that lane was USB. So the phone sent its "accept" message into a lane that the laptop had already closed. The laptop never received it and waited forever.
+
+We made two changes on the Linux side:
+
+1. After the laptop claims the USB interface, it reads and discards data until the pipe is quiet for 50 ms.
+2. The laptop claims and clears USB before it invites the phone onto USB. A clear after the invite also discards the phone's real first frame.
+
+The next run worked. The laptop discarded 33 old bytes and sent the file.
+
+| Lane | Chunks | Share | Speed |
+|---|---|---|---|
+| USB | 255 | 99.6% | 19.1 MB/s |
+| Wi-Fi | 13 | 5.0% | 0.97 MB/s |
+| Bluetooth | 0 | 0% | 0 |
+
+256 MiB took 13.98 seconds, at 19.2 MB/s. The shares add up to more than 100% because about 12 chunks went out twice. The speedup over USB alone was 1.00. The file now arrived, but Wi-Fi and Bluetooth added nothing.
+
+## Step 3: find the real limits
+
+Before we changed the scheduler, we measured each link on its own. We wanted to know how much of the problem was the links and how much was our code.
+
+### USB
+
+USB carried 17.8 to 19.9 MB/s over nine runs of 256 MiB. One run gave 9.6 MB/s, and we do not know why. We tested three causes:
+
+- The laptop side. We raised the number of queued USB transfers from 1 to 8. The speed did not change.
+- The phone CPU. No thread used more than about 35% of a core during a transfer.
+- Thread priority. We raised the priority of the phone's USB reader thread. The speed did not change.
+
+Then we read the kernel driver. The test phone runs kernel 5.10. Its `f_accessory` driver reads at most 16 KiB per `read()` call. It queues one USB request, then blocks until that request completes. Nothing is queued between two reads. At 20 MB/s, that is about 840 microseconds for each 16 KiB. The speed we measured matches this design, so we accepted about 20 MB/s as the AOA ceiling on this phone.
+
+### Wi-Fi
+
+We counted bytes on the laptop's network interfaces during a run. The Wi-Fi lane went out through Ethernet, then through the router, then to the phone over 2.4 GHz Wi-Fi. iperf3 measured that path at 19 to 24 Mbit/s. FileShare got only 7.8 Mbit/s from it, with 20 stalls for 13 chunks.
+
+At first we thought that we saw Wi-Fi bursts at 82 Mbit/s. That was a measurement error. The progress counter samples every 100 ms. One 1 MiB frame that lands inside one sample shows as 84 Mbit/s for that sample.
+
+### Bluetooth
+
+Bluetooth carries about 1.5 Mbit/s. One 1 MiB chunk takes about 5.6 seconds. The scheduler's maximum stall deadline was 3 seconds. So every chunk that Bluetooth received was declared stalled before it arrived. Bluetooth sent 0 useful chunks in every run.
+
+## Step 4: why the scheduler lost Wi-Fi
+
+The old scheduler pushed each chunk to a lane in advance, based on a speed estimate for each lane. It set a deadline for each chunk. When a deadline expired, it marked the chunk as stalled and sent it again on another lane. We read the code and found five faults:
+
+1. Each estimate started from a fixed hint. Wi-Fi started at 400 Mbit/s, so its first chunks missed their deadlines.
+2. After a stall, the late ack for that chunk did not count. The Wi-Fi estimate fell to about 7 Mbit/s and never recovered.
+3. The 3 second cap on the deadline was shorter than one Bluetooth chunk.
+4. On a stall, the scheduler told every lane to drop the chunk. This included the lane that was about to carry the replacement copy. That is one reason for the high count of abandoned chunks.
+5. The estimator also used the time of each socket write. A socket write ends when the kernel takes the bytes, not when the phone receives them. Another input divided a byte count by an interval of 1 microsecond.
+
+## Step 5: simulate before we write code
+
+We wrote a small discrete event simulation in Python. It models each lane as a pipe with the speeds that we measured. Each scheduler in it learns speeds from acks and starts from the same hints as the real code. For the current rules, it predicted 14.7 seconds and 19 Wi-Fi chunks. The real run took 14.0 seconds with 13 Wi-Fi chunks, so the model was close enough to compare designs.
+
+Our first idea was a plain shared queue. Each lane takes the next chunk when it has room. The simulation showed that this is worse than the old code. Bluetooth takes some of the last chunks, and then the whole transfer waits seconds for them.
+
+| Scheduler | 2.4 GHz Wi-Fi at 19 Mbit/s | 5 GHz Wi-Fi at 250 Mbit/s |
+|---|---|---|
+| Best possible, sum of all lanes | 1.13 | 2.62 |
+| Old push rules | 0.94 | 2.46 |
+| Push with a fixed estimator | 0.82 | 2.46 |
+| Plain shared queue | 0.62 | 1.24 |
+| Queue with an end of transfer rule | 1.13 | 2.46 |
+
+The numbers are speedups over USB alone. The 5 GHz column was a guess at that time.
+
+The table told us two things. First, the end of the transfer matters more than the middle. Second, with 2.4 GHz Wi-Fi, no scheduler can do better than about 13%. The link speeds set that limit.
+
+The end of transfer rule comes from multipath TCP research, where it has the name ECF, for earliest completion first. A slow lane can take a chunk only if it will deliver that chunk before the fastest lane can send everything that is left. Near the end, the slow lanes stop and the fast lane finishes the file.
+
+## Step 6: the new scheduler
+
+We kept the existing code structure and changed the rules:
+
+- The first ack replaces the hint. After that, acks are the only input to the estimate. Socket write times no longer count.
+- A lane holds one chunk until an ack measures it. A wrong hint can no longer fill a queue.
+- The stall deadline has no cap. It starts when the lane starts to send the chunk, and it is at least 1 second.
+- A stall lowers the estimate to a value that the lane did not reach. The chunk stays on a list of overdue chunks. If its ack arrives late, the estimate learns from it.
+- A stall tells only the stalled lane to drop the chunk.
+- The ECF rule applies to new chunks, to chunks that come back after a stall and to duplicates at the end of the transfer.
+
+First we added a Rust test that uses the real hints and the real link speeds, with the stall timer on. On the old code, the test failed. Striping took 6.80 seconds against 6.91 seconds on USB alone, with 23 stalls. On the new code, striping took 6.16 seconds. That is 1.12, close to the 1.13 limit. The test had 0 stalls, and the estimates settled at 155, 19 and 1.5 Mbit/s. All 201 tests passed.
+
+On the phone, we ran the old and new senders in turns, so that both saw the same radio conditions.
+
+| Run | Old time | New time | Old stalls | New stalls | Old abandoned | New abandoned |
+|---|---|---|---|---|---|---|
+| 1 | 13.92 s | 14.75 s | 21 | 2 | 21 | 2 |
+| 2 | 13.97 s | 13.84 s | 26 | 5 | 12 | 5 |
+| 3 | 13.01 s | 13.31 s | 25 | 1 | 18 | 1 |
+
+The stalls almost stopped. With the old code, every chunk that Wi-Fi carried was also sent over USB. With the new code, Wi-Fi carried 4 to 6 chunks that USB did not need to send. The total times did not change, because USB alone varies by about 10% between runs. This matched the simulation. The scheduler was correct now, and the links were the limit.
+
+We also tested two chunks in flight per lane instead of one. Wi-Fi went from about 21 to about 27 Mbit/s, but USB carried less. The total time stayed the same, so we kept one chunk.
+
+## Step 7: the Wi-Fi bursts
+
+Next we measured Wi-Fi alone. FileShare sent 64 MiB at 1.7 to 1.9 MB/s. Each chunk moved at about 19 Mbit/s while it was on the air, but the average was lower. The transfer looked like bursts with pauses between them.
+
+We wrote a script that reads the transmit byte counter of the network card every 20 ms. On Ethernet, it showed almost no traffic. The data used a different path. The laptop's Wi-Fi card had joined the phone's hotspot during the day. The test rig advertises the wireless address first, so the Wi-Fi lane now went straight from the laptop to the phone hotspot.
+
+The hotspot was on 2427 MHz. The phone was also connected to the router on 2462 MHz. One 2.4 GHz radio served two channels, so it switched between them all the time. When the radio was on the router channel, the hotspot was silent.
+
+The 20 ms samples on the laptop Wi-Fi card confirmed this:
+
+- 56% of the samples had no data at all.
+- There were 336 pauses in one 64 MiB transfer. The median pause was 40 ms. The 90th percentile was 100 ms.
+- Between the pauses, the link sent at 50 to 130 Mbit/s.
+
+That is about five pauses for each chunk, inside the TCP stream. A scheduler problem gives one pause for each chunk. So the radio caused the bursts, not FileShare.
+
+We made two changes on the phone. We disconnected it from the router, and we moved the hotspot to 5 GHz with an 80 MHz channel. The laptop then linked at 780 Mbit/s at -25 dBm. We did not change any code.
+
+## Step 8: the result
+
+| Lanes, 256 MiB | Time | Speed |
+|---|---|---|
+| USB only | 13.98 s | 19.2 MB/s |
+| Wi-Fi only | 6.52 to 6.80 s | 39.5 to 41.1 MB/s |
+| Bluetooth, Wi-Fi and USB | 5.04 to 5.41 s | 49.6 to 53.2 MB/s |
+
+Wi-Fi alone is now 20 times faster than before and twice as fast as USB. With all three lanes, Wi-Fi carried about 192 chunks and USB about 65. That split matches their speeds. Only 2 chunks went out twice, both at the very end. There were 0 stalls and 0 abandoned chunks. Bluetooth got no chunks, which is correct. It cannot finish a chunk before the other lanes finish the file.
+
+The sum of the two lanes is about 59 MB/s, so the striped transfer reaches 85 to 90% of the maximum. It is 1.3 times faster than Wi-Fi alone and 2.7 times faster than USB alone.
+
+## What we learned
+
+Measure each link alone before you tune a scheduler. Our first plan was to rewrite the scheduler. The measurements showed that the scheduler had only 13% to gain on those links. The largest gain came from a phone setting.
+
+The end of a transfer decides its time. A slow lane that holds the last chunk costs more than the help it gave during the middle.
+
+Check where the bytes go. We measured the wrong network card first, and we believed a burst at 82 Mbit/s that came from our own sample window.
+
+Simulate with the real numbers and the real starting hints. A model with perfect estimates hides the faults that matter.
+
+## What is still open
+
+- USB is stuck at about 20 MB/s by the AOA driver. USB tethering with NCM gives the cable a normal network interface. It will make USB one more TCP lane, and we will test it next.
+- With all three lanes, the estimate for Wi-Fi reads 550 to 650 Mbit/s, but Wi-Fi alone measures 370 Mbit/s. The split is still correct, but the reports must show true numbers.
+- When one end closes a lane after an error, it does not tell the other end. That fault caused the stall in step 2, and other errors can cause it again.
+- The phone always accepts transfer number 1. This works today only because each session sends one file.

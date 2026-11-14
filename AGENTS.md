@@ -1,7 +1,7 @@
 this is a landing for my open source AI ready linux distro operating system based on arch linux. 
 
 ## Coding style
-Do Low level design before writing code. follow solid principles. write maintainable modular code without too much comments.
+Follow SOLID principles. Write maintainable, modular code without too many comments.
 
 ## UI Style
 Always maintain a consistent design languageand coding style across the project. create smooth transitions and parallax effects across the sections in the pages.
@@ -29,7 +29,7 @@ https://tailwindcss.com/plus (font and style and spacing)
 https://stripe.com/ (layout and style)
 coreicon.dev (icons)
 
- keep all of this in your memory to retrieve on every task that you do. act like a professional designer who maintains an consistent design language all over the project.
+Act like a professional designer who keeps one consistent design language across the whole project.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

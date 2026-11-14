@@ -14,6 +14,7 @@ export const footer = {
     ],
     [
       { label: "Docs", href: "/docs" },
+      { label: "Blog", href: "/blog" },
       { label: "Changelog", href: "/changelog" },
     ],
     [
