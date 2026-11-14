@@ -3,7 +3,7 @@ import tailwind from "@tailwindcss/postcss";
 import postcss from "postcss";
 import { renderToStaticMarkup } from "react-dom/server";
 import { APP_VIEWS } from "../src/components/visuals/system-apps/app-views";
-import { systemAppShots } from "../src/data/system-apps";
+import { systemAppsLineupShot } from "../src/data/system-apps";
 import { SYSTEM_APPS } from "../src/data/system-apps/stack";
 
 const STYLES_ENTRY = "src/app/globals.css";
@@ -12,7 +12,7 @@ const INTER_CSS =
 const WOFF2_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 const PUBLIC_FROM_HTML = "../../public/";
-const { html, window } = systemAppShots;
+const { html, window } = systemAppsLineupShot;
 
 async function interFontFace() {
   const css = await (
@@ -38,7 +38,7 @@ const sheetStyles = `
 html, body { background: transparent; min-height: 0; }
 body::before, body::after { display: none; }
 body { margin: 0; padding: 48px; display: grid; gap: 48px; justify-content: start; align-content: start; }
-.lineup-window { width: ${window.width}px; height: ${window.height}px; box-shadow: none; -webkit-box-reflect: none; }
+.lineup-window { position: relative; width: ${window.width}px; height: ${window.height}px; overflow: hidden; border-radius: 12px; background: #0a0a0b; }
 `;
 
 const windows = renderToStaticMarkup(
