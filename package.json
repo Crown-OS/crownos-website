@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "dev": "next dev",
     "build": "next build && bun scripts/early-hints.ts",
     "start": "next start",
@@ -14,7 +15,8 @@
     "devices": "bun scripts/encode-devices.ts",
     "system-apps:html": "bun scripts/export-system-apps.tsx",
     "system-apps": "bun scripts/capture-system-apps.ts",
-    "illustrations": "bun scripts/export-illustrations.ts"
+    "illustrations": "bun scripts/export-illustrations.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",
