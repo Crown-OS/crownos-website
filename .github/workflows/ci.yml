@@ -1,0 +1,16 @@
+# Lints (Biome) and builds (next build, which also type-checks) on every push
+# and pull request. Logic lives in Crown-OS/.github.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: Crown-OS/.github/.github/workflows/web.yml@main
