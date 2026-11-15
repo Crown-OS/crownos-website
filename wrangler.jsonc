@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "crownos-landing-page",
+  "name": "crownos-website-v0",
   "compatibility_date": "2026-09-28",
+  "routes": [{ "pattern": "v0.crownos.org", "custom_domain": true }],
   "assets": {
     "directory": "./out",
     "not_found_handling": "404-page"
