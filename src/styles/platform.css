@@ -1,0 +1,751 @@
+@utility platform-card {
+  --color-sweep-sky: #38b6ff;
+  --color-sweep-blue: #0a5cff;
+  --color-sweep-pink: #ff3df0;
+  --color-sweep-red: #ff1f3d;
+  --color-sweep-orange: #ff8a00;
+}
+
+@utility board-trace-mask {
+  mask-image:
+    radial-gradient(ellipse 420px 290px at 50% 50%, #000 30%, transparent),
+    linear-gradient(#000 calc(50% + 90px), transparent calc(50% + 135px));
+  mask-composite: intersect;
+}
+
+@utility line-bundle-glow {
+  filter: saturate(1.4) drop-shadow(0 0 3px rgb(56 182 255 / 0.45));
+}
+
+@utility line-bundle-stroke {
+  stroke-width: 1.25;
+  opacity: 1;
+
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      stroke-dasharray: 1 1;
+      animation: line-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 45%;
+    }
+  }
+}
+
+@utility line-bundle-glint {
+  stroke-width: 1.5;
+  stroke-dasharray: 0.08 1;
+  stroke-dashoffset: 0.08;
+  opacity: 0;
+
+  .platform-card:hover & {
+    opacity: 1;
+    animation: line-glint 1.8s var(--ease-in-out-sine) infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  .platform-card:hover &:nth-child(odd) {
+    animation-delay: 0.3s;
+  }
+}
+
+@utility crownlink-progress {
+  animation: crownlink-progress 7s linear both paused;
+
+  .crownlink-features[data-running]:not(:has(:focus-visible)) & {
+    animation-play-state: running;
+  }
+
+  @media (hover: hover) {
+    .crownlink-features:hover & {
+      animation-play-state: paused;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes line-glint {
+  from {
+    stroke-dashoffset: 0.08;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+
+@keyframes platform-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes chip-trace-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+@keyframes compositor-layer-drift {
+  to {
+    transform: translate3d(-3px, 2px, 0);
+  }
+}
+
+@keyframes chip-core-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes crownlink-progress {
+  from {
+    scale: 0 1;
+  }
+}
+
+@keyframes compositor-window-fall {
+  0% {
+    translate: 0 var(--plane-rise);
+    scale: 0.2;
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  16% {
+    scale: 1;
+  }
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    translate: 0 0;
+    scale: 1;
+    opacity: 0;
+  }
+}
+
+@keyframes compositor-window-tint {
+  0%,
+  28% {
+    opacity: 0;
+  }
+  42%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes compositor-base-pulse {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0.28;
+  }
+}
+
+@utility agent-stage {
+  container-type: inline-size;
+  --u: calc(100cqw / 520);
+  --spacing: calc(var(--u) * 4);
+  --text-xs: calc(var(--u) * 12);
+  --text-sm: calc(var(--u) * 13);
+  --text-base: calc(var(--u) * 14);
+  --text-lg: calc(var(--u) * 18);
+  --radius-md: calc(var(--u) * 6);
+  --radius-lg: calc(var(--u) * 10);
+  --radius-xl: calc(var(--u) * 12);
+  --radius-2xl: calc(var(--u) * 16);
+  --cu-frame: #0f0f10;
+  --cu-surface: #0f0f10;
+  --cu-raised: #171718;
+  --cu-border: #27272a;
+  --cu-caption: #93939b;
+  --cu-primary: #fafafa;
+  --cu-body: #d4d4d8;
+  --cu-muted: #9f9f9f;
+  --cu-icon: #d4d4d8;
+  --cu-sidebar-text: #a1a1aa;
+  --cu-selected: #232326;
+  --cu-selected-ring: rgb(255 255 255 / 0.11);
+  --cu-track: #3a3a3d;
+  --cu-field: #1c1c1c;
+  --cu-field-ring: #282828;
+  --cu-accent-start: #8f6dfb;
+  --cu-accent-end: #6d48e8;
+  --cu-accent: linear-gradient(
+    180deg,
+    var(--cu-accent-start),
+    var(--cu-accent-end)
+  );
+  --cu-success: #4ade80;
+
+  @variant md {
+    --u: calc(100cqw / 1200);
+  }
+}
+
+@utility crownui-pane {
+  border-radius: var(--radius-2xl);
+  background: var(--cu-surface);
+  box-shadow: inset 0 0 0 1px var(--cu-border);
+}
+
+@utility crownui-card {
+  border-radius: calc(var(--u) * 14);
+  background: var(--cu-raised);
+  box-shadow: inset 0 0 0 1px var(--cu-border);
+}
+
+@utility crownui-field {
+  background: var(--cu-field);
+  box-shadow: inset 0 0 0 1px var(--cu-field-ring);
+}
+
+@utility agent-window-placement {
+  position: absolute;
+  left: calc(var(--u) * var(--mobile-x));
+  top: calc(var(--u) * var(--mobile-y));
+  width: calc(var(--u) * var(--mobile-width));
+  height: calc(var(--u) * var(--mobile-height));
+
+  @variant md {
+    left: calc(var(--u) * var(--desktop-x));
+    top: calc(var(--u) * var(--desktop-y));
+    width: calc(var(--u) * var(--desktop-width));
+    height: calc(var(--u) * var(--desktop-height));
+  }
+}
+
+@utility agent-motion {
+  animation-name: var(--agent-track);
+  animation-duration: 12s;
+  animation-timing-function: var(--ease-in-out-sine);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: paused;
+
+  [data-running] & {
+    animation-play-state: running;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation-name: none;
+  }
+}
+
+@keyframes agent-cursor-you {
+  0% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 170);
+    scale: 1;
+  }
+  8% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 170);
+    scale: 1;
+  }
+  18% {
+    translate: calc(var(--u) * var(--window-scale) * 150)
+      calc(var(--u) * var(--window-scale) * 20);
+    scale: 1;
+  }
+  20% {
+    translate: calc(var(--u) * var(--window-scale) * 150)
+      calc(var(--u) * var(--window-scale) * 20);
+    scale: 0.82;
+  }
+  22% {
+    translate: calc(var(--u) * var(--window-scale) * 150)
+      calc(var(--u) * var(--window-scale) * 20);
+    scale: 1;
+  }
+  42% {
+    translate: calc(var(--u) * var(--window-scale) * 150)
+      calc(var(--u) * var(--window-scale) * 20);
+    scale: 1;
+  }
+  50% {
+    translate: calc(var(--u) * var(--window-scale) * 64)
+      calc(var(--u) * var(--window-scale) * 138);
+    scale: 1;
+  }
+  52% {
+    translate: calc(var(--u) * var(--window-scale) * 64)
+      calc(var(--u) * var(--window-scale) * 138);
+    scale: 0.82;
+  }
+  54% {
+    translate: calc(var(--u) * var(--window-scale) * 64)
+      calc(var(--u) * var(--window-scale) * 138);
+    scale: 1;
+  }
+  58% {
+    translate: calc(var(--u) * var(--window-scale) * 64)
+      calc(var(--u) * var(--window-scale) * 138);
+    scale: 1;
+  }
+  70% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 170);
+    scale: 1;
+  }
+  100% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 170);
+    scale: 1;
+  }
+}
+
+@keyframes agent-browser-placeholder {
+  0%,
+  18% {
+    opacity: 1;
+  }
+  20%,
+  92% {
+    opacity: 0;
+  }
+  98%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes agent-browser-url {
+  0%,
+  23% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 1;
+    animation-timing-function: steps(33, end);
+  }
+  38%,
+  88% {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+  94%,
+  100% {
+    clip-path: inset(0);
+    opacity: 0;
+  }
+}
+
+@keyframes agent-browser-page {
+  0%,
+  39% {
+    opacity: 0;
+  }
+  44%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-browser-toc {
+  0%,
+  52% {
+    opacity: 0;
+  }
+  54%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-browser-scroll {
+  0%,
+  55% {
+    translate: 0 0;
+  }
+  64%,
+  100% {
+    translate: 0 calc(var(--spacing) * -14);
+  }
+}
+
+@keyframes agent-cursor-claude {
+  0% {
+    translate: calc(var(--u) * var(--window-scale) * 320)
+      calc(var(--u) * var(--window-scale) * 160);
+    scale: 1;
+  }
+  4% {
+    translate: calc(var(--u) * var(--window-scale) * 320)
+      calc(var(--u) * var(--window-scale) * 160);
+    scale: 1;
+  }
+  12% {
+    translate: calc(var(--u) * var(--window-scale) * 186)
+      calc(var(--u) * var(--window-scale) * 64);
+    scale: 1;
+  }
+  14% {
+    translate: calc(var(--u) * var(--window-scale) * 186)
+      calc(var(--u) * var(--window-scale) * 64);
+    scale: 0.82;
+  }
+  16% {
+    translate: calc(var(--u) * var(--window-scale) * 186)
+      calc(var(--u) * var(--window-scale) * 64);
+    scale: 1;
+  }
+  32% {
+    translate: calc(var(--u) * var(--window-scale) * 186)
+      calc(var(--u) * var(--window-scale) * 64);
+    scale: 1;
+  }
+  44% {
+    translate: calc(var(--u) * var(--window-scale) * 320)
+      calc(var(--u) * var(--window-scale) * 160);
+    scale: 1;
+  }
+  100% {
+    translate: calc(var(--u) * var(--window-scale) * 320)
+      calc(var(--u) * var(--window-scale) * 160);
+    scale: 1;
+  }
+}
+
+@keyframes agent-terminal-command {
+  0%,
+  16% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 1;
+    animation-timing-function: steps(18, end);
+  }
+  30%,
+  88% {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+  94%,
+  100% {
+    clip-path: inset(0);
+    opacity: 0;
+  }
+}
+
+@keyframes agent-terminal-resolving {
+  0%,
+  33% {
+    opacity: 0;
+  }
+  34%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-terminal-download {
+  0%,
+  36% {
+    opacity: 0;
+  }
+  37%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-terminal-progress {
+  0%,
+  37% {
+    scale: 0 1;
+    animation-timing-function: steps(12, end);
+  }
+  60%,
+  100% {
+    scale: 1 1;
+  }
+}
+
+@keyframes agent-terminal-done {
+  0%,
+  61% {
+    opacity: 0;
+  }
+  62%,
+  88% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-cursor-codex {
+  0% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 290);
+    scale: 1;
+  }
+  14% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 290);
+    scale: 1;
+  }
+  22% {
+    translate: calc(var(--u) * var(--window-scale) * 422)
+      calc(var(--u) * var(--window-scale) * 147);
+    scale: 1;
+  }
+  24% {
+    translate: calc(var(--u) * var(--window-scale) * 422)
+      calc(var(--u) * var(--window-scale) * 147);
+    scale: 0.82;
+  }
+  26% {
+    translate: calc(var(--u) * var(--window-scale) * 422)
+      calc(var(--u) * var(--window-scale) * 147);
+    scale: 1;
+  }
+  34% {
+    translate: calc(var(--u) * var(--window-scale) * 372)
+      calc(var(--u) * var(--window-scale) * 191);
+    scale: 1;
+  }
+  36% {
+    translate: calc(var(--u) * var(--window-scale) * 372)
+      calc(var(--u) * var(--window-scale) * 191);
+    scale: 0.82;
+  }
+  38% {
+    translate: calc(var(--u) * var(--window-scale) * 372)
+      calc(var(--u) * var(--window-scale) * 191);
+    scale: 1;
+  }
+  46% {
+    translate: calc(var(--u) * var(--window-scale) * 384)
+      calc(var(--u) * var(--window-scale) * 236);
+    scale: 1;
+  }
+  48% {
+    translate: calc(var(--u) * var(--window-scale) * 384)
+      calc(var(--u) * var(--window-scale) * 236);
+    scale: 0.82;
+  }
+  60% {
+    translate: calc(var(--u) * var(--window-scale) * 422)
+      calc(var(--u) * var(--window-scale) * 236);
+    scale: 0.82;
+  }
+  63% {
+    translate: calc(var(--u) * var(--window-scale) * 422)
+      calc(var(--u) * var(--window-scale) * 236);
+    scale: 1;
+  }
+  72% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 290);
+    scale: 1;
+  }
+  100% {
+    translate: calc(var(--u) * var(--window-scale) * 300)
+      calc(var(--u) * var(--window-scale) * 290);
+    scale: 1;
+  }
+}
+
+@keyframes agent-settings-toggle-track {
+  0%,
+  24% {
+    opacity: 0;
+  }
+  27%,
+  90% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes agent-settings-toggle-knob {
+  0%,
+  24% {
+    translate: 0 0;
+  }
+  27%,
+  90% {
+    translate: calc(var(--spacing) * 4) 0;
+  }
+  96%,
+  100% {
+    translate: 0 0;
+  }
+}
+
+@keyframes agent-settings-accent {
+  0%,
+  36% {
+    translate: 0 0;
+  }
+  39%,
+  90% {
+    translate: calc(var(--spacing) * 5.5) 0;
+  }
+  96%,
+  100% {
+    translate: 0 0;
+  }
+}
+
+@keyframes agent-settings-slider-fill {
+  0%,
+  48% {
+    scale: 0.35 1;
+  }
+  60%,
+  90% {
+    scale: 0.75 1;
+  }
+  96%,
+  100% {
+    scale: 0.35 1;
+  }
+}
+
+@keyframes agent-settings-slider-thumb {
+  0%,
+  48% {
+    translate: calc(var(--spacing) * 8.4) 0;
+  }
+  60%,
+  90% {
+    translate: calc(var(--spacing) * 18) 0;
+  }
+  96%,
+  100% {
+    translate: calc(var(--spacing) * 8.4) 0;
+  }
+}
+
+@utility app-stage {
+  --u: min(100cqw / 400, 1.1px);
+  --spacing: calc(var(--u) * 4);
+  --radius-sm: calc(var(--u) * 4);
+  --radius-md: calc(var(--u) * 6);
+  --radius-lg: calc(var(--u) * 9);
+  --radius-xl: calc(var(--u) * 12);
+  --radius-2xl: calc(var(--u) * 16);
+}
+
+@utility app-launch-motion {
+  animation: app-window-launch 10s cubic-bezier(0.2, 0.8, 0.2, 1) infinite
+    var(--launch-delay);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility app-dock-bounce-motion {
+  animation: app-dock-bounce 10s var(--ease-in-out-sine) infinite
+    var(--launch-delay);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility app-dock-running-motion {
+  animation: app-dock-running 10s linear infinite var(--launch-delay);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes app-window-launch {
+  0%,
+  7% {
+    opacity: 0;
+    scale: 0.15;
+  }
+  17%,
+  84% {
+    opacity: 1;
+    scale: 1;
+  }
+  93%,
+  100% {
+    opacity: 0;
+    scale: 0.15;
+  }
+}
+
+@keyframes app-dock-bounce {
+  0%,
+  1% {
+    translate: 0 0;
+  }
+  3.5% {
+    translate: 0 -40%;
+  }
+  6% {
+    translate: 0 0;
+  }
+  8% {
+    translate: 0 -16%;
+  }
+  10%,
+  100% {
+    translate: 0 0;
+  }
+}
+
+@keyframes app-dock-running {
+  0%,
+  8% {
+    opacity: 0;
+  }
+  12%,
+  90% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
