@@ -1,0 +1,19 @@
+@layer base {
+  :root:has(.intro) {
+    overflow: hidden;
+  }
+
+  :root:has(.intro) [data-intro-target] {
+    opacity: 0;
+  }
+
+  :root:has(.intro[data-intro="waiting"]) [data-reveal] {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .intro {
+      display: none;
+    }
+  }
+}

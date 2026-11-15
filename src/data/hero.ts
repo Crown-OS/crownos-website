@@ -1,6 +1,4 @@
 import type { HorizonGlowGeometry } from "@/shaders/horizon-glow";
-import type { DeviceStill } from "@/util/device-still";
-import type { FrameSequence } from "@/util/frame-sequence";
 
 export const hero = {
   eyebrow: "Introducing",
@@ -8,60 +6,16 @@ export const hero = {
   slogan: {
     lead: "An",
     emphasis: "agent native",
-    trail: "desktop OS built on Linux kernel",
+    trail: "desktop OS built on the CachyOS kernel",
   },
   laptop: {
-    label: "A CrownOS laptop opening to the desktop",
-    sequence: {
-      path: "/sequences/crownbook/v8",
-      frames: 145,
-      timeline: 240,
-      digits: 4,
-      size: { width: 1240, height: 880 },
-      tiers: [
-        { width: 828, media: "(width <= 480px)" },
-        {
-          width: 1240,
-          media:
-            "(width > 480px) and (resolution <= 1dppx) and (height <= 880px)",
-        },
-        {
-          width: 1860,
-          media:
-            "(width > 480px) and (resolution <= 1dppx) and (height > 880px), (width > 480px) and (1dppx < resolution <= 1.5dppx)",
-        },
-        { width: 2480, media: "(width > 480px) and (resolution > 1.5dppx)" },
-      ],
-      restingTop: 0.602,
-    } satisfies FrameSequence,
-    finalBounds: { top: 0.078, bottom: 0.84 },
-    deskEdge: 0.52,
-    glow: { span: 3, above: 0.8, below: 0.3 } satisfies HorizonGlowGeometry,
+    label: "A CrownOS laptop, open to the desktop, seen from the front",
+    path: "/hero/crownbook-front/v1",
+    widths: [800, 1280, 1850],
+    size: { width: 1850, height: 1266 },
+    viewportShare: 0.8,
+    horizon: 0.3,
+    glowCut: 0.5,
   },
-  ecosystem: {
-    title: "Superpowered together",
-    lead: "Crown Link pairs your phone, tablet and desktop, end-to-end encrypted. Share clipboard, files, notifications, calls and camera without cloud accounts.",
-    devices: {
-      tablet: {
-        label: "A CrownOS tablet beside the laptop",
-        path: "/devices/v2/tablet",
-        widths: [480, 960],
-        size: { width: 447, height: 631 },
-        centerX: 0.943,
-        bottom: 0.607,
-        depth: 0.73,
-        enterFrom: "right",
-      },
-      phone: {
-        label: "A CrownOS phone beside the laptop",
-        path: "/devices/v2/phone",
-        widths: [320, 640],
-        size: { width: 182, height: 370 },
-        centerX: 0.141,
-        bottom: 0.607,
-        depth: 0.73,
-        enterFrom: "left",
-      },
-    } satisfies Record<string, DeviceStill>,
-  },
+  glow: { span: 1.3, above: 0.8, below: 0.3 } satisfies HorizonGlowGeometry,
 } as const;

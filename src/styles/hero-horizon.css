@@ -1,0 +1,14 @@
+@property --glow-rise {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@keyframes glow-rise {
+  from {
+    --glow-rise: 0;
+  }
+  to {
+    --glow-rise: 1;
+  }
+}
