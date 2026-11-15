@@ -39,10 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling
+.claude/settings.local.json
 .playwright-mcp/
-
-# cloudflare
 .wrangler/
-
-# source assets (not deployed)
 /assets-src/

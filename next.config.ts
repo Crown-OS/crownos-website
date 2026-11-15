@@ -5,6 +5,14 @@ import { codeTheme } from "./src/data/code-theme";
 const nextConfig: NextConfig = {
   output: "export",
   reactCompiler: true,
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
 };
 
 const withMDX = createMDX({
@@ -15,6 +23,7 @@ const withMDX = createMDX({
       ["remark-mdx-frontmatter", { name: "frontmatter" }],
     ],
     rehypePlugins: [
+      "rehype-slug",
       [
         "rehype-pretty-code",
         {

@@ -1,52 +1,36 @@
-# CrownOS Website
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-This repository contains the landing page for CrownOS, an open source and AI ready Linux distribution based on Arch Linux. The site also hosts a catalog of plugins and themes.
+## Getting Started
 
-## Requirements
-
-You need [Bun](https://bun.sh) to install dependencies and run the scripts.
-
-## Development
-
-Install the dependencies and start the development server.
+First, run the development server:
 
 ```bash
-bun install
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
 bun dev
 ```
 
-The site will be available at http://localhost:3000.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Building and Deploying
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-The site is built as a static export into the `out` directory and served by Cloudflare Workers.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-```bash
-bun run build
-bun run preview
-bun run deploy
-```
+## Learn More
 
-The `preview` command serves the build locally through Wrangler, and the `deploy` command publishes it.
+To learn more about Next.js, take a look at the following resources:
 
-## Content
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-Plugins and themes are written as MDX files in `src/content/plugins` and `src/content/themes`. Each file becomes its own page in the catalog.
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Assets
+## Deploy on Vercel
 
-The hero frame sequence and device images are encoded from the sources in `assets-src`.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-```bash
-bun run frames
-bun run devices
-```
-
-## Code Quality
-
-The project uses Biome for linting and formatting.
-
-```bash
-bun run lint
-bun run format
-```
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
