@@ -1,7 +1,5 @@
 type FrontmatterRecord = Record<string, unknown>;
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-
 export class FrontmatterError extends Error {
   override name = "FrontmatterError";
 }
@@ -25,22 +23,6 @@ export function readFrontmatter(source: string, value: unknown) {
       : fail(key, "a non-empty string");
   };
 
-  const optionalText = (key: string) =>
-    value[key] === undefined ? undefined : text(key);
-
-  const version = (key: string) => {
-    const field = value[key];
-    return typeof field === "number" ? String(field) : text(key);
-  };
-
-  const list = (key: string) => {
-    const field = value[key] ?? [];
-    return Array.isArray(field) &&
-      field.every((item) => typeof item === "string")
-      ? (field as string[])
-      : fail(key, "a list of strings");
-  };
-
   const oneOf = <Option extends string>(
     key: string,
     options: readonly Option[],
@@ -51,22 +33,5 @@ export function readFrontmatter(source: string, value: unknown) {
       : fail(key, `one of ${options.join(", ")}`);
   };
 
-  const color = (key: string) => {
-    const field = text(key);
-    return HEX_COLOR.test(field) ? field : fail(key, "a #rrggbb colour");
-  };
-
-  const colors = <Count extends number>(key: string, count: Count) => {
-    const field = list(key);
-    return field.length === count && field.every((item) => HEX_COLOR.test(item))
-      ? field
-      : fail(key, `${count} #rrggbb colours`);
-  };
-
-  const group = (key: string) =>
-    readFrontmatter(`${source} → ${key}`, value[key]);
-
-  return { text, optionalText, version, list, oneOf, color, colors, group };
+  return { text, oneOf };
 }
-
-export type FrontmatterReader = ReturnType<typeof readFrontmatter>;

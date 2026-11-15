@@ -1,15 +1,21 @@
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { MDXContent } from "mdx/types";
 import { cache } from "react";
-import { AUTHOR_IDS, type PostMeta } from "@/data/blog";
+import { AUTHOR_IDS, POST_CATEGORY_IDS, type PostMeta } from "@/data/blog";
 import { FrontmatterError, readFrontmatter } from "./frontmatter";
+import { extractPostHeadings, type PostHeading } from "./post-headings";
+import { readingMinutes } from "./reading-time";
 
 const BLOG_ROOT = path.join(process.cwd(), "src", "content", "blog");
 const MDX_EXTENSION = ".mdx";
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export type Post = { meta: PostMeta; Content: MDXContent };
+export type Post = {
+  meta: PostMeta;
+  headings: PostHeading[];
+  Content: MDXContent;
+};
 
 function readDate(source: string, value: string) {
   if (!ISO_DATE.test(value) || Number.isNaN(Date.parse(value))) {
@@ -20,9 +26,10 @@ function readDate(source: string, value: string) {
 
 async function loadPost(slug: string): Promise<Post> {
   const source = `blog/${slug}${MDX_EXTENSION}`;
-  const { default: Content, frontmatter } = await import(
-    `@/content/blog/${slug}.mdx`
-  );
+  const [{ default: Content, frontmatter }, raw] = await Promise.all([
+    import(`@/content/blog/${slug}.mdx`),
+    readFile(path.join(BLOG_ROOT, `${slug}${MDX_EXTENSION}`), "utf8"),
+  ]);
   const reader = readFrontmatter(source, frontmatter);
   return {
     meta: {
@@ -30,9 +37,11 @@ async function loadPost(slug: string): Promise<Post> {
       title: reader.text("title"),
       description: reader.text("description"),
       date: readDate(source, reader.text("date")),
-      tag: reader.text("tag"),
+      category: reader.oneOf("category", POST_CATEGORY_IDS),
       author: reader.oneOf("author", AUTHOR_IDS),
+      readingMinutes: readingMinutes(raw),
     },
+    headings: extractPostHeadings(raw),
     Content,
   };
 }
@@ -48,6 +57,10 @@ export const loadPosts = cache(async () => {
     right.meta.date.localeCompare(left.meta.date),
   );
 });
+
+export const loadPostMetas = cache(async () =>
+  (await loadPosts()).map(({ meta }) => meta),
+);
 
 export const findPost = (posts: Post[], slug: string) =>
   posts.find((post) => post.meta.slug === slug);

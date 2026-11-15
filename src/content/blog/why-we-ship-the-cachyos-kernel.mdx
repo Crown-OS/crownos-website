@@ -1,0 +1,34 @@
+---
+title: "Why CrownOS ships the CachyOS kernel"
+description: The October beta replaced the stock Arch kernel with linux-cachyos. This post explains what the CachyOS kernel changes and why it suits a desktop.
+date: "2026-10-27"
+category: product
+author: rama-krishnan
+---
+
+The October 27 beta of CrownOS replaced the stock Arch kernel with `linux-cachyos`, the CachyOS kernel. This post explains what that kernel changes and why we chose it for the desktop.
+
+## What the CachyOS kernel changes
+
+CachyOS builds the Linux kernel with settings for interactive use. CrownOS ships it with these settings:
+
+- The EEVDF scheduler, tuned so that the task you use gets CPU time first.
+- A 1000 Hz timer tick, so the scheduler makes decisions more often.
+- A build with Clang ThinLTO and AutoFDO profiling, so the hot paths of the kernel run faster.
+
+The result is a desktop that stays responsive under load. When a build or an update runs in the background, the compositor and the apps you use still get the CPU time that they need.
+
+## Why it suits CrownOS
+
+CrownOS is a rolling release on Arch Linux. The CachyOS kernel follows the same release rhythm, so new kernels arrive as soon as they are ready. Your Arch tools work as usual:
+
+```bash
+uname -r
+pacman -Qi linux-cachyos
+```
+
+The kernel is one layer of three. Crownpositor renders with direct scanout, so an idle frame costs almost nothing. CrownUI compiles its shaders ahead of time, so the first animation is as smooth as the next one. The kernel keeps the two of them on time when the system is busy.
+
+## Report a problem
+
+If your hardware has a problem with the new kernel, report it on the [crownos-iso issue tracker](https://github.com/Crown-OS/crownos-iso/issues). Include the output of `uname -r` and your hardware model.

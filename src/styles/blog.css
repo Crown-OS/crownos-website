@@ -1,0 +1,105 @@
+@utility post-cover-art {
+  position: absolute;
+  inset: calc(var(--cover-blur) * -2);
+  display: flex;
+  align-items: flex-end;
+  padding: calc(var(--cover-blur) * 2);
+  filter: blur(var(--cover-blur));
+  background: linear-gradient(
+    to top,
+    var(--color-sweep-orange),
+    var(--color-sweep-red) 14%,
+    var(--color-sweep-pink) 34%,
+    var(--color-sweep-blue) 62%,
+    color-mix(in srgb, var(--color-sweep-sky) 70%, var(--color-ink)) 82%,
+    var(--color-ink)
+  );
+}
+
+@utility highlight-featured {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -1.5rem;
+    z-index: -2;
+    filter: blur(1.5rem);
+    background:
+      radial-gradient(
+        120% 90% at 100% 100%,
+        var(--color-sweep-blue),
+        transparent 70%
+      ),
+      radial-gradient(
+        90% 70% at 0% 0%,
+        color-mix(in srgb, var(--color-sweep-sky) 80%, transparent),
+        transparent 70%
+      ),
+      linear-gradient(
+        150deg,
+        color-mix(in srgb, var(--color-sweep-sky) 70%, var(--color-sweep-blue)),
+        var(--color-sweep-blue)
+      );
+  }
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--grain-tile) 0 0 / 160px;
+    mix-blend-mode: soft-light;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+}
+
+@utility post-header {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2.5rem calc(var(--spacing-gutter) * -1) 0;
+    z-index: -1;
+    background:
+      radial-gradient(
+        50% 60% at 50% 0%,
+        color-mix(in srgb, var(--color-sweep-blue) 22%, transparent),
+        transparent
+      ),
+      radial-gradient(
+        30% 40% at 70% 10%,
+        color-mix(in srgb, var(--color-sweep-pink) 14%, transparent),
+        transparent
+      );
+    mask-image: linear-gradient(to bottom, #000 40%, transparent);
+    pointer-events: none;
+  }
+}
+
+@utility blog-hero-grid {
+  --grid-cell: 4rem;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: -1;
+  width: 100vw;
+  height: 34rem;
+  translate: -50% 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgb(255 255 255 / 0.07) 1px, transparent 1px)
+    center top / var(--grid-cell) var(--grid-cell),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.07) 1px, transparent 1px)
+    center top / var(--grid-cell) var(--grid-cell);
+  mask-image: linear-gradient(
+    to bottom,
+    #000,
+    rgb(0 0 0 / 0.78) 25%,
+    rgb(0 0 0 / 0.42) 50%,
+    rgb(0 0 0 / 0.14) 75%,
+    transparent
+  );
+
+  html:has(&) {
+    overflow-x: clip;
+  }
+}

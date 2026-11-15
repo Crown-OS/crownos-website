@@ -1,0 +1,33 @@
+---
+title: "How we measure idle memory"
+description: CrownOS idles in 1.1 GB after login. This post shows the method behind that number and the results for Fedora, Ubuntu and Windows 11.
+date: "2026-11-06"
+category: engineering
+author: rama-krishnan
+---
+
+The CrownOS website says that CrownOS idles in 1.1 GB of memory. A number like that is only useful when you know how we measured it. This post gives the method, the results and the limits of the test.
+
+## The method
+
+We measure each system in the same way:
+
+1. Install the system fresh on the same laptop, a Lenovo Legion 5 Slim with 16 GB of RAM.
+2. Log in and let the desktop settle.
+3. Record the used memory at idle.
+4. Repeat the test 10 times and use the average.
+
+We do not install extra apps or extensions before the test. Each system runs with its default settings.
+
+## The results
+
+| System | Idle memory | CrownOS uses |
+|---|---|---|
+| CrownOS | 1.1 GB | — |
+| Fedora KDE | 2.1 GB | 48% less |
+| Ubuntu GNOME | 2.4 GB | 54% less |
+| Windows 11 | 3.6 GB | 69% less |
+
+## The limits of the test
+
+These results come from one laptop model. Other hardware can give different numbers, and each new release of each system can change them. We will run the tests again for each CrownOS release and update this post.
