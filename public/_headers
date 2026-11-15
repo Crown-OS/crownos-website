@@ -1,18 +1,18 @@
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
 
-/sequences/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/devices/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/showcase/*
-  Cache-Control: public, max-age=31536000, immutable
-
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
 
 /opengraph-image
+  Content-Type: image/png
+
+/twitter-image
+  Content-Type: image/png
+
+/*/opengraph-image
+  Content-Type: image/png
+
+/*/twitter-image
   Content-Type: image/png

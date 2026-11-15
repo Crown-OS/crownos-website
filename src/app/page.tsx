@@ -1,34 +1,31 @@
-import { IntroLoader } from "@/components/motion";
-import {
-  Beta,
-  Comparison,
-  Foundation,
-  Hero,
-  Personalize,
-  Showcase,
-  Trust,
-} from "@/components/sections";
-import { Footer, Navbar, StructuredData } from "@/components/site";
-import { SeamedSections } from "@/components/ui";
+import type { Metadata } from "next";
+import { IntroLoader } from "@/components/intro/IntroLoader";
+import { Agent } from "@/components/sections/Agent";
+import { Benchmarks } from "@/components/sections/Benchmarks";
+import { BlogHighlights } from "@/components/sections/BlogHighlights";
+import { CrownLink } from "@/components/sections/CrownLink";
+import { Hero } from "@/components/sections/Hero";
+import { Platform } from "@/components/sections/Platform";
+import { Team } from "@/components/sections/Team";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { Footer } from "@/components/site/Footer";
+import { homeStructuredData } from "@/data/structured-data";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default function Home() {
   return (
     <>
-      <IntroLoader />
-      <StructuredData />
-      <Navbar />
+      <JsonLd data={homeStructuredData} />
       <main>
+        <IntroLoader />
         <Hero />
-        <div className="landing-type">
-          <SeamedSections>
-            <Showcase />
-            <Personalize />
-            <Foundation />
-            <Comparison />
-            <Trust />
-            <Beta />
-          </SeamedSections>
-        </div>
+        <Benchmarks />
+        <Agent />
+        <Platform />
+        <CrownLink />
+        <BlogHighlights />
+        <Team />
       </main>
       <Footer />
     </>
