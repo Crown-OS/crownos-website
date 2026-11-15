@@ -1,4 +1,4 @@
-import { type CSSProperties, Fragment, type JSX } from "react";
+import { type CSSProperties, Fragment, type JSX, type ReactNode } from "react";
 
 type SplitLettersProps = {
   lines: readonly string[];
@@ -6,6 +6,7 @@ type SplitLettersProps = {
   id?: string;
   className?: string;
   delay?: number;
+  renderLetter?: (letter: string) => ReactNode;
 };
 
 function splitIntoIndexedLetters(lines: readonly string[]) {
@@ -24,6 +25,7 @@ export function SplitLetters({
   id,
   className,
   delay = 0,
+  renderLetter = (letter) => letter,
 }: SplitLettersProps) {
   return (
     <Tag
@@ -40,11 +42,11 @@ export function SplitLetters({
             // biome-ignore lint/suspicious/noArrayIndexKey: words are static and positional
             <Fragment key={wordIndex}>
               {wordIndex > 0 && " "}
-              <span className="split-letters">
+              <span className="inline-block whitespace-nowrap">
                 {letters.map(({ letter, index }) => (
                   <span key={index} className="split-letter">
                     <span style={{ "--i": index } as CSSProperties}>
-                      {letter}
+                      {renderLetter(letter)}
                     </span>
                   </span>
                 ))}

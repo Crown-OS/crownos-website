@@ -1,0 +1,90 @@
+@layer base {
+  [data-reveal] {
+    --delay: 0ms;
+    animation: reveal-rise 1.2s var(--ease-out-expo) var(--delay) both;
+  }
+
+  [data-reveal="fade"] {
+    animation-name: reveal-fade;
+    animation-duration: 1.6s;
+  }
+
+  [data-reveal="text"] {
+    animation-name: text-stretch;
+    transform-origin: 50% 100%;
+  }
+
+  [data-reveal="letters"] {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      animation: none;
+    }
+  }
+}
+
+@utility split-letter {
+  display: inline-block;
+  clip-path: inset(-10% -10% -20% -10%);
+
+  & > span {
+    display: inline-block;
+    animation: letter-rise 0.85s var(--ease-out-quart)
+      calc(var(--delay) + var(--i, 0) * 28ms) both;
+
+    @variant intro-waiting {
+      animation-play-state: paused;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  & > span:has([data-intro-target]) {
+    animation: none;
+  }
+}
+
+@utility scroll-reveal {
+  @supports (animation-timeline: view()) {
+    animation: reveal-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35vh;
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+}
+
+@keyframes reveal-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 2.5rem, 0) skewY(2.5deg);
+    filter: blur(12px);
+  }
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4rem, 0);
+  }
+}
+
+@keyframes letter-rise {
+  from {
+    transform: translate3d(0, 130%, 0);
+  }
+}
+
+@keyframes text-stretch {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 1.5rem, 0) scaleY(1.9);
+    filter: blur(10px);
+  }
+}

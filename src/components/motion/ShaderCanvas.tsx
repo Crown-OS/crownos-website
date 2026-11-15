@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createEasedPointer } from "@/util/eased-pointer";
-import { runWhileVisible } from "@/util/frame-loop";
 import { createFullscreenProgram } from "@/util/webgl";
 
 const MAX_PIXEL_RATIO = 2;
@@ -10,22 +8,20 @@ const MAX_PIXEL_RATIO = 2;
 type ShaderCanvasProps = {
   fragment: string;
   resolutionScale?: number;
-  animated?: boolean;
-  className?: string;
+  progressProperty?: string;
 };
 
 export function ShaderCanvas({
   fragment,
   resolutionScale = 1,
-  animated = true,
-  className,
+  progressProperty,
 }: ShaderCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const gl = canvas?.getContext("webgl2", {
-      alpha: false,
+      alpha: true,
       antialias: false,
       powerPreference: "low-power",
     });
@@ -34,44 +30,54 @@ export function ShaderCanvas({
     if (!uniform) return;
 
     const resolution = uniform("uResolution");
-    const time = uniform("uTime");
-    const pointerPosition = uniform("uPointer");
-    const pointer = createEasedPointer(() => canvas.getBoundingClientRect());
+    const progress = uniform("uProgress");
     const pixelRatio =
       Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO) * resolutionScale;
 
-    const draw = (now: number) => {
-      const { x, y } = pointer.step();
-      gl.uniform1f(time, now / 1000);
-      gl.uniform2f(pointerPosition, x, y);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-    };
+    let progressValue = 1;
+    let frameRequest = 0;
 
-    const resize = () => {
+    const readProgress = () =>
+      progressProperty
+        ? Number.parseFloat(
+            getComputedStyle(canvas).getPropertyValue(progressProperty),
+          )
+        : 1;
+
+    const drawAtCanvasSize = () => {
       const { width, height } = canvas.getBoundingClientRect();
       canvas.width = Math.round(width * pixelRatio);
       canvas.height = Math.round(height * pixelRatio);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(resolution, canvas.width, canvas.height);
-      draw(animated ? performance.now() : 0);
+      gl.uniform1f(progress, progressValue);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
 
-    const sizeObserver = new ResizeObserver(resize);
+    const sizeObserver = new ResizeObserver(drawAtCanvasSize);
     sizeObserver.observe(canvas);
-    const stop = animated ? runWhileVisible(canvas, draw) : () => {};
+
+    const followProgress = () => {
+      const next = readProgress();
+      if (next !== progressValue) {
+        progressValue = next;
+        drawAtCanvasSize();
+      }
+      if (next < 1) frameRequest = requestAnimationFrame(followProgress);
+    };
+    if (progressProperty) followProgress();
 
     return () => {
-      stop();
+      cancelAnimationFrame(frameRequest);
       sizeObserver.disconnect();
-      pointer.dispose();
     };
-  }, [fragment, resolutionScale, animated]);
+  }, [fragment, resolutionScale, progressProperty]);
 
   return (
     <canvas
       ref={canvasRef}
       aria-hidden
-      className={`absolute inset-0 size-full ${className ?? ""}`}
+      className="absolute inset-0 size-full [image-rendering:pixelated]"
     />
   );
 }

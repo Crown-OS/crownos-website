@@ -18,45 +18,46 @@
   color: transparent;
   text-shadow: none;
   filter: drop-shadow(0 0.06em 0.3em rgb(0 0 0 / 0.1));
-}
-
-.text-sweep::before,
-.text-sweep::after {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  padding: inherit;
-  background-image: linear-gradient(
-    90deg,
-    transparent 33.33%,
-    var(--sweep-band),
-    transparent 66.67%
-  );
-  background-size: inherit;
-  background-position: inherit;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  mix-blend-mode: plus-lighter;
-  pointer-events: none;
-}
-
-.text-sweep::before {
-  filter: blur(0.08em);
-}
-
-.text-sweep::after {
-  filter: blur(0.3em) saturate(1.4);
-  opacity: 0.85;
-}
-
-.js [data-shown] .text-sweep {
   animation: text-sweep var(--sweep-cycle, 6s) linear var(--sweep-at, 0s)
     infinite;
-}
 
-.js [data-faded] .text-sweep {
-  animation-play-state: paused;
+  &::before,
+  &::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    padding: inherit;
+    background-image: linear-gradient(
+      90deg,
+      transparent 33.33%,
+      var(--sweep-band),
+      transparent 66.67%
+    );
+    background-size: inherit;
+    background-position: inherit;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    mix-blend-mode: plus-lighter;
+    pointer-events: none;
+  }
+
+  &::before {
+    filter: blur(0.08em);
+  }
+
+  &::after {
+    filter: blur(0.3em) saturate(1.4);
+    opacity: 0.85;
+  }
+
+  @variant intro-waiting {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 @keyframes text-sweep {
@@ -67,11 +68,5 @@
   65%,
   100% {
     background-position: 0 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .js [data-shown] .text-sweep {
-    animation: none;
   }
 }

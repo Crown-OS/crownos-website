@@ -1,0 +1,2 @@
+@custom-variant intro-waiting (:root:has(.intro[data-intro="waiting"]) &);
+@custom-variant link-engaged (:where(a, button):is(:hover, :focus-visible) &);

@@ -1,0 +1,14 @@
+@utility roll-char {
+  display: inline-block;
+  white-space: pre;
+  text-shadow: 0 1.15em currentColor;
+  transition: transform 0.55s var(--ease-out-expo) calc(var(--i) * 16ms);
+
+  @variant link-engaged {
+    transform: translate3d(0, -1.15em, 0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
