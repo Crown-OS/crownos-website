@@ -16,3 +16,6 @@
 
 /opengraph-image
   Content-Type: image/png
+
+/*
+  X-Robots-Tag: noindex
