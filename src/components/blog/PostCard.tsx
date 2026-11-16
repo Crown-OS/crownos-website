@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPostDate, type PostMeta } from "@/data/blog";
 import { AuthorLine } from "./AuthorLine";
+import { OutwardArrow } from "./OutwardArrow";
 import { PostCover } from "./PostCover";
 import { PostTag } from "./PostTag";
 
@@ -18,6 +19,7 @@ export function PostCard({ post }: { post: PostMeta }) {
         <span className="absolute top-5 left-5">
           <PostTag category={post.category} />
         </span>
+        <OutwardArrow className="absolute top-5 right-5 size-9" />
       </div>
       <span className="pt-2 text-[0.8125rem] text-white/45">
         {formatPostDate(post.date)}

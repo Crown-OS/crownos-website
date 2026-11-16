@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { blogCopy, formatPostDate, type PostMeta } from "@/data/blog";
+import { OutwardArrow } from "./OutwardArrow";
 import { PostCover } from "./PostCover";
 import { PostTag } from "./PostTag";
 
@@ -26,6 +27,7 @@ export function FeaturedPostCard({ post }: { post: PostMeta }) {
           {blogCopy.readMore}
         </span>
       </div>
+      <OutwardArrow className="absolute top-8 right-8 z-2 size-10 md:top-10 md:right-10" />
       <PostCover
         seed={post.slug}
         className="min-h-64 md:mask-[linear-gradient(to_right,transparent,#000_35%)] transition-transform duration-700 ease-(--ease-out-expo) group-hover:scale-[1.02]"

@@ -52,7 +52,7 @@ export function HighlightCarousel({ posts }: { posts: readonly PostMeta[] }) {
     const slide = track?.querySelector("li");
     if (!track || !slide) return;
     track.scrollBy({
-      left: direction * (slide.getBoundingClientRect().width + 8),
+      left: direction * (slide.getBoundingClientRect().width + 16),
       behavior: "smooth",
     });
   };
@@ -86,7 +86,7 @@ export function HighlightCarousel({ posts }: { posts: readonly PostMeta[] }) {
       </div>
       <ul
         ref={trackRef}
-        className="flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-(--spacing-gutter) px-gutter"
+        className="flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-(--spacing-gutter) px-gutter"
       >
         {posts.map((post, index) => (
           <li key={post.slug} className="flex">

@@ -43,7 +43,8 @@ export const blogCopy = {
 } as const;
 
 export const blogHighlightCopy = {
-  headline: "Notes from the people building the OS",
+  headline: "Our Blog",
+  description: "Writings from the people building the Operating System",
   allPosts: "All posts",
   previous: "Previous posts",
   next: "Next posts",

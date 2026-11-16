@@ -1,40 +1,22 @@
 import Link from "next/link";
 import type { PostMeta } from "@/data/blog";
 import { AuthorLine } from "./AuthorLine";
+import { OutwardArrow } from "./OutwardArrow";
 import { PostTag } from "./PostTag";
 
 type HighlightSlideProps = { post: PostMeta; isFeatured: boolean };
 
 const READING_TIME_LABEL = "Reading time";
 
-function OutwardArrow() {
-  return (
-    <span className="grid size-10 place-items-center rounded-full bg-white text-ink transition-transform duration-300 ease-(--ease-out-expo) group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="size-[18px]"
-      >
-        <path d="M7 17 17 7M9 7h8v8" />
-      </svg>
-    </span>
-  );
-}
-
 export function HighlightSlide({ post, isFeatured }: HighlightSlideProps) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className={`group relative isolate flex h-[35.5rem] snap-start flex-col overflow-hidden rounded-xl border p-8 ${isFeatured ? "highlight-featured w-[min(43.5rem,88vw)] border-transparent" : "w-[min(31.75rem,82vw)] border-white/8 bg-surface hover:border-white/20"} shrink-0 transition-colors duration-300`}
+      className={`group relative isolate flex h-[35.5rem] snap-start flex-col overflow-hidden rounded-[2rem] border p-8 ${isFeatured ? "highlight-featured w-[min(43.5rem,88vw)] border-transparent" : "w-[min(31.75rem,82vw)] border-white/8 bg-surface hover:border-white/20"} shrink-0 transition-colors duration-300`}
     >
       <span className="flex items-start justify-between">
-        <PostTag category={post.category} />
-        {isFeatured && <OutwardArrow />}
+        <PostTag category={post.category} tone="solid" />
+        <OutwardArrow tone={isFeatured ? "solid" : "quiet"} />
       </span>
       <h3
         className={`mt-9 tracking-[-0.02em] text-white ${isFeatured ? "max-w-[18em] text-[1.875rem] leading-[1.15] font-medium" : "text-[1.5rem] leading-[1.3]"}`}
