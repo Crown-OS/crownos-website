@@ -56,10 +56,10 @@ export function AskIllustration() {
         <span className="relative z-2 flex min-w-0 grow items-center justify-center gap-3">
           <svg
             aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="size-5 shrink-0 fill-sweep-sky"
+            viewBox="3 1 18 18"
+            className="size-6 shrink-0 fill-sweep-sky"
           >
-            <path d="M12 2c.6 4.6 2.9 7.4 8 8-5.1.6-7.4 3.4-8 8-.6-4.6-2.9-7.4-8-8 5.1-.6 7.4-3.4 8-8Zm7 12c.3 2 1.2 3.2 3 3.5-1.8.3-2.7 1.5-3 3.5-.3-2-1.2-3.2-3-3.5 1.8-.3 2.7-1.5 3-3.5Z" />
+            <path d="M12 2c.6 4.6 2.9 7.4 8 8-5.1.6-7.4 3.4-8 8-.6-4.6-2.9-7.4-8-8 5.1-.6 7.4-3.4 8-8Z" />
           </svg>
           <Typewriter
             phrases={askPrompts}
@@ -72,7 +72,7 @@ export function AskIllustration() {
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth={1.75}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
             className="size-[18px]"

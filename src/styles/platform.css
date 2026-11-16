@@ -6,6 +6,57 @@
   --color-sweep-orange: #ff8a00;
 }
 
+@utility cursor-glow {
+  --glow-x: 50%;
+  --glow-y: 50%;
+  isolation: isolate;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-out-expo);
+  }
+
+  &::after {
+    background: radial-gradient(
+      30rem circle at var(--glow-x) var(--glow-y),
+      rgb(255 255 255 / 0.09),
+      rgb(255 255 255 / 0.05) 40%,
+      rgb(255 255 255 / 0.015) 75%,
+      transparent
+    );
+  }
+
+  &::before {
+    z-index: -1;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+      radial-gradient(
+        26rem circle at var(--glow-x) var(--glow-y),
+        var(--color-sweep-sky),
+        color-mix(in oklab, var(--color-sweep-blue) 70%, transparent) 25%,
+        color-mix(in oklab, var(--color-sweep-pink) 40%, transparent) 50%,
+        color-mix(in oklab, var(--color-sweep-orange) 12%, transparent) 75%,
+        transparent
+      )
+      border-box;
+  }
+
+  @media (hover: hover) {
+    [data-glow-active] > &::before,
+    [data-glow-active] > &::after {
+      opacity: 1;
+    }
+  }
+}
+
 @utility board-trace-mask {
   mask-image:
     radial-gradient(ellipse 420px 290px at 50% 50%, #000 30%, transparent),
@@ -18,7 +69,7 @@
 }
 
 @utility line-bundle-stroke {
-  stroke-width: 1.25;
+  stroke-width: var(--line-bundle-width, 1.25);
   opacity: 1;
 
   @supports (animation-timeline: view()) {
@@ -32,7 +83,7 @@
 }
 
 @utility line-bundle-glint {
-  stroke-width: 1.5;
+  stroke-width: calc(var(--line-bundle-width, 1.25) + 0.25);
   stroke-dasharray: 0.08 1;
   stroke-dashoffset: 0.08;
   opacity: 0;
@@ -680,6 +731,15 @@
   }
 }
 
+@utility app-cursor-motion {
+  animation: app-cursor-path 10s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+  }
+}
+
 @utility app-dock-bounce-motion {
   animation: app-dock-bounce 10s var(--ease-in-out-sine) infinite
     var(--launch-delay);
@@ -712,6 +772,417 @@
   100% {
     opacity: 0;
     scale: 0.15;
+  }
+}
+
+@keyframes app-cursor-path {
+  0% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 0.85;
+  }
+  2.6% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 0.85;
+  }
+  3.4% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  9% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  10.14% {
+    translate: calc(var(--u) * 220.3) calc(var(--u) * 252.3);
+    scale: 1;
+  }
+  11.29% {
+    translate: calc(var(--u) * 208.8) calc(var(--u) * 228);
+    scale: 1;
+  }
+  12.43% {
+    translate: calc(var(--u) * 184.4) calc(var(--u) * 186.2);
+    scale: 1;
+  }
+  13.57% {
+    translate: calc(var(--u) * 146.8) calc(var(--u) * 144.7);
+    scale: 1;
+  }
+  14.71% {
+    translate: calc(var(--u) * 107.5) calc(var(--u) * 116.5);
+    scale: 1;
+  }
+  15.86% {
+    translate: calc(var(--u) * 84.5) calc(var(--u) * 102.6);
+    scale: 1;
+  }
+  17% {
+    translate: calc(var(--u) * 80) calc(var(--u) * 100);
+    scale: 1;
+  }
+  18.57% {
+    translate: calc(var(--u) * 79.3) calc(var(--u) * 100.6);
+    scale: 1;
+  }
+  19.14% {
+    translate: calc(var(--u) * 75.8) calc(var(--u) * 103.8);
+    scale: 1;
+  }
+  19.71% {
+    translate: calc(var(--u) * 69) calc(var(--u) * 109);
+    scale: 1;
+  }
+  20.29% {
+    translate: calc(var(--u) * 60) calc(var(--u) * 113.2);
+    scale: 1;
+  }
+  20.86% {
+    translate: calc(var(--u) * 51.6) calc(var(--u) * 115.2);
+    scale: 1;
+  }
+  21.43% {
+    translate: calc(var(--u) * 46.9) calc(var(--u) * 115.9);
+    scale: 1;
+  }
+  22% {
+    translate: calc(var(--u) * 46) calc(var(--u) * 116);
+    scale: 1;
+  }
+  22.8% {
+    translate: calc(var(--u) * 46) calc(var(--u) * 116);
+    scale: 0.85;
+  }
+  24.6% {
+    translate: calc(var(--u) * 46) calc(var(--u) * 116);
+    scale: 0.85;
+  }
+  25.4% {
+    translate: calc(var(--u) * 46) calc(var(--u) * 116);
+    scale: 1;
+  }
+  26.86% {
+    translate: calc(var(--u) * 53.4) calc(var(--u) * 116.5);
+    scale: 1;
+  }
+  27.71% {
+    translate: calc(var(--u) * 91.8) calc(var(--u) * 118.5);
+    scale: 1;
+  }
+  28.57% {
+    translate: calc(var(--u) * 161.1) calc(var(--u) * 116.5);
+    scale: 1;
+  }
+  29.43% {
+    translate: calc(var(--u) * 239.1) calc(var(--u) * 97.5);
+    scale: 1;
+  }
+  30.29% {
+    translate: calc(var(--u) * 301.5) calc(var(--u) * 67.4);
+    scale: 1;
+  }
+  31.14% {
+    translate: calc(var(--u) * 334.7) calc(var(--u) * 47.8);
+    scale: 1;
+  }
+  32% {
+    translate: calc(var(--u) * 341) calc(var(--u) * 44);
+    scale: 1;
+  }
+  33% {
+    translate: calc(var(--u) * 341) calc(var(--u) * 44);
+    scale: 1;
+  }
+  33.8% {
+    translate: calc(var(--u) * 341) calc(var(--u) * 44);
+    scale: 0.85;
+  }
+  35.6% {
+    translate: calc(var(--u) * 341) calc(var(--u) * 44);
+    scale: 0.85;
+  }
+  36.4% {
+    translate: calc(var(--u) * 341) calc(var(--u) * 44);
+    scale: 1;
+  }
+  37.43% {
+    translate: calc(var(--u) * 336.2) calc(var(--u) * 48.2);
+    scale: 1;
+  }
+  37.86% {
+    translate: calc(var(--u) * 310.8) calc(var(--u) * 69.9);
+    scale: 1;
+  }
+  38.29% {
+    translate: calc(var(--u) * 262) calc(var(--u) * 105);
+    scale: 1;
+  }
+  38.71% {
+    translate: calc(var(--u) * 198.4) calc(var(--u) * 133.1);
+    scale: 1;
+  }
+  39.14% {
+    translate: calc(var(--u) * 139.5) calc(var(--u) * 145.2);
+    scale: 1;
+  }
+  39.57% {
+    translate: calc(var(--u) * 106.4) calc(var(--u) * 149.3);
+    scale: 1;
+  }
+  40% {
+    translate: calc(var(--u) * 100) calc(var(--u) * 150);
+    scale: 1;
+  }
+  40.43% {
+    translate: calc(var(--u) * 101.4) calc(var(--u) * 149.6);
+    scale: 1;
+  }
+  40.86% {
+    translate: calc(var(--u) * 108.6) calc(var(--u) * 147.6);
+    scale: 1;
+  }
+  41.29% {
+    translate: calc(var(--u) * 121.3) calc(var(--u) * 142.8);
+    scale: 1;
+  }
+  41.71% {
+    translate: calc(var(--u) * 134.5) calc(var(--u) * 134.3);
+    scale: 1;
+  }
+  42.14% {
+    translate: calc(var(--u) * 144.2) calc(var(--u) * 124.8);
+    scale: 1;
+  }
+  42.57% {
+    translate: calc(var(--u) * 149.1) calc(var(--u) * 119.1);
+    scale: 1;
+  }
+  43% {
+    translate: calc(var(--u) * 150) calc(var(--u) * 118);
+    scale: 1;
+  }
+  43.43% {
+    translate: calc(var(--u) * 151.5) calc(var(--u) * 118.6);
+    scale: 1;
+  }
+  43.86% {
+    translate: calc(var(--u) * 159.1) calc(var(--u) * 121.9);
+    scale: 1;
+  }
+  44.29% {
+    translate: calc(var(--u) * 172.2) calc(var(--u) * 128.9);
+    scale: 1;
+  }
+  44.71% {
+    translate: calc(var(--u) * 185.4) calc(var(--u) * 140);
+    scale: 1;
+  }
+  45.14% {
+    translate: calc(var(--u) * 194.6) calc(var(--u) * 151.7);
+    scale: 1;
+  }
+  45.57% {
+    translate: calc(var(--u) * 199.1) calc(var(--u) * 158.7);
+    scale: 1;
+  }
+  46% {
+    translate: calc(var(--u) * 200) calc(var(--u) * 160);
+    scale: 1;
+  }
+  46.57% {
+    translate: calc(var(--u) * 200.9) calc(var(--u) * 162.7);
+    scale: 1;
+  }
+  47.14% {
+    translate: calc(var(--u) * 205.5) calc(var(--u) * 177);
+    scale: 1;
+  }
+  47.71% {
+    translate: calc(var(--u) * 216) calc(var(--u) * 201.9);
+    scale: 1;
+  }
+  48.29% {
+    translate: calc(var(--u) * 233.8) calc(var(--u) * 227.5);
+    scale: 1;
+  }
+  48.86% {
+    translate: calc(var(--u) * 253.5) calc(var(--u) * 245.9);
+    scale: 1;
+  }
+  49.43% {
+    translate: calc(var(--u) * 265.2) calc(var(--u) * 255.2);
+    scale: 1;
+  }
+  50% {
+    translate: calc(var(--u) * 267.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  51% {
+    translate: calc(var(--u) * 267.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  51.8% {
+    translate: calc(var(--u) * 267.5) calc(var(--u) * 257);
+    scale: 0.85;
+  }
+  53.6% {
+    translate: calc(var(--u) * 267.5) calc(var(--u) * 257);
+    scale: 0.85;
+  }
+  54.4% {
+    translate: calc(var(--u) * 267.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  56.29% {
+    translate: calc(var(--u) * 267.1) calc(var(--u) * 253);
+    scale: 1;
+  }
+  57.57% {
+    translate: calc(var(--u) * 265.1) calc(var(--u) * 232.3);
+    scale: 1;
+  }
+  58.86% {
+    translate: calc(var(--u) * 264.7) calc(var(--u) * 194.8);
+    scale: 1;
+  }
+  60.14% {
+    translate: calc(var(--u) * 273.3) calc(var(--u) * 152.3);
+    scale: 1;
+  }
+  61.43% {
+    translate: calc(var(--u) * 288.2) calc(var(--u) * 117.9);
+    scale: 1;
+  }
+  62.71% {
+    translate: calc(var(--u) * 298.1) calc(var(--u) * 99.5);
+    scale: 1;
+  }
+  64% {
+    translate: calc(var(--u) * 300) calc(var(--u) * 96);
+    scale: 1;
+  }
+  64.71% {
+    translate: calc(var(--u) * 299.1) calc(var(--u) * 98.2);
+    scale: 1;
+  }
+  65.43% {
+    translate: calc(var(--u) * 294.5) calc(var(--u) * 109.8);
+    scale: 1;
+  }
+  66.14% {
+    translate: calc(var(--u) * 288.1) calc(var(--u) * 131.3);
+    scale: 1;
+  }
+  66.86% {
+    translate: calc(var(--u) * 286) calc(var(--u) * 157.2);
+    scale: 1;
+  }
+  67.57% {
+    translate: calc(var(--u) * 288.9) calc(var(--u) * 179.5);
+    scale: 1;
+  }
+  68.29% {
+    translate: calc(var(--u) * 291.5) calc(var(--u) * 191.7);
+    scale: 1;
+  }
+  69% {
+    translate: calc(var(--u) * 292) calc(var(--u) * 194);
+    scale: 1;
+  }
+  70% {
+    translate: calc(var(--u) * 292) calc(var(--u) * 194);
+    scale: 1;
+  }
+  70.8% {
+    translate: calc(var(--u) * 292) calc(var(--u) * 194);
+    scale: 0.85;
+  }
+  72.6% {
+    translate: calc(var(--u) * 292) calc(var(--u) * 194);
+    scale: 0.85;
+  }
+  73.4% {
+    translate: calc(var(--u) * 292) calc(var(--u) * 194);
+    scale: 1;
+  }
+  74.86% {
+    translate: calc(var(--u) * 289) calc(var(--u) * 191.8);
+    scale: 1;
+  }
+  75.71% {
+    translate: calc(var(--u) * 273.7) calc(var(--u) * 180);
+    scale: 1;
+  }
+  76.57% {
+    translate: calc(var(--u) * 247.9) calc(var(--u) * 156.5);
+    scale: 1;
+  }
+  77.43% {
+    translate: calc(var(--u) * 224.4) calc(var(--u) * 123.8);
+    scale: 1;
+  }
+  78.29% {
+    translate: calc(var(--u) * 210.4) calc(var(--u) * 91.9);
+    scale: 1;
+  }
+  79.14% {
+    translate: calc(var(--u) * 204.2) calc(var(--u) * 73.5);
+    scale: 1;
+  }
+  80% {
+    translate: calc(var(--u) * 203) calc(var(--u) * 70);
+    scale: 1;
+  }
+  83% {
+    translate: calc(var(--u) * 203) calc(var(--u) * 70);
+    scale: 1;
+  }
+  83.8% {
+    translate: calc(var(--u) * 203) calc(var(--u) * 70);
+    scale: 0.85;
+  }
+  85.6% {
+    translate: calc(var(--u) * 203) calc(var(--u) * 70);
+    scale: 0.85;
+  }
+  86.4% {
+    translate: calc(var(--u) * 203) calc(var(--u) * 70);
+    scale: 1;
+  }
+  88.57% {
+    translate: calc(var(--u) * 202.1) calc(var(--u) * 74.5);
+    scale: 1;
+  }
+  90.14% {
+    translate: calc(var(--u) * 197.6) calc(var(--u) * 97.9);
+    scale: 1;
+  }
+  91.71% {
+    translate: calc(var(--u) * 193.1) calc(var(--u) * 140.6);
+    scale: 1;
+  }
+  93.29% {
+    translate: calc(var(--u) * 198.2) calc(var(--u) * 190);
+    scale: 1;
+  }
+  94.86% {
+    translate: calc(var(--u) * 211.5) calc(var(--u) * 230.8);
+    scale: 1;
+  }
+  96.43% {
+    translate: calc(var(--u) * 220.7) calc(var(--u) * 252.8);
+    scale: 1;
+  }
+  98% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  98.6% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 1;
+  }
+  100% {
+    translate: calc(var(--u) * 222.5) calc(var(--u) * 257);
+    scale: 0.85;
   }
 }
 

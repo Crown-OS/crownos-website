@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Fragment_Mono, Instrument_Serif, Inter } from "next/font/google";
+import {
+  Fira_Code,
+  Fragment_Mono,
+  Instrument_Serif,
+  Inter,
+} from "next/font/google";
 import localFont from "next/font/local";
 import { site } from "@/data/site";
 import "./globals.css";
@@ -28,6 +33,12 @@ const instrumentSerif = Instrument_Serif({
 const fragmentMono = Fragment_Mono({
   variable: "--font-fragment-mono",
   weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const firaCode = Fira_Code({
+  variable: "--font-fira-code",
   subsets: ["latin"],
   display: "swap",
 });
@@ -81,7 +92,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${clashDisplay.variable} ${inter.variable} ${instrumentSerif.variable} ${fragmentMono.variable}`}
+      className={`${clashDisplay.variable} ${inter.variable} ${instrumentSerif.variable} ${fragmentMono.variable} ${firaCode.variable}`}
     >
       <head>
         <noscript>

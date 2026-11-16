@@ -6,7 +6,7 @@ import { WindowStack } from "./WindowStack";
 export function AgentWindow() {
   return (
     <WindowStack>
-      <figure className="relative flex h-[40rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] shadow-[0_40px_80px_rgb(0_0_0/0.55)]">
+      <figure className="relative flex h-[40rem] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0e0e10] shadow-[0_0_80px_rgb(255_255_255/0.1),0_40px_80px_rgb(0_0_0/0.55)]">
         <div className="flex min-h-0 grow">
           <AgentSidebar />
           <AgentConversation />

@@ -51,6 +51,7 @@ export function UpdatesIllustration() {
   return (
     <>
       <LineBundle
+        className="[--line-bundle-width:3]"
         lineCount={1}
         curves={[
           {

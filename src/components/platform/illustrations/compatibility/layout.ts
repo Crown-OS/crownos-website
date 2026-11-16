@@ -13,18 +13,30 @@ export type AppWindowSpec = {
 
 export type IconArtwork = "disc" | "tile";
 
-export type DockApp = { id: string; name: string; artwork: IconArtwork };
+export type DockApp = {
+  id: string;
+  name: string;
+  artwork: IconArtwork;
+  backing?: string;
+  artworkScale?: number;
+};
 
-const APP_ICON_PATH = "/platform/app-icons/v3";
+const APP_ICON_PATH = "/platform/app-icons/v4";
 
 export const appIconSource = ({ id }: DockApp) => `${APP_ICON_PATH}/${id}.avif`;
 
 export const DOCK_APPS: readonly DockApp[] = [
   { id: "files", name: "Files", artwork: "disc" },
-  { id: "chrome", name: "Google Chrome", artwork: "tile" },
+  { id: "chrome", name: "Google Chrome", artwork: "disc" },
   { id: "kitty", name: "Kitty", artwork: "disc" },
-  { id: "affinity", name: "Affinity", artwork: "tile" },
-  { id: "whatsapp", name: "WhatsApp", artwork: "tile" },
+  {
+    id: "affinity",
+    name: "Affinity",
+    artwork: "tile",
+    backing: "#8ff261",
+    artworkScale: 0.78,
+  },
+  { id: "whatsapp", name: "WhatsApp", artwork: "disc" },
   { id: "settings", name: "Settings", artwork: "disc" },
 ];
 

@@ -7,14 +7,19 @@ import {
 
 type StackSide = "left" | "right";
 
-const SIDE_CLASSES: Record<StackSide, { layer: string; image: string }> = {
+const SIDE_CLASSES: Record<
+  StackSide,
+  { layer: string; image: string; inwardSign: number }
+> = {
   left: {
     layer: "left-[calc(var(--layer-depth)*var(--stack-peek)*-1)]",
     image: "object-left-top",
+    inwardSign: 1,
   },
   right: {
     layer: "right-[calc(var(--layer-depth)*var(--stack-peek)*-1)]",
     image: "object-right-top",
+    inwardSign: -1,
   },
 };
 
@@ -31,8 +36,14 @@ function StackLayer({
   const sideClasses = SIDE_CLASSES[side];
   return (
     <span
-      className={`absolute inset-y-[calc(var(--layer-depth)*var(--stack-shrink))] w-[60%] overflow-hidden rounded-2xl border border-[rgb(255_255_255/0.1)] bg-[#0f0f10] [box-shadow:0_20px_50px_rgb(0_0_0/0.45)] after:absolute after:inset-0 after:bg-[rgb(0_0_0/calc(var(--layer-depth)*0.18))] after:content-[''] ${sideClasses.layer}`}
-      style={{ "--layer-depth": depth, zIndex: -depth } as CSSProperties}
+      className={`stack-layer-reveal absolute inset-y-[calc(var(--layer-depth)*var(--stack-shrink))] w-[60%] overflow-hidden rounded-2xl border border-[rgb(255_255_255/0.1)] bg-[#0f0f10] [box-shadow:0_0_60px_rgb(255_255_255/0.1),0_20px_50px_rgb(0_0_0/0.45)] after:absolute after:inset-0 after:bg-[rgb(0_0_0/calc(var(--layer-depth)*0.18))] after:content-[''] ${sideClasses.layer}`}
+      style={
+        {
+          "--layer-depth": depth,
+          "--inward-sign": sideClasses.inwardSign,
+          zIndex: -depth,
+        } as CSSProperties
+      }
     >
       {/* biome-ignore lint/performance/noImgElement: static export serves the captured PNG as is */}
       <img

@@ -17,7 +17,7 @@ export function TerminalWindow() {
       }
       cursor={<AgentCursor identity={CURSORS.claude} rest={[320, 160]} />}
     >
-      <div className="grid content-start gap-2 p-4 font-mono text-xs text-(--cu-muted)">
+      <div className="grid content-start gap-2 p-4 font-fira-code text-xs text-(--cu-muted)">
         <span>
           <span className="text-(--cu-accent-start)">{prompt}</span>{" "}
           <span

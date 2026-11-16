@@ -1,12 +1,10 @@
-import { DiscIcon } from "@/components/icons/DiscIcon";
 import { AgentCursorsCard } from "@/components/platform/agent-cursors/AgentCursorsCard";
 import { PlatformCard } from "@/components/platform/PlatformCard";
-import { ArrowButton } from "@/components/ui/ArrowButton";
-import { latestIsoUrl } from "@/data/download";
+import { PlatformGrid } from "@/components/platform/PlatformGrid";
 import { platformCopy, platformFeatures } from "@/data/platform";
 
 export function Platform() {
-  const { headline, subline, action } = platformCopy;
+  const { headline, subline } = platformCopy;
   return (
     <section
       id="platform"
@@ -21,16 +19,13 @@ export function Platform() {
           {headline}
           <span className="block text-muted">{subline}</span>
         </h2>
-        <ArrowButton href={latestIsoUrl} icon={<DiscIcon className="size-5" />}>
-          {action}
-        </ArrowButton>
       </header>
-      <ul className="scroll-reveal mt-14 grid gap-4 md:grid-cols-3">
+      <PlatformGrid className="scroll-reveal mt-14 grid gap-4 md:grid-cols-3">
         {platformFeatures.map((feature) => (
           <PlatformCard key={feature.title} feature={feature} />
         ))}
         <AgentCursorsCard />
-      </ul>
+      </PlatformGrid>
     </section>
   );
 }

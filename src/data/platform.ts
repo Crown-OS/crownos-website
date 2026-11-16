@@ -16,7 +16,6 @@ export type PlatformFeature = {
 export const platformCopy = {
   headline: "One OS for your entire workflow.",
   subline: "Agents that keep your desktop moving.",
-  action: "Download ISO",
 } as const;
 
 export const platformFeatures: readonly PlatformFeature[] = [
@@ -26,6 +25,14 @@ export const platformFeatures: readonly PlatformFeature[] = [
       "Customize everything on your system with your favorite coding agents.",
     illustration: "ask",
     span: "wide",
+  },
+  {
+    title: "CachyOS kernel",
+    description:
+      "linux-cachyos with a tuned EEVDF scheduler and ThinLTO builds keeps the desktop responsive under load.",
+    illustration: "kernel",
+    span: "narrow",
+    textAlign: "center",
   },
   {
     title: "Always up to date",
@@ -47,14 +54,6 @@ export const platformFeatures: readonly PlatformFeature[] = [
       "Install .exe and .apk files out of the box. They open in their own windows and sit in your dock like any other app.",
     illustration: "compatibility",
     span: "narrow",
-  },
-  {
-    title: "CachyOS kernel",
-    description:
-      "linux-cachyos with a tuned EEVDF scheduler and ThinLTO builds keeps the desktop responsive under load.",
-    illustration: "kernel",
-    span: "narrow",
-    textAlign: "center",
   },
 ];
 

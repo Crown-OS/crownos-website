@@ -37,7 +37,7 @@ export function CrownLinkVideo({
   }, [activeIndex, isOnScreen]);
 
   return (
-    <div className="relative aspect-square overflow-hidden rounded-xl border border-white/8 bg-surface lg:aspect-auto lg:self-stretch">
+    <div className="relative aspect-square overflow-hidden rounded-[2rem] border border-white/8 bg-surface lg:aspect-auto lg:self-stretch">
       {crownLinkFeatures.map((feature, index) => {
         const sources = crownLinkReelSources(feature.id);
         const isActive = index === activeIndex;

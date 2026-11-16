@@ -4,7 +4,10 @@ import { type ComponentProps, useEffect, useRef, useState } from "react";
 
 const RESUME_MARGIN = "200px 0px";
 
-export function PlatformCardShell(props: ComponentProps<"li">) {
+export function PlatformCardShell({
+  className = "",
+  ...props
+}: ComponentProps<"li">) {
   const cardRef = useRef<HTMLLIElement>(null);
   const [isOffscreen, setIsOffscreen] = useState(false);
 
@@ -23,6 +26,7 @@ export function PlatformCardShell(props: ComponentProps<"li">) {
     <li
       ref={cardRef}
       data-offscreen={isOffscreen ? "" : undefined}
+      className={`cursor-glow ${className}`}
       {...props}
     />
   );

@@ -4,6 +4,8 @@
     var(--font-inter-variable), ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     var(--font-fragment-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-fira-code:
+    var(--font-fira-code), ui-monospace, SFMono-Regular, monospace;
   --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
 
   --color-ink: #040404;

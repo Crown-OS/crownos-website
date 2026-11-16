@@ -1,3 +1,4 @@
+import { AppCursor } from "./compatibility/AppCursor";
 import { AppDock } from "./compatibility/AppDock";
 import { AppWindow } from "./compatibility/AppWindow";
 import { ChatAppContent } from "./compatibility/ChatAppContent";
@@ -31,6 +32,7 @@ export function CompatibilityIllustration() {
             );
           })}
           <AppDock />
+          <AppCursor />
         </div>
       </div>
     </>
