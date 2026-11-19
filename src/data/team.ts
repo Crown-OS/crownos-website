@@ -45,7 +45,18 @@ export const teamMembers: readonly TeamMember[] = [
       x: "https://x.com/marvelxcodes",
     },
   },
-  { id: "member-02", ...PLACEHOLDER_MEMBER },
+  {
+    id: "pushkar-desai",
+    name: "Pushkar Desai",
+    role: "Core Contributor",
+    bio: "Explores how things work under the hood and builds the CrownUI app framework for Wayland.",
+    portrait: "/team/pushkar-desai",
+    focus: ["Toolkit / CrownUI", "Web / Website"],
+    links: {
+      github: "https://github.com/PushkarDesai-06",
+      x: "https://x.com/trulypushkar",
+    },
+  },
   { id: "member-03", ...PLACEHOLDER_MEMBER },
   {
     id: "open-position",
